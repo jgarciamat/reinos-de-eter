@@ -293,7 +293,9 @@ function visit(h,o,cb){
     case'gate':case'mono':{if(o.dir==='out'){notify('Esta salida es solo de salida','bad');done();break}const dest=o.pair!=null?G.map.objs[o.pair]:null;
       if(!dest||dest.dead||!teleportHero(h,dest)){notify('El portal está bloqueado','bad');done();break}notify(o.t==='gate'?'Cruzas la puerta entre mundos':'El monolito te transporta','good');done();break}
     case'mine':{if(o.owner!==h.pid){o.owner=h.pid;const rate=o.res==='gold'?1000:(o.res==='wood'||o.res==='ore')?2:1,rn=RESN[o.res].toLowerCase();notify(h.pid===0?`Conquistada mina de ${rn}: +${rate} de ${rn} al día`:`${p.name} captura una mina de ${rn}`,'good')}done();break}
-    case'dwell':{if(human)G.hooks.dwell(o,h,done);else{aiBuyDwell(p,h,o);done()}break}
+    case'dwell':{if(o.owner!==h.pid){o.owner=h.pid;const bn=dwellBonusInfo(o);
+        notify(human?`Conquistada morada de ${CR[o.cr].name}: +${CR[o.cr].grow} por semana`+(bn?` · suma +${CR[o.cr].grow} semanales en ${bn} castillo${bn>1?'s':''} con ese edificio`:''):`${p.name} conquista una morada de ${CR[o.cr].name}`,'good')}
+      if(human)G.hooks.dwell(o,h,done);else{aiBuyDwell(p,h,o);done()}break}
     case'town':{
       if(o.owner===h.pid){learnTownSpells(o,h);const mg=o.b.mage1;if(mg)h.mana=Math.max(h.mana,maxMana(h));
         if(human)G.hooks.town(o,h,done);else done()}
@@ -393,6 +395,12 @@ function rollWeek(week){
   return{t:'normal',week};
 }
 function weekLabel(w){return w.t==='creature'?`Semana de ${CR[w.cr].name}`:w.t==='plague'?'Semana de la Plaga':`Semana ${w.week}`}
+// castillos del dueño de la morada que crían la misma criatura (o su mejora) con el edificio construido
+function dwellTiers(t,cr){const u=FDEF[t.fi].units,out=[];for(let k=1;k<=7;k++)if((u[k-1]===cr||u[k-1+7]===cr)&&t.b['dw'+k])out.push(k);return out}
+function dwellBonusInfo(o){let n=0;for(const t of ownedTowns(o.owner))if(dwellTiers(t,o.cr).length)n++;return n}
+// crecimiento semanal extra de un castillo por las moradas externas conquistadas de esa criatura
+function dwellExtra(t,tier){if(t.owner<0)return 0;const u=FDEF[t.fi].units;let sum=0;
+  for(const o of objsOfType('dwell')){if(o.dead||o.owner!==t.owner)continue;if(o.cr===u[tier-1]||o.cr===u[tier-1+7])sum+=CR[o.cr].grow}return sum}
 function newWeek(){
   const week=Math.floor((G.day-1)/7)+1;const ev=G.week=rollWeek(week);const m=G.map;let spawned=0,boosted=0;
   const cid=ev.t==='creature'?ev.cr:null;
@@ -400,6 +408,7 @@ function newWeek(){
     if(o.t==='town'){const mul=1+(o.b.fort2?.5:0)+(o.b.fort3?.5:0);
       for(let t=1;t<=7;t++)if(o.b['dw'+t]){const id=FDEF[o.fi].units[t-1];let add=Math.round(CR[id].grow*mul);
         if(cid&&(id===cid||FDEF[o.fi].units[t-1+7]===cid)){add=add*2+5;boosted++}
+        const ex=o.owner>=0?dwellExtra(o,t):0;if(ex){add+=(cid&&(FDEF[o.fi].units[t-1]===cid||FDEF[o.fi].units[t-1+7]===cid))?ex*2:ex}
         o.avail[t-1]+=add;if(ev.t==='plague')o.avail[t-1]=Math.floor(o.avail[t-1]/2)}}
     else if(o.t==='dwell'){let add=CR[o.cr].grow;if(cid&&o.cr===cid){add=add*2+5;boosted++}o.n+=add;if(ev.t==='plague')o.n=Math.floor(o.n/2)}
     else if(o.t==='mon'){ // las manadas crecen cada semana; las de la criatura de la semana se duplican
