@@ -24,7 +24,7 @@ function previewOf(m){
 }
 function drawMenu(dt){
   const c=ctx,t=S.clock;S.clock+=dt;
-  const f=Math.floor(t/9)%8,f2=(f+1)%8,k=(t%9)/9;
+  const f=((Math.floor(t/9)%8)+8)%8,f2=(f+1)%8,k=(t%9)/9;
   const pan=townPanorama(f),pan2=townPanorama(f2);
   c.fillStyle='#000';c.fillRect(0,0,VW,VH);
   const draw=(img,a)=>{c.globalAlpha=a;const h=VH*1.12,w=h*960/430;const ox=-(w-VW)*(.5+.5*Math.sin(t*.07));c.drawImage(img,0,0,960,430,ox,-30,w,h)};
