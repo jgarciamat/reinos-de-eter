@@ -25,10 +25,7 @@ function sfx(n){
     case'lose':[392,330,262,196].forEach((f,i)=>tone(f,.4,'sawtooth',.05,0,i*.18));break;
   }
 }
-// música generativa suave
-const SCALES={adv:[0,2,4,7,9,12,14,16],battle:[0,3,5,7,10,12,15,17],town:[0,2,4,7,9,11,12,14]};let mus=0;
-setInterval(()=>{if(!AC||S.sound===false||AC.state!=='running')return;const sc=SCALES[S.scr==='battle'?'battle':S.scr==='town'?'town':'adv'];mus++;const root=S.scr==='battle'?110:S.scr==='town'?174:146;
-  if(S.scr==='battle'||mus%2===0)tone(root*Math.pow(2,sc[Math.floor(Math.random()*sc.length)]/12),1.2,'triangle',S.scr==='battle'?.02:.014);if(mus%8===0)tone(root/2,2.4,'sine',.02)},S.scr==='battle'?300:520);
+// (sin música de fondo: solo efectos de sonido)
 // ---------- ganchos ----------
 G.hooks.visibleTo=(x,y)=>!!S.ai&&isVis(x,y);
 G.hooks.notify=(m,k,l)=>{if(S.ai&&!(l&&isVis(l.x,l.y))&&!/Pierdes|Tu |tu |tus /.test(m))return;toast(m,k)};
