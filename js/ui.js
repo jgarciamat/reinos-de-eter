@@ -2,22 +2,31 @@
 // =====================================================================
 //  Marco de interfaz (modo inmediato sobre canvas), diálogos y efectos
 // =====================================================================
-const VW=1280,VH=720;
+let VW=1280,VH=720; // en modo móvil cambian según el modo de dibujo (ver UI.mode)
 const UI={hits:[],mx:-1,my:-1,down:false,clicks:[],rclicks:[],wheel:0,nohit:false,tt:null,toasts:[],modals:[],t:0,q:1,avg:16,nAd:0,lastAd:-9,keys:{},cursor:'default',shake:0,fade:{a:0,to:0,col:'#000',cb:null,spd:2}};
 let cv,ctx;
 function setupCanvas(){
   cv=document.getElementById('c');ctx=cv.getContext('2d');
-  const fit=()=>{const dpr=Math.min(IS_TOUCH?1.25:1.5,window.devicePixelRatio||1)*UI.q;const s=Math.min(innerWidth/VW,innerHeight/VH);cv.style.width=VW*s+'px';cv.style.height=VH*s+'px';cv.width=Math.round(VW*s*dpr);cv.height=Math.round(VH*s*dpr);UI.scale=s*dpr};
+  // móvil horizontal: lienzo lógico de 520 de alto y ancho según la pantalla; la aventura usa todo el lienzo y el resto de pantallas (diseñadas a 1280×720) se dibujan escaladas y centradas
+  const fit=()=>{const ph=(IS_TOUCH||/[?&]phone/.test(location.search))&&innerWidth>innerHeight&&innerHeight<=520;UI.ph=ph;
+    let cw=1280,ch=720;if(ph){ch=520;cw=Math.max(960,Math.min(1400,Math.round(520*innerWidth/innerHeight)))}
+    UI.cw=cw;UI.ch=ch;UI.ke=Math.min(cw/1280,ch/720);UI.oxe=(cw-1280*UI.ke)/2;UI.oye=(ch-720*UI.ke)/2;UI.k=Math.min(cw/1280,ch/720);UI.ox=(cw-1280*UI.k)/2;UI.oy=(ch-720*UI.k)/2;
+    const dpr=Math.min(IS_TOUCH?1.25:1.5,window.devicePixelRatio||1)*UI.q;const s=Math.min(innerWidth/cw,innerHeight/ch);cv.style.width=cw*s+'px';cv.style.height=ch*s+'px';cv.width=Math.round(cw*s*dpr);cv.height=Math.round(ch*s*dpr);UI.scale=s*dpr;
+    if(typeof setAdvSize==='function')setAdvSize()};
+  // d=true: pantallas de 1280×720 escaladas y centradas; false: lienzo completo
+  UI.mode=(d,z=1)=>{if(UI._sv){ctx.restore();UI._sv=false}UI.des=!!(UI.ph&&d);if(!UI.ph){VW=1280;VH=720;ctx.setTransform(UI.scale,0,0,UI.scale,0,0);return}
+    if(UI.des){VW=1280;VH=720;const ke=UI.k*z;UI.ke=ke;UI.oxe=UI.cw/2-640*ke;UI.oye=UI.ch/2-360*ke;ctx.save();UI._sv=true;const a=UI.scale*ke;ctx.setTransform(a,0,0,a,UI.scale*UI.oxe,UI.scale*UI.oye);ctx.beginPath();ctx.rect(0,0,1280,720);ctx.clip()}else{VW=UI.cw;VH=UI.ch;ctx.setTransform(UI.scale,0,0,UI.scale,0,0)}};
   UI.fit=fit;addEventListener('resize',fit);fit();
   // resolución dinámica: si los fotogramas tardan, baja la resolución interna del lienzo (nunca la vuelve a subir)
   UI.adapt=ms=>{if(document.hidden||S.loading)return;UI.avg=UI.avg*.93+Math.min(ms,100)*.07;UI.nAd++;
     if(UI.nAd>90&&UI.avg>26&&UI.q>.6&&UI.t-UI.lastAd>2){UI.q=Math.max(.6,UI.q*.82);UI.lastAd=UI.t;UI.avg=16;fit()}};
-  const pos=e=>{const r=cv.getBoundingClientRect();UI.mx=(e.clientX-r.left)/r.width*VW;UI.my=(e.clientY-r.top)/r.height*VH};
+  const lpos=(cx,cy)=>{const r=cv.getBoundingClientRect();let x=(cx-r.left)/r.width*UI.cw,y=(cy-r.top)/r.height*UI.ch;if(UI.des){x=(x-UI.oxe)/UI.ke;y=(y-UI.oye)/UI.ke}UI.mx=x;UI.my=y};
+  const pos=e=>lpos(e.clientX,e.clientY);
   cv.addEventListener('mousemove',e=>{pos(e);if(UI.onDrag)UI.onDrag(e)});
   cv.addEventListener('mousedown',e=>{pos(e);if(e.button===0){UI.down=true;UI.clicks.push({x:UI.mx,y:UI.my,type:'down'})}else if(e.button===2){UI.rclicks.push({x:UI.mx,y:UI.my})}else if(e.button===1){UI.mid=true}});
   addEventListener('mouseup',e=>{if(e.button===0){UI.down=false;UI.clicks.push({x:UI.mx,y:UI.my,type:'up'})}if(e.button===1)UI.mid=false});
   // ---- táctil: toque = clic, pulsación larga = clic derecho, arrastre = mover el mapa ----
-  let T=null;const tpos=t=>{const r=cv.getBoundingClientRect();UI.mx=(t.clientX-r.left)/r.width*VW;UI.my=(t.clientY-r.top)/r.height*VH};
+  let T=null;const tpos=t=>lpos(t.clientX,t.clientY);
   const onMap=()=>typeof S!=='undefined'&&S.scr==='adv'&&!UI.modals.length&&UI.mx<VPW&&UI.my<VPH&&UI.my>40;
   cv.addEventListener('touchstart',e=>{e.preventDefault();UI.touch=true;if(e.touches.length>1){if(T)clearTimeout(T.lp);T=null;return}
     const t=e.touches[0];tpos(t);T={x:UI.mx,y:UI.my,lx:UI.mx,ly:UI.my,moved:false,long:false,map:onMap()};UI.down=true;UI.clicks.push({x:UI.mx,y:UI.my,type:'down'});
@@ -102,6 +111,9 @@ function drawToasts(dt){
     text(t.msg,28,y-4,{size:15,bold:true,color:t.kind==='bad'?'#ffb0a0':t.kind==='good'?'#c8ffc0':'#f2e6c8'});ctx.globalAlpha=1;y-=30}
 }
 // ---------- diálogos modales ----------
+// móvil: los diálogos de texto (pequeños) se amplían para llenar la pantalla
+function dlgZoom(){if(!UI.ph||!UI.modals.length)return 1;const m=UI.modals[UI.modals.length-1];if(m.draw)return 1;
+  const lines=wrap(m.text||'',m.w-50,16),h=70+lines.length*21+(m.extra?m.extra:0)+60;return Math.max(1,Math.min(2.2,(UI.cw-30)/(UI.k*m.w),(UI.ch-24)/(UI.k*h)))}
 const Dlg={
   show(o){UI.modals.push(Object.assign({w:460,t:0,buttons:[{label:'Aceptar'}]},o))},
   close(){UI.modals.pop()},
@@ -109,7 +121,7 @@ const Dlg={
     for(let mi=0;mi<UI.modals.length;mi++){
       const m=UI.modals[mi],last=mi===UI.modals.length-1;m.t+=dt;
       const was=UI.nohit;UI.nohit=!last||was&&false;
-      ctx.fillStyle=`rgba(4,2,10,${Math.min(.62,m.t*3)})`;ctx.fillRect(0,0,VW,VH);if(last)UI.nohit=false;hit(0,0,VW,VH,null,{block:true});
+      if(!(UI.ph&&S.scr==='adv')){ctx.fillStyle=`rgba(4,2,10,${Math.min(.62,m.t*3)})`;ctx.fillRect(0,0,VW,VH)}if(last)UI.nohit=false;hit(0,0,VW,VH,null,{block:true});
       if(m.draw){m.draw(m);continue}
       const lines=wrap(m.text||'',m.w-50,16);const h=70+lines.length*21+(m.extra?m.extra:0)+60;const x=(VW-m.w)/2,y=(VH-h)/2-10;
       const sc=Math.min(1,.88+m.t*.6);ctx.save();ctx.translate(VW/2,VH/2);ctx.scale(sc,sc);ctx.translate(-VW/2,-VH/2);ctx.globalAlpha=Math.min(1,m.t*5);

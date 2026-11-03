@@ -38,19 +38,19 @@ let last=performance.now();
 function frame(now){
   const raw=now-last,dt=Math.max(0,Math.min(.05,raw/1000));last=now;if(UI.adapt&&raw>0)UI.adapt(raw);UI.t+=dt;
   try{
-    ctx.setTransform(UI.scale,0,0,UI.scale,0,0);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality=IS_TOUCH?'low':'high';processClicks();UI.hits=[];UI.tt=null;UI.cursor='default';UI.hover=null;UI.nohit=UI.modals.length>0;
+    UI.mode(false);if(UI.ph&&S.scr!=='adv'){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#000';ctx.fillRect(0,0,cv.width,cv.height);ctx.restore()}UI.mode(UI.ph&&S.scr!=='adv');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality=IS_TOUCH?'low':'high';processClicks();UI.hits=[];UI.tt=null;UI.cursor='default';UI.hover=null;UI.nohit=UI.modals.length>0;
     updateFade(dt);
     switch(S.scr){
       case'menu':drawMenu(dt);break;
       case'select':drawSelect(dt);break;
       case'adv':{if(!UI.modals.length||true)advUpdate(dt);advDraw(dt);hit(0,0,VPW,VPH,c=>S.mapClicks.push(c),{right:c=>{const tx=Math.floor((c.x+S.cam.x)/TILE),ty=Math.floor((c.y+S.cam.y)/TILE);if(tx>=0&&ty>=0&&tx<G.map.w&&ty<G.map.h)inspect(tx,ty)},cursor:S.hov&&S.hov.o&&(S.hov.o.t==='mon')?'crosshair':'default'});
-        drawFxOverlay();drawTopBar();drawSidePanel(dt);drawStatus();drawBanner(dt);
+        drawFxOverlay();drawTopBar();if(UI.ph)drawSidePanelPhone(dt);else drawSidePanel(dt);drawStatus();drawBanner(dt);
         FX.update&&0;break}
       case'town':S.clock+=dt;drawTown(dt);FX.update(dt);FX.draw(ctx,0,0);break;
       case'battle':battleUpdate(dt);battleDraw(dt);FX.update(dt);break;
     }
-    UI.nohit=false;
-    if(UI.modals.length)Dlg.draw(dt);UI.nohit=false;
+    UI.nohit=false;UI.mode(UI.ph&&(S.scr!=='adv'||UI.modals.length>0||!!S.loading),dlgZoom());
+    if(UI.modals.length){if(UI.des&&S.scr==='adv'){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=`rgba(4,2,10,${Math.min(.62,UI.modals[UI.modals.length-1].t*3)})`;ctx.fillRect(0,0,cv.width,cv.height);ctx.restore()}Dlg.draw(dt)}UI.nohit=false;
     if(S.loading){ctx.fillStyle='rgba(6,4,12,.85)';ctx.fillRect(0,0,VW,VH);text(S.loading,VW/2,VH/2,{size:28,bold:true,align:'center',color:'#ffe9a0'});ctx.strokeStyle='#ffe27a';ctx.lineWidth=4;ctx.beginPath();ctx.arc(VW/2,VH/2+50,18,UI.t*6,UI.t*6+4.2);ctx.stroke()}
     drawToasts(dt);drawTooltip();drawFade();
     if(UI.err){ctx.fillStyle='rgba(120,0,0,.9)';ctx.fillRect(0,0,VW,80);text('ERROR: '+UI.err.split('\n').slice(0,2).join(' | '),10,24,{size:12});}

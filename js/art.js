@@ -177,7 +177,7 @@ function postOverlay(w,h,mood){
   PFX.ov[key]={a,b};return PFX.ov[key]}
 // bloom: reduce el frame a 1/8, 'multiply' consigo mismo (realza solo los brillos), vuelve a escalar con suavizado y suma en 'lighter'
 function postFX(c,vx,vy,vw,vh,o={}){
-  const cv=c.canvas,k=cv.width/(typeof VW==='number'?VW:cv.width),mood=o.mood||'day';          // k = píxeles de canvas por píxel lógico
+  const cv=c.canvas,k=c.getTransform?c.getTransform().a:cv.width/(typeof VW==='number'?VW:cv.width),mood=o.mood||'day';          // k = píxeles de canvas por píxel lógico
   const ov=postOverlay(Math.ceil(vw*k),Math.ceil(vh*k),mood);
   c.save();c.setTransform(1,0,0,1,0,0);
   const px=Math.round(vx*k),py=Math.round(vy*k),pw=Math.ceil(vw*k),ph=Math.ceil(vh*k);
