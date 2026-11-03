@@ -110,7 +110,7 @@ function battleDraw(dt){
   const hov=!UI.modals.length?hexAtMouse():null;BU.hover=hov;
   for(let y=0;y<BH;y++)for(let x=0;x<BW;x++){const[px,py]=hexPx(x,y);hexPoly(c,px,py,HS-1);
     const k=hk(x,y);const obst=b.obst.has(k);
-    c.fillStyle=obst?'rgba(0,0,0,.28)':'rgba(255,255,255,.035)';c.fill();c.strokeStyle='rgba(0,0,0,.22)';c.lineWidth=1;c.stroke();
+    c.fillStyle=obst?'rgba(0,0,0,.28)':'rgba(255,255,255,.055)';c.fill();c.strokeStyle='rgba(0,0,0,.32)';c.lineWidth=1;c.stroke();
     if(R&&R.dist.has(k)&&!obst&&(!b.at(x,y)||b.at(x,y)===cur)){hexPoly(c,px,py,HS-3);c.fillStyle='rgba(255,255,255,.14)';c.fill()}}
   // obstáculos
   const terr=b.info.terr==null?GRASS:b.info.terr;
@@ -158,37 +158,57 @@ function battleDraw(dt){
   c.restore();
   drawBattleHud(dt,cur);
 }
+// iconos propios de la barra de acciones (se dibujan centrados en x,y)
+const BI={
+  spell:(x,y)=>{const c=ctx;c.save();c.translate(x,y);c.fillStyle='#8a6aff';c.strokeStyle='#1a1020';c.lineWidth=1.2;c.beginPath();c.moveTo(-10,-8);c.lineTo(0,-5);c.lineTo(10,-8);c.lineTo(10,8);c.lineTo(0,11);c.lineTo(-10,8);c.closePath();c.fill();c.stroke();c.strokeStyle='#e8d8ff';c.beginPath();c.moveTo(0,-5);c.lineTo(0,11);c.stroke();c.fillStyle='#ffe27a';c.beginPath();c.arc(5,-1,2.4,0,6.3);c.fill();c.restore()},
+  wait:(x,y)=>{const c=ctx;c.save();c.translate(x,y);c.fillStyle='#ffe27a';c.strokeStyle='#1a1020';c.lineWidth=1.2;c.beginPath();c.moveTo(-8,-10);c.lineTo(8,-10);c.lineTo(0,0);c.closePath();c.fill();c.stroke();c.fillStyle='#e8c25a';c.beginPath();c.moveTo(-8,10);c.lineTo(8,10);c.lineTo(0,0);c.closePath();c.fill();c.stroke();c.restore()},
+  def:(x,y)=>{const c=ctx;c.save();c.translate(x,y);c.fillStyle='#7aa8e8';c.strokeStyle='#1a1020';c.lineWidth=1.3;c.beginPath();c.moveTo(-9,-9);c.lineTo(9,-9);c.lineTo(9,2);c.quadraticCurveTo(8,9,0,11);c.quadraticCurveTo(-8,9,-9,2);c.closePath();c.fill();c.stroke();c.fillStyle='#e8f0ff';c.fillRect(-1.5,-7,3,15);c.fillRect(-6,-2,12,3);c.restore()},
+  auto:(x,y)=>{const c=ctx;c.save();c.translate(x,y);c.strokeStyle='#9aff9a';c.lineWidth=2.4;c.beginPath();c.arc(0,0,8,.6,5.4);c.stroke();c.fillStyle='#9aff9a';c.beginPath();c.moveTo(6,-9);c.lineTo(11,-1);c.lineTo(2,-2);c.fill();c.restore()},
+  flee:(x,y)=>{const c=ctx;c.save();c.translate(x,y);c.strokeStyle='#ffb090';c.lineWidth=3;c.beginPath();c.moveTo(-10,0);c.lineTo(5,0);c.stroke();c.fillStyle='#ffb090';c.beginPath();c.moveTo(3,-8);c.lineTo(12,0);c.lineTo(3,8);c.fill();c.restore()},
+  surr:(x,y)=>{const c=ctx;c.save();c.translate(x,y);c.strokeStyle='#c8b890';c.lineWidth=2.4;c.beginPath();c.moveTo(-7,11);c.lineTo(-7,-10);c.stroke();c.fillStyle='#fff';c.strokeStyle='#1a1020';c.lineWidth=1;c.beginPath();c.moveTo(-6,-10);c.quadraticCurveTo(2,-6,10,-10);c.lineTo(10,2);c.quadraticCurveTo(2,-2,-6,2);c.closePath();c.fill();c.stroke();c.restore()}
+};
 function drawBattleHud(dt,cur){
-  const b=BU.b,c=ctx;
-  // héroes
-  [0,1].forEach(si=>{const sd=b.sides[si],x=si===0?14:VW-14-250,y=8;const p=G.players[sd.pid];
-    panel(x,y,250,86,{plain:1,r:8,noshadow:1,border:p?p.col:'#c8a24a'});
-    if(sd.hero){c.drawImage(portrait(sd.hero.fi,sd.hero.port,sd.hero.cls),x+8,y+8,56,56);text(sd.hero.name,x+72,y+24,{size:15,bold:true,color:'#ffe9a0'});text(`Nv ${sd.hero.lvl} · ${sd.hs.a}/${sd.hs.d}/${sd.hs.sp}/${sd.hs.kn}`,x+72,y+42,{size:12});
-      bar(x+72,y+50,164,11,sd.hero.mana/Math.max(1,maxMana(sd.hero)),'#6aa0ff','#2a5ac0');text(`${Math.floor(sd.hero.mana)}`,x+154,y+60,{size:10,bold:true,align:'center',shadow:false});
-      text(`Moral ${sd.hs.lead>=0?'+':''}${sd.hs.lead||0}  Suerte +${sd.hs.luck||0}`,x+72,y+77,{size:11,color:'#bfe8ff'})}
-    else{text(sd.name,x+125,y+36,{size:16,bold:true,align:'center',color:'#ffe9a0'});text(si===0?'Atacante':'Defensor',x+125,y+58,{size:12,align:'center'})}
-    if(b.cast[si])text('✦ hechizo usado',x+240,y+78,{size:10,align:'right',color:'#9a8a70'})});
-  text(`Ronda ${b.round}`,VW/2,30,{size:20,bold:true,align:'center',color:'#ffe9a0',outline:1});
-  // orden de turno
-  const order=[...b.queue.filter(s=>!s.dead),...b.waitQ.filter(s=>!s.dead)].slice(0,12);
-  order.forEach((s,i)=>{const x=VW/2-order.length*17+i*34,y=40;const p=G.players[b.sides[s.side].pid];rrect(c,x,y,32,32,5,'rgba(10,6,16,.85)',i===0?'#ffe27a':(p?p.col:'#888'),i===0?2.4:1.5);c.save();c.beginPath();c.rect(x+1,y+1,30,30);c.clip();c.drawImage(creatureSprite(s.id,false),x-4,y-6,40,40);c.restore();hit(x,y,32,32,null,{tip:CR[s.id].name+' ×'+s.n})});
-  // registro
-  c.save();rrect(c,6,VH-150,236,142,8,'rgba(12,8,18,.72)','rgba(200,162,74,.7)',1.2);c.beginPath();c.rect(10,VH-148,228,138);c.clip();BU.log.slice(-8).forEach((l,i,a)=>{c.globalAlpha=.5+.5*((i+1)/a.length);text(l,14,VH-134+i*16.5,{size:11,color:'#f2e6c8'})});c.restore();c.globalAlpha=1;
-  // barra inferior
+  const b=BU.b,c=ctx,P=UI.ph;
+  // héroes (arriba a los lados); en móvil, tarjetas compactas
+  [0,1].forEach(si=>{const sd=b.sides[si],cw=P?210:250,chh=P?62:86,x=si===0?8:VW-8-cw,y=6;const p=G.players[sd.pid];
+    panel(x,y,cw,chh,{plain:1,r:8,noshadow:1,border:p?p.col:'#c8a24a'});
+    if(sd.hero){const ps=chh-16;c.drawImage(portrait(sd.hero.fi,sd.hero.port,sd.hero.cls),x+8,y+8,ps,ps);rrect(c,x+8,y+8,ps,ps,3,null,p?p.col:'#c8a24a',1.6);const tx=x+ps+16;
+      text(sd.hero.name,tx,y+(P?22:24),{size:P?16:15,bold:true,color:'#ffe9a0'});
+      if(P){bar(tx,y+30,cw-ps-26,13,sd.hero.mana/Math.max(1,maxMana(sd.hero)),'#6aa0ff','#2a5ac0');text(`${Math.floor(sd.hero.mana)}`,tx+(cw-ps-26)/2,y+41,{size:11,bold:true,align:'center',shadow:false})}
+      else{text(`Nv ${sd.hero.lvl} · ${sd.hs.a}/${sd.hs.d}/${sd.hs.sp}/${sd.hs.kn}`,tx,y+42,{size:12});
+        bar(tx,y+50,164,11,sd.hero.mana/Math.max(1,maxMana(sd.hero)),'#6aa0ff','#2a5ac0');text(`${Math.floor(sd.hero.mana)}`,tx+82,y+60,{size:10,bold:true,align:'center',shadow:false});
+        text(`Moral ${sd.hs.lead>=0?'+':''}${sd.hs.lead||0}  Suerte +${sd.hs.luck||0}`,tx,y+77,{size:11,color:'#bfe8ff'})}}
+    else{text(sd.name,x+cw/2,y+chh/2,{size:P?16:16,bold:true,align:'center',color:'#ffe9a0'});text(si===0?'Atacante':'Defensor',x+cw/2,y+chh/2+20,{size:12,align:'center'})}
+    if(b.cast[si]&&!P)text('✦ hechizo usado',x+cw-10,y+chh-8,{size:10,align:'right',color:'#9a8a70'})});
+  // cola de iniciativa (arriba, centro): la unidad activa se agranda
+  const order=[...b.queue.filter(s=>!s.dead),...b.waitQ.filter(s=>!s.dead)].slice(0,P?10:12),qs=P?40:34,total=order.length*qs+8;
+  rrect(c,VW/2-total/2-4,P?32:34,total+8,qs+10,7,'rgba(10,6,16,.55)','rgba(200,162,74,.5)',1.2);
+  order.forEach((s,i)=>{const x=VW/2-total/2+i*qs+4,y=P?36:38,z=qs-3;const p=G.players[b.sides[s.side].pid];rrect(c,x,y,z,z,5,'rgba(10,6,16,.85)',i===0?'#ffe27a':(p?p.col:'#888'),i===0?2.6:1.6);c.save();c.beginPath();c.rect(x+1,y+1,z-2,z-2);c.clip();c.drawImage(creatureSprite(s.id,false),x-5,y-6,z+10,z+10);c.restore();
+    rrect(c,x+z-14,y+z-12,15,12,3,'rgba(0,0,0,.75)');text(String(s.n>999?'999+':s.n),x+z-6,y+z-2,{size:9,bold:true,align:'center',shadow:false,color:'#ffe9a0'});
+    hit(x,y,z,z,null,{tip:CR[s.id].name+' ×'+s.n})});
+  // barra inferior: registro · acciones · datos
   const hum=cur&&!b.over&&humanSide(cur.side)&&!BU.ev&&!BU.q.length;
-  panel(250,VH-66,780,60,{plain:1,r:8,noshadow:1});
-  const side=cur?cur.side:0,hr=b.sides[side].hero;
-  const can=hum;let bx=262;
-  button(bx,VH-58,108,44,'Hechizo',()=>openSpellMenu(),{size:14,disabled:!can||!hr||b.cast[side]||!hr.spells.length,tip:!hr?'Sin héroe':b.cast[side]?'Ya lanzaste un hechizo esta ronda':'Abrir el libro de hechizos (S)'});bx+=116;
-  button(bx,VH-58,108,44,'Esperar',()=>{b.actWait(cur);BU.pull();BU.mode=null},{size:14,disabled:!can||cur.waited,tip:'Actuar al final de la ronda (W)'});bx+=116;
-  button(bx,VH-58,108,44,'Defender',()=>{b.actDefend(cur);BU.pull();BU.mode=null},{size:14,disabled:!can,tip:'+20% de defensa hasta tu próximo turno (D)'});bx+=116;
-  button(bx,VH-58,108,44,BU.auto?'Manual':'Auto',()=>{BU.auto=!BU.auto;BU.wait=.1},{size:14,tip:'El combate automático lo juega la IA (A)'});bx+=116;
+  const bh=P?70:64,by=VH-bh-4;panel(4,by,VW-8,bh,{plain:1,r:8,noshadow:1});
+  const lw=P?250:372,nl=P?3:4,lh=P?16:15;
+  c.save();c.beginPath();c.rect(10,by+4,lw,bh-8);c.clip();BU.log.slice(-nl).forEach((l,i,a)=>{c.globalAlpha=.5+.5*((i+1)/a.length);text(l,14,by+17+i*lh,{size:P?12:11,color:'#f2e6c8'})});c.restore();c.globalAlpha=1;
+  const side=cur?cur.side:0,hr=b.sides[side].hero,can=hum;
+  const bw=P?124:110,bhh=bh-12,by2=by+6,gp=6;let bx=lw+22;
   const myside=b.sides[0].human?0:1,mysd=b.sides[myside];
-  button(bx,VH-58,108,44,'Huir',()=>Dlg.show({title:'¿Huir del combate?',text:mysd.hero?'Tu ejército se perderá, pero el héroe sobrevivirá y podrá ser contratado de nuevo.':'No puedes huir.',buttons:[{label:'Huir',primary:1,disabled:!mysd.hero,fn:()=>{b.retreat(myside);BU.pull()}},{label:'Seguir luchando'}]}),{size:14,disabled:!can||!mysd.hero||b.info.type==='mon'&&false});bx+=116;
   const cost=surrenderCost(mysd.army.map((a,i)=>{const s=b.st.find(u=>u.side===myside&&u.slot===i&&!u.dead);return s?{id:s.id,n:s.n}:null}));
-  button(bx,VH-58,108,44,'Rendirse',()=>Dlg.show({title:'Rendirse',text:`Pagar ${cost} de oro para retirar a tu héroe del combate.`,buttons:[{label:'Pagar y rendirse',primary:1,disabled:G.players[mysd.pid].res.gold<cost,fn:()=>{G.players[mysd.pid].res.gold-=cost;b.retreat(myside);BU.pull()}},{label:'Cancelar'}]}),{size:14,disabled:!can||!mysd.hero||b.info.type==='mon'&&true,tip:'Solo contra héroes y ciudades'});
-  if(BU.mode==='spell')text(`Elige objetivo para ${SPELLS[BU.spell].n} (clic derecho: cancelar)`,VW/2,VH-76,{size:15,bold:true,align:'center',color:'#bfe8ff',outline:1});
-  if(cur&&hum){const s=cur;text(`Turno de ${CR[s.id].name} ×${s.n}`,VW/2,96,{size:15,bold:true,align:'center',color:'#ffe9a0',outline:1})}
+  const fs=P?17:14;
+  const A=[
+    ['Hechizo','spell',()=>openSpellMenu(),{disabled:!can||!hr||b.cast[side]||!hr.spells.length,tip:!hr?'Sin héroe':b.cast[side]?'Ya lanzaste un hechizo esta ronda':'Abrir el libro de hechizos (S)'}],
+    ['Esperar','wait',()=>{b.actWait(cur);BU.pull();BU.mode=null},{disabled:!can||cur.waited,tip:'Actuar al final de la ronda (W)'}],
+    ['Defender','def',()=>{b.actDefend(cur);BU.pull();BU.mode=null},{disabled:!can,tip:'+20% de defensa hasta tu próximo turno (D)'}],
+    [BU.auto?'Manual':'Auto','auto',()=>{BU.auto=!BU.auto;BU.wait=.1},{tip:'El combate automático lo juega la IA (A)'}],
+    ['Huir','flee',()=>Dlg.show({title:'¿Huir del combate?',text:mysd.hero?'Tu ejército se perderá, pero el héroe sobrevivirá y podrá ser contratado de nuevo.':'No puedes huir.',buttons:[{label:'Huir',primary:1,disabled:!mysd.hero,fn:()=>{b.retreat(myside);BU.pull()}},{label:'Seguir luchando'}]}),{disabled:!can||!mysd.hero}],
+    ['Rendirse','surr',()=>Dlg.show({title:'Rendirse',text:`Pagar ${cost} de oro para retirar a tu héroe del combate.`,buttons:[{label:'Pagar y rendirse',primary:1,disabled:G.players[mysd.pid].res.gold<cost,fn:()=>{G.players[mysd.pid].res.gold-=cost;b.retreat(myside);BU.pull()}},{label:'Cancelar'}]}),{disabled:!can||!mysd.hero||b.info.type==='mon',tip:'Solo contra héroes y ciudades'}]];
+  A.forEach(q=>{button(bx,by2,bw,bhh,q[0],q[2],Object.assign({size:fs,icon:(x,y)=>BI[q[1]](x+8,y)},q[3]));bx+=bw+gp});
+  // datos del turno (derecha)
+  const rx=bx+8;text(`Ronda ${b.round}`,rx,by+24,{size:P?20:19,bold:true,color:'#ffe9a0'});
+  if(hr){bar(rx,by+34,VW-rx-16,12,hr.mana/Math.max(1,maxMana(hr)),'#6aa0ff','#2a5ac0');text(`Maná ${Math.floor(hr.mana)}`,rx+(VW-rx-16)/2,by+44,{size:10,bold:true,align:'center',shadow:false});const hs2=b.sides[side].hs;text(`Moral ${hs2.lead>=0?'+':''}${hs2.lead||0} · Suerte +${hs2.luck||0}`,rx,by+bh-8,{size:P?12:11,color:'#bfe8ff'})}
+  if(BU.mode==='spell')text(`Elige objetivo para ${SPELLS[BU.spell].n} (clic derecho: cancelar)`,VW/2,by-8,{size:fz(15),bold:true,align:'center',color:'#bfe8ff',outline:1});
+  if(cur&&hum){const s=cur;text(`Turno de ${CR[s.id].name} ×${s.n}`,VW/2,P?98:96,{size:P?17:15,bold:true,align:'center',color:'#ffe9a0',outline:1})}
   // clic en el campo
   if(hum){hit(HOX-20,HOY-30,BW*HW+HW+40,BH*HS*1.5+60,()=>battleClick(),{right:()=>{if(BU.mode==='spell'){BU.mode=null;return}const t=BU.hover&&b.at(BU.hover[0],BU.hover[1]);if(t)creatureInfo(t.id,0)}})}
   else hit(HOX-20,HOY-30,BW*HW+HW+40,BH*HS*1.5+60,null,{right:()=>{const t=BU.hover&&b.at(BU.hover[0],BU.hover[1]);if(t)creatureInfo(t.id,0)}});
@@ -207,14 +227,27 @@ function battleClick(){
     b.actMoveAttack(cur,hx[0][0],hx[0][1],t);BU.pull();return}
   if(!t&&!b.obst.has(hk(h[0],h[1]))){const R=b.reach(cur);if(R.dist.has(hk(h[0],h[1]))){b.actMoveAttack(cur,h[0],h[1],null);BU.pull()}}
 }
+const SPK={dmg:['#ff7a5a','✦'],area:['#ffa040','✹'],chain:['#fff27a','ϟ'],debuff:['#b070d0','☠'],buff:['#ffe27a','✚'],heal:['#7aff9a','♥'],res:['#7aff9a','♥'],all:['#7ac8ff','✺']};
 function openSpellMenu(){
-  const b=BU.b,cur=b.cur(),side=cur.side,hr=b.sides[side].hero;
-  Dlg.show({w:640,title:'Libro de hechizos',draw:m=>{const x=320,y=150,w=640,hh=400;panel(x,y,w,hh,{title:`Libro de hechizos — Maná ${Math.floor(hr.mana)}`});
-    const sp=hr.spells.slice().sort((a,c2)=>SPELLS[a].lv-SPELLS[c2].lv);
-    sp.forEach((s,i)=>{const S2=SPELLS[s],cx=x+22+(i%2)*302,cy=y+56+Math.floor(i/2)*56;const ok=hr.mana>=S2.cost;
-      rrect(ctx,cx,cy,292,50,7,ok?'rgba(60,50,90,.85)':'rgba(30,24,34,.8)',ok?'#8a7ac0':'#3a3040',1.4);text(S2.n,cx+10,cy+20,{size:15,bold:true,color:ok?'#fff':'#7a7080'});text(`Nivel ${S2.lv} · ${S2.cost} maná`,cx+10,cy+38,{size:12,color:ok?'#bfa8ff':'#5a5060'});
-      hit(cx,cy,292,50,ok?()=>{Dlg.close();if(S2.k==='all'){b.castSpell(side,s,null,0,0);BU.pull()}else{BU.mode='spell';BU.spell=s}}:null,{tip:[S2.n,S2.d,`Daño/efecto: ${S2.base?S2.base+S2.per*b.hs(side).sp:'—'}`]})});
-    button(x+w/2-60,y+hh-48,120,34,'Cerrar',()=>Dlg.close())}});
+  const b=BU.b,cur=b.cur(),side=cur.side,hr=b.sides[side].hero;let page=0;
+  const sp=hr.spells.slice().sort((a,c2)=>SPELLS[a].lv-SPELLS[c2].lv);
+  Dlg.show({w:900,title:'Libro de hechizos',draw:m=>{const P=UI.ph,x=190,y=P?30:70,w=900,hh=P?460:560,per=P?4:6,pages=Math.max(1,Math.ceil(sp.length/(per*2)));
+    panel(x,y,w,hh,{title:`Libro de hechizos — Maná ${Math.floor(hr.mana)}/${maxMana(hr)}`,c1:'rgba(86,52,36,.97)',c2:'rgba(40,22,20,.98)'});
+    // dos páginas de pergamino con el lomo en medio
+    for(const px of[x+22,x+w/2+8]){rrect(ctx,px,y+30,w/2-30,hh-96,6,lg(ctx,px,0,px+w/2-30,0,['#e8d8b0','#d8c498']),'#7a5a30',1.4)}
+    ctx.fillStyle='rgba(60,30,10,.5)';ctx.fillRect(x+w/2-4,y+30,8,hh-96);
+    const ph=(hh-110)/per;
+    for(let pg=0;pg<2;pg++){const list=sp.slice((page*2+pg)*per,(page*2+pg+1)*per),px=pg?x+w/2+16:x+30;
+      list.forEach((s,i)=>{const S2=SPELLS[s],cy=y+38+i*ph,ok=hr.mana>=S2.cost,pw=w/2-46,col=(SPK[S2.k]||SPK.all)[0];
+        const hov=hit(px,cy,pw,ph-6,ok?()=>{Dlg.close();if(S2.k==='all'){b.castSpell(side,s,null,0,0);BU.pull()}else{BU.mode='spell';BU.spell=s}}:null,{tip:[S2.n,S2.d,`Daño/efecto: ${S2.base?S2.base+S2.per*b.hs(side).sp:'—'}`]});
+        rrect(ctx,px,cy,pw,ph-6,6,hov&&ok?'rgba(255,240,190,.55)':'rgba(255,248,224,.25)',ok?'#8a6a3a':'#a89a80',1.2);
+        ell(ctx,px+28,cy+(ph-6)/2,20,20,rg(ctx,px+24,cy+(ph-6)/2-4,2,22,[ok?col:'#8a8070','#2a1a30']),'#2a1a10',1.5);text((SPK[S2.k]||SPK.all)[1],px+28,cy+(ph-6)/2+7,{size:20,bold:true,align:'center',color:'#fff',shadow:false});
+        text(S2.n,px+58,cy+22,{size:fz(16),bold:true,color:ok?'#2a1608':'#7a6a58',shadow:false});text(`Nivel ${S2.lv} · ${S2.cost} de maná`,px+58,cy+40,{size:fz(12),color:ok?'#6a3a98':'#8a7a68',shadow:false});
+        if(ph>62)text(wrap(S2.d||'',pw-70,fz(11))[0]||'',px+58,cy+56,{size:fz(11),italic:true,color:'#5a4630',shadow:false})})}
+    if(!sp.length)text('Tu héroe no conoce ningún hechizo.',x+w/2,y+hh/2,{size:20,align:'center',color:'#2a1608',shadow:false});
+    button(x+24,y+hh-58,110,44,'◀ Anterior',()=>{page--},{size:fz(14),disabled:page<=0});button(x+w-134,y+hh-58,110,44,'Siguiente ▶',()=>{page++},{size:fz(14),disabled:page>=pages-1});
+    text(`Página ${page+1}/${pages}`,x+w/2,y+hh-30,{size:fz(14),align:'center'});
+    button(x+w/2-170,y+hh-58,100,44,'Cerrar',()=>Dlg.close(),{size:fz(15)})}});
 }
 function showBattleResult(){
   BU.resultShown=true;const b=BU.b;const w=b.winner;const hs=b.sides.findIndex(s=>s.human);const me=hs<0?0:hs;const won=w===me;
