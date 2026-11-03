@@ -131,7 +131,7 @@ function polishSprite(c,o={}){
   const src=mkc(w,h),sx=src.ctx;sx.drawImage(c,0,0,w,h);                       // copia del sprite original
   // máscara 'sólida': descarta sombras suaves y destellos (alfa < 55%) para que contorno/luces sigan solo el cuerpo
   const msk=mkc(w,h),mx=msk.ctx;mx.drawImage(src,0,0,w,h);{const id=mx.getImageData(0,0,msk.width,msk.height),D=id.data;for(let i=3;i<D.length;i+=4)D[i]=D[i]>140?255:0;mx.save();mx.setTransform(1,0,0,1,0,0);mx.putImageData(id,0,0);mx.restore()}
-  const rim=o.rim||'#fff0c0',bounce=o.bounce||'#7aa8ff',ol=o.outline||'#100818',R=o.ow||1.6;
+  const rim=o.rim||'#fff0c0',bounce=o.bounce||'#7aa8ff',ol=o.outline||(o.up?'#1c1006':'#100818'),R=o.ow||1.35;
   const tint=(img,col)=>{const t=mkc(w,h),g=t.ctx;g.drawImage(img,0,0,w,h);g.globalCompositeOperation='source-in';g.fillStyle=col;g.fillRect(0,0,w,h);return t};
   x.clearRect(0,0,w,h);
   // 1) contorno exterior de grosor constante: silueta oscura desplazada en 12 direcciones
@@ -147,6 +147,12 @@ function polishSprite(c,o={}){
   // 5) luz de rebote (abajo-der), fría y suave: da separación del fondo
   {const t=mkc(w,h),g=t.ctx;g.drawImage(msk,0,0,w,h);g.globalCompositeOperation='destination-out';g.drawImage(msk,-1.6,-1.6,w,h);g.globalCompositeOperation='source-in';g.fillStyle=bounce;g.fillRect(0,0,w,h);
     x.save();x.globalCompositeOperation='screen';x.globalAlpha=.42;x.drawImage(t,0,0,w,h);x.restore()}
+  // 5b) contraste de color suave (soft-light del propio sprite, recortado a la silueta): más chroma y volumen sin tocar el contorno
+  {const t=mkc(w,h),g=t.ctx;g.drawImage(c,0,0,w,h);g.globalCompositeOperation='soft-light';g.drawImage(src,0,0,w,h);g.globalCompositeOperation='destination-in';g.drawImage(msk,0,0,w,h);
+    x.save();x.globalAlpha=.45;x.drawImage(t,0,0,w,h);x.restore()}
+  // 5c) criatura mejorada: filo dorado en la luz de recorte
+  if(o.up){const t=mkc(w,h),g=t.ctx;g.drawImage(msk,0,0,w,h);g.globalCompositeOperation='destination-out';g.drawImage(msk,1.2,1.2,w,h);g.globalCompositeOperation='source-in';g.fillStyle='#ffd75a';g.fillRect(0,0,w,h);
+    x.save();x.globalCompositeOperation='lighter';x.globalAlpha=.55;x.drawImage(t,0,0,w,h);x.restore()}
   // 6) oclusión ambiental en el tercio inferior y gradiente tonal global (3 tonos: luz / media / sombra)
   {const t=mkc(w,h),g=t.ctx;g.drawImage(msk,0,0,w,h);g.globalCompositeOperation='source-in';
     g.fillStyle=lg(g,0,h*.55,0,h*.97,['rgba(14,6,30,0)','rgba(14,6,30,.34)']);g.fillRect(0,0,w,h);x.drawImage(t,0,0,w,h)}
