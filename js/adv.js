@@ -354,7 +354,6 @@ function runAI(){
 function banner(txt,sub){S.banner={txt,sub,t:0}}
 function drawBanner(dt){const b=S.banner;if(!b)return;b.t+=dt;if(b.t>2.4){S.banner=null;return}const a=Math.min(1,b.t*4,(2.4-b.t)*3);const c=ctx;c.save();c.globalAlpha=a;
   const w=360;rrect(c,VPW/2-w/2,VPH*.3,w,64,12,lg(c,0,0,0,64,['rgba(60,40,24,.92)','rgba(20,12,16,.92)']),'#e8c25a',2.4);text(b.txt,VPW/2,VPH*.3+42,{size:30,bold:true,align:'center',color:'#ffe9a0',outline:1});c.restore()}
-function autosave(){try{localStorage.setItem('reinos_save_auto',saveState())}catch(e){console.warn('no se pudo guardar',e)}}
 // ---------- entrada a castillos ----------
 function startCastleEntry(t,h,cb){
   const gx=(t.x+t.ex+.5)*TILE,gy=(t.y+t.ey+.5)*TILE;

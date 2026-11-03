@@ -90,7 +90,7 @@ function newPlayer(id,fac,human,diff){
   return{id,fac,human,res,col:PCOL[id],name:PNAME[id],heroes:[],alive:true,fog:null,pool:[],ai:{}};
 }
 function newGame(idx,opt){
-  const spec=mapSpec(idx);const map=genMap(spec,{fac0:opt.fac});G.map=map;snapMap(map);G.opt=opt;G.day=1;G.cur=0;G.over=false;G.busy=false;G.heroes=[];G.players=[];G.usedH={};G.week={t:'normal',week:1};G.quick=G.quick||false;
+  const spec=mapSpec(idx);const map=genMap(spec,{fac0:opt.fac});G.map=map;snapMap(map);G.opt=opt;G.day=1;G.cur=0;G.over=false;G.busy=false;G.heroes=[];G.players=[];G.usedH={};G.week={t:'normal',week:1};G.gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);G.quick=G.quick||false;
   G.hmap=new Int16Array(map.w*map.h);
   const hc=opt.color==null?0:opt.color;const cols=[hc];for(let i=0;i<8;i++)if(i!==hc)cols.push(i);
   for(let i=0;i<8;i++){const p=newPlayer(i,map.starts[i].fac,i===0,opt.diff);p.col=PCOL[cols[i]];p.name=PNAME[cols[i]];p.colIdx=cols[i];G.players.push(p)}
@@ -537,7 +537,7 @@ function aiHeroAct(p,h,cb){
 function saveState(){
   const m=G.map;return JSON.stringify({idx:m.spec.i,opt:G.opt,day:G.day,cur:G.cur,
     players:G.players.map(p=>({...p,fog:null})),fog:G.players[0].fog?packFog(G.players[0].fog):null,
-    heroes:G.heroes,usedH:G.usedH,week:G.week,objs:diffObjs(m)});
+    heroes:G.heroes,gid:G.gid,usedH:G.usedH,week:G.week,objs:diffObjs(m)});
 }
 // solo se guardan los objetos que cambiaron respecto al mundo generado por la semilla
 function snapMap(m){m.snap=m.objs.map(o=>JSON.stringify(o))}
@@ -550,7 +550,7 @@ function loadState(str){
   for(const o of d.objs){if(o.id>=map.objs.length){if(o.dead)map.objs.push({t:'void',dead:1,id:o.id,x:0,y:0,w:1,h:1,ex:0,ey:0});else addMapObj(o);continue}
     if(o.dead){const real=map.objs[o.id];if(real&&!real.dead)removeObj(real)}else Object.assign(map.objs[o.id],o)}
   for(const o of map.objs)if(!o.dead&&o.t==='town')o.gar=padArmy(o.gar);
-  G.heroes=d.heroes;G.players=d.players;G.usedH=d.usedH||{};G.week=d.week||{t:'normal',week:Math.floor((d.day-1)/7)+1};G.hmap=new Int16Array(map.w*map.h);
+  G.heroes=d.heroes;G.players=d.players;G.usedH=d.usedH||{};G.gid=d.gid||('g'+Date.now().toString(36));G.week=d.week||{t:'normal',week:Math.floor((d.day-1)/7)+1};G.hmap=new Int16Array(map.w*map.h);
   for(const h of G.heroes)if(h.alive&&h.x>=0)G.hmap[mapIdx(h.x,h.y)]=h.id+1;
   G.players[0].fog=d.fog?unpackFog(d.fog,map.w*map.h):new Uint8Array(map.w*map.h);
   for(let i=1;i<G.players.length;i++)G.players[i].fog=null;

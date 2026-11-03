@@ -59,6 +59,7 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 addEventListener('pointerdown',()=>audio(),{once:true});
+addEventListener('visibilitychange',()=>{if(document.hidden&&S.scr==='adv'&&G.map&&!G.over)autosave()});
 addEventListener('beforeunload',()=>{if(S.scr==='adv'&&G.map&&!G.over)autosave()});
 function boot(){setupCanvas();initGfx();S.mapClicks=[];requestAnimationFrame(frame)}
 boot();

@@ -35,7 +35,7 @@ function drawMenu(dt){
   c.save();c.textAlign='center';c.shadowColor='rgba(255,190,70,.8)';c.shadowBlur=30;
   c.font='bold 84px '+FONT;c.fillStyle=lg(c,0,110,0,190,['#fff6c8','#e8b83a','#8a5a14']);c.strokeStyle='#2a1608';c.lineWidth=8;c.strokeText('REINOS DE ÉTER',VW/2,170);c.fillText('REINOS DE ÉTER',VW/2,170);c.restore();
   text('Estrategia por turnos · 200 mundos gigantes · 8 castillos · 126 criaturas',VW/2,208,{size:19,align:'center',color:'#e8d8b0',italic:1});
-  const has=!!(localStorage.getItem('reinos_save_auto')||localStorage.getItem('reinos_save_1')||localStorage.getItem('reinos_save_2')||localStorage.getItem('reinos_save_3'));
+  const has=!!S.hasSaves;
   const bx=VW/2-150;
   button(bx,300,300,52,'Nueva partida',()=>openSelect(),{primary:1,size:21});
   button(bx,364,300,46,'Continuar partida',()=>loadMenu(),{size:18,disabled:!has});
@@ -106,20 +106,10 @@ function initWorldUI(){
   const hs=myHeroes();selectHero(hs[0],false);const t=ownedTowns(0)[0];S.cam.x=0;S.cam.y=0;camTo(t.x+2,t.y+1,true);fadeIn(2);
 }
 // ---------- guardado / carga ----------
-function saveSlot(n){try{localStorage.setItem('reinos_save_'+n,saveState());toast(`Partida guardada en la ranura ${n}`,'good')}catch(e){toast('No se pudo guardar (espacio lleno)','bad')}}
-function loadSlot(n,key){const s=localStorage.getItem(key||('reinos_save_'+n));if(!s)return;S.loading='Cargando partida…';setTimeout(()=>{try{loadState(s);G.sync=false;initWorldUI();for(const p of G.players)if(p.alive)p.human=p.id===0;toast('Partida cargada','good')}catch(e){console.error(e);toast('Error al cargar','bad')}S.loading=null},40)}
-function slotInfo(key){try{const s=localStorage.getItem(key);if(!s)return null;const d=JSON.parse(s.slice(0,400)+'}').x}catch(e){}
-  try{const m=/"idx":(\d+).*?"day":(\d+)/.exec(localStorage.getItem(key));if(m)return`${mapSpec(+m[1]).name} · día ${m[2]}`}catch(e){}return localStorage.getItem(key)?'Partida guardada':null}
-function loadMenu(){
-  Dlg.show({title:'Cargar partida',w:560,draw:m=>{const x=360,y=150,w=560,hh=380;panel(x,y,w,hh,{title:'Cargar partida'});
-    [['reinos_save_auto','Autoguardado'],['reinos_save_1','Ranura 1'],['reinos_save_2','Ranura 2'],['reinos_save_3','Ranura 3']].forEach(([k,l],i)=>{const inf=slotInfo(k);const yy=y+50+i*68;rrect(ctx,x+24,yy,w-48,58,8,'rgba(40,30,44,.85)','#7a6a48',1.4);text(l,x+40,yy+24,{size:16,bold:true,color:'#ffe9a0'});text(inf||'(vacía)',x+40,yy+44,{size:13,color:inf?'#d8c8a0':'#6a5a48'});
-      button(x+w-150,yy+10,110,38,'Cargar',()=>{Dlg.close();loadSlot(0,k)},{disabled:!inf,primary:1})});
-    button(x+w/2-60,y+hh-52,120,36,'Cerrar',()=>Dlg.close())}});
-}
 function openSystemMenu(){
   Dlg.show({title:'Sistema',w:420,draw:m=>{const x=430,y=120,w=420,hh=490;panel(x,y,w,hh,{title:'Sistema'});let by=y+34;
     button(x+40,by,w-80,40,'Continuar',()=>Dlg.close(),{primary:1});by+=50;
-    for(let n=1;n<=3;n++){button(x+40,by,(w-80)/2-4,36,`Guardar ${n}`,()=>{saveSlot(n)},{size:14});button(x+40+(w-80)/2+4,by,(w-80)/2-4,36,`Cargar ${n}`,()=>{Dlg.close();loadSlot(n)},{size:14,disabled:!localStorage.getItem('reinos_save_'+n)});by+=42}
+    button(x+40,by,(w-80)/2-4,36,'Guardar',()=>saveManual(),{size:14,tip:'Guarda esta partida (también se autoguarda cada día)'});button(x+40+(w-80)/2+4,by,(w-80)/2-4,36,'Cargar…',()=>loadMenu(),{size:14});by+=42;
     button(x+40,by,w-80,36,S.sound===false?'Sonido: NO':'Sonido: SÍ',()=>{S.sound=S.sound===false},{size:14});by+=42;
     button(x+40,by,w-80,36,G.quick?'Combate rápido: SÍ':'Combate rápido: NO',()=>toggleQuick(),{size:14,tip:['Combate rápido','El resultado se calcula al instante (muros, catapulta y torres incluidos) sin entrar en la pantalla de combate']});by+=42;
     button(x+40,by,w-80,36,'Ayuda',()=>helpDlg(),{size:14});by+=42;

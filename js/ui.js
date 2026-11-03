@@ -13,6 +13,18 @@ function setupCanvas(){
   cv.addEventListener('mousemove',e=>{pos(e);if(UI.onDrag)UI.onDrag(e)});
   cv.addEventListener('mousedown',e=>{pos(e);if(e.button===0){UI.down=true;UI.clicks.push({x:UI.mx,y:UI.my,type:'down'})}else if(e.button===2){UI.rclicks.push({x:UI.mx,y:UI.my})}else if(e.button===1){UI.mid=true}});
   addEventListener('mouseup',e=>{if(e.button===0){UI.down=false;UI.clicks.push({x:UI.mx,y:UI.my,type:'up'})}if(e.button===1)UI.mid=false});
+  // ---- táctil: toque = clic, pulsación larga = clic derecho, arrastre = mover el mapa ----
+  let T=null;const tpos=t=>{const r=cv.getBoundingClientRect();UI.mx=(t.clientX-r.left)/r.width*VW;UI.my=(t.clientY-r.top)/r.height*VH};
+  const onMap=()=>typeof S!=='undefined'&&S.scr==='adv'&&!UI.modals.length&&UI.mx<VPW&&UI.my<VPH&&UI.my>40;
+  cv.addEventListener('touchstart',e=>{e.preventDefault();UI.touch=true;if(e.touches.length>1){if(T)clearTimeout(T.lp);T=null;return}
+    const t=e.touches[0];tpos(t);T={x:UI.mx,y:UI.my,lx:UI.mx,ly:UI.my,moved:false,long:false,map:onMap()};UI.down=true;UI.clicks.push({x:UI.mx,y:UI.my,type:'down'});
+    T.lp=setTimeout(()=>{if(T&&!T.moved){T.long=true;UI.rclicks.push({x:T.x,y:T.y});if(navigator.vibrate)navigator.vibrate(15)}},520)},{passive:false});
+  cv.addEventListener('touchmove',e=>{e.preventDefault();if(!T)return;const t=e.touches[0];tpos(t);
+    if(!T.moved&&Math.hypot(UI.mx-T.x,UI.my-T.y)>16&&!T.long){T.moved=true;clearTimeout(T.lp)}
+    if(T.moved&&T.map&&typeof clampCam==='function'){S.flyTo=null;S.cam.x-=UI.mx-T.lx;S.cam.y-=UI.my-T.ly;clampCam()}
+    T.lx=UI.mx;T.ly=UI.my},{passive:false});
+  const tend=e=>{e.preventDefault();if(!T)return;clearTimeout(T.lp);UI.down=false;const cancel=T.moved||T.long;UI.clicks.push({x:cancel?-1000:T.x,y:cancel?-1000:T.y,type:'up'});T=null;setTimeout(()=>{if(!T){UI.mx=-999;UI.my=-999}},120)};
+  cv.addEventListener('touchend',tend,{passive:false});cv.addEventListener('touchcancel',tend,{passive:false});
   cv.addEventListener('contextmenu',e=>e.preventDefault());
   cv.addEventListener('wheel',e=>{e.preventDefault();UI.wheel+=Math.sign(e.deltaY)},{passive:false});
   addEventListener('keydown',e=>{UI.keys[e.code]=true;UI.keyq=UI.keyq||[];UI.keyq.push(e);if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(e.code))e.preventDefault()});
