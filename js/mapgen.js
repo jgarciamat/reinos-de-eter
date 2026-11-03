@@ -109,6 +109,61 @@ const FOOT={town:{w:4,h:3,ex:1,ey:2},mine:{w:3,h:2,ex:1,ey:1},dwell:{w:3,h:2,ex:
   gate:{w:2,h:2,ex:0,ey:1},mono:{w:1,h:1,ex:0,ey:0},boat:{w:1,h:1,ex:0,ey:0}};
 const TOWN_NAMES=['Aldea','Villa','Puerto','Fuerte','Torre','Monte','Valle','Cumbre','Rocas','Alba','Ocaso','Bruma','Sol','Luna','Piedra','Cruce','Río','Lago','Nube','Hierro','Cobre','Trono','Alcázar','Mirador'];
 const ART_PRICE=[0,900,2200,5000,10000,18000];
+// ---------- utilidades de macro-terreno (regiones coherentes) ----------
+// filtro de mayoría 3x3 sobre una máscara de líquido (1=líquido); fuera del mapa cuenta como líquido
+function smoothMask(src,W,H,passes){
+  let a=src,b=new Uint8Array(src.length);
+  for(let p=0;p<passes;p++){
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){let c=0;for(let j=-1;j<=1;j++){const yy=y+j;for(let i=-1;i<=1;i++){const xx=x+i;c+=(xx<0||yy<0||xx>=W||yy>=H)?1:a[yy*W+xx]}}
+      b[y*W+x]=c>=5?1:0}
+    const t=a;a=b;b=t===src?new Uint8Array(src.length):t}
+  return a;
+}
+// filtro de moda (ventana cuadrada de radio rad) solo sobre terrenos de tierra; los líquidos no se tocan
+function modeFilter(terr,W,H,rad,passes){
+  const N=W*H,W1=W+1,integ=new Int32Array(W1*(H+1)),bestC=new Int32Array(N),curC=new Int32Array(N),bestT=new Uint8Array(N);
+  for(let p=0;p<passes;p++){
+    const present=new Uint8Array(16);for(let i=0;i<N;i++)present[terr[i]]=1;
+    bestC.fill(-1);
+    for(let t=1;t<16;t++){if(!present[t]||IMP(t))continue;
+      for(let y=0;y<H;y++){let row=0;for(let x=0;x<W;x++){row+=terr[y*W+x]===t?1:0;integ[(y+1)*W1+x+1]=integ[y*W1+x+1]+row}}
+      for(let y=0;y<H;y++){const y0=Math.max(0,y-rad),y1=Math.min(H,y+rad+1);for(let x=0;x<W;x++){const i=y*W+x;if(IMP(terr[i]))continue;
+        const x0=Math.max(0,x-rad),x1=Math.min(W,x+rad+1);const c=integ[y1*W1+x1]-integ[y0*W1+x1]-integ[y1*W1+x0]+integ[y0*W1+x0];
+        if(terr[i]===t)curC[i]=c;if(c>bestC[i]){bestC[i]=c;bestT[i]=t}}}}
+    for(let i=0;i<N;i++)if(!IMP(terr[i])&&bestC[i]>curC[i])terr[i]=bestT[i];
+  }
+}
+// recuento de una máscara en ventana (radio rad), devuelve Uint16Array
+function winCount(mask,W,H,rad){
+  const W1=W+1,integ=new Int32Array(W1*(H+1)),out=new Uint16Array(W*H);
+  for(let y=0;y<H;y++){let row=0;for(let x=0;x<W;x++){row+=mask[y*W+x];integ[(y+1)*W1+x+1]=integ[y*W1+x+1]+row}}
+  for(let y=0;y<H;y++){const y0=Math.max(0,y-rad),y1=Math.min(H,y+rad+1);for(let x=0;x<W;x++){const x0=Math.max(0,x-rad),x1=Math.min(W,x+rad+1);
+    out[y*W+x]=integ[y1*W1+x1]-integ[y0*W1+x1]-integ[y1*W1+x0]+integ[y0*W1+x0]}}
+  return out;
+}
+// fusiona con el vecino dominante los fragmentos de un terreno menores de minSize casillas
+function cleanSmall(terr,W,H,minSize,passes){
+  const N=W*H,seen=new Int32Array(N),stack=[];
+  for(let p=0;p<passes;p++){seen.fill(0);let changed=0;
+    for(let s0=0;s0<N;s0++){const t=terr[s0];if(seen[s0]||IMP(t))continue;const cells=[];stack.push(s0);seen[s0]=1;const nb=new Int32Array(16);
+      while(stack.length){const c=stack.pop();cells.push(c);const cx=c%W,cy=(c/W)|0;
+        for(let k=0;k<4;k++){const nx=cx+(k===0?1:k===1?-1:0),ny=cy+(k===2?1:k===3?-1:0);if(nx<0||ny<0||nx>=W||ny>=H)continue;const ni=ny*W+nx,tn=terr[ni];
+          if(tn===t){if(!seen[ni]){seen[ni]=1;stack.push(ni)}}else if(!IMP(tn))nb[tn]++}}
+      if(cells.length<minSize){let bt=-1,bc=0;for(let q=1;q<16;q++)if(nb[q]>bc){bc=nb[q];bt=q}
+        if(bt>0){for(const c of cells)terr[c]=bt;changed++}}}
+    if(!changed)break}
+}
+// transiciones graduales: entre terrenos incompatibles se intercala una franja de terreno intermedio
+const BRIDGE_T={};
+(function(){const add=(a,b,t)=>{BRIDGE_T[a*16+b]=t;BRIDGE_T[b*16+a]=t};
+  add(GRASS,SNOW,DIRT);add(SAND,SNOW,DIRT);add(GRASS,ASH,DIRT);add(SAND,ASH,DIRT);add(SNOW,ASH,ROUGH);add(SNOW,SWAMP,DIRT);add(SAND,SWAMP,DIRT);add(SWAMP,ASH,DIRT)})();
+const BR_OFF=[[2,0],[-2,0],[0,2],[0,-2],[1,1],[1,-1],[-1,1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1],[2,1],[-2,1],[1,2],[1,-2]];
+function bridgeTerrain(terr,W,H){
+  const N=W*H,out=new Uint8Array(terr);
+  for(let y=2;y<H-2;y++)for(let x=2;x<W-2;x++){const i=y*W+x,t=terr[i];if(t===DIRT||t===ROUGH||IMP(t)||t===SUBT)continue;
+    for(const[dx,dy]of BR_OFF){const tn=terr[i+dy*W+dx];const b=BRIDGE_T[t*16+tn];if(b){out[i]=b;break}}}
+  terr.set(out);
+}
 function genLevel(spec,opt={}){
   const under=!!opt.under,W=spec.size,H=spec.size,N=W*H,r=mulberry(spec.seed+(under?7777:0));
   const m={spec,w:W,h:H,terr:new Uint8Array(N),road:new Uint8Array(N),deco:new Uint8Array(N),fp:new Int32Array(N),en:new Int32Array(N),objs:[],starts:[],occ:new Uint8Array(N),gates:[],lvl:under?1:0};
@@ -123,19 +178,88 @@ function genLevel(spec,opt={}){
     for(let s0=0;s0<N;s0++){if(IMP(m.terr[s0])||comp[s0]>=0)continue;let cnt=0;stack.push(s0);comp[s0]=cid;
       while(stack.length){const c=stack.pop();cnt++;const cx=c%W,cy=(c/W)|0;for(let k=0;k<4;k++){const nx=cx+[1,-1,0,0][k],ny=cy+[0,0,1,-1][k];if(nx<0||ny<0||nx>=W||ny>=H)continue;const ni=ny*W+nx;if(!IMP(m.terr[ni])&&comp[ni]<0){comp[ni]=cid;stack.push(ni)}}}
       csize.push(cnt);if(cnt>bestN){bestN=cnt;best=cid}cid++}};
-  for(let wl=spec.wl;;wl-=.015){for(let i=0;i<N;i++)m.terr[i]=hm[i]<wl?LIQ:BASE;label();if(bestN/N>=(under?.4:.45)||wl<.2)break}
-  // 2. biomas por regiones de Voronoi deformadas
-  const seeds=[];const nS=Math.round(W/9);const totalW=bio.pal.reduce((s,p)=>s+p[1],0);
-  for(let k=0;k<nS*nS/2;k++){let t=r()*totalW,ty=bio.pal[0][0];for(const[tt,wgt]of bio.pal){t-=wgt;if(t<=0){ty=tt;break}}seeds.push([r()*W,r()*H,ty])}
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(IMP(m.terr[i]))continue;
-    const px=x+(nW(x/14,y/14)-.5)*16,py=y+(nW(x/14+50,y/14+50)-.5)*16;let bd=1e9,bt=BASE;
-    for(const s of seeds){const d=(s[0]-px)**2+(s[1]-py)**2;if(d<bd){bd=d;bt=s[2]}}
-    if((bt===ASH||under&&bt===ROUGH)&&nW(x/7+100,y/7+100)>.67)bt=LAVA;
-    m.terr[i]=bt}
-  if(LIQ===WATER&&!under)for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){const i=y*W+x;if(m.terr[i]===GRASS||m.terr[i]===DIRT){
-    if(m.terr[i-1]===WATER||m.terr[i+1]===WATER||m.terr[i-W]===WATER||m.terr[i+W]===WATER)if(nD(x/6,y/6)>.35)m.terr[i]=SAND}}
+  const liqMask=new Uint8Array(N);
+  for(let wl=spec.wl;;wl-=.015){for(let i=0;i<N;i++)liqMask[i]=hm[i]<wl?1:0;const sm=smoothMask(liqMask,W,H,2);
+    for(let i=0;i<N;i++)m.terr[i]=sm[i]?LIQ:BASE;label();if(bestN/N>=(under?.4:.45)||wl<.2)break}
+  // costa limpia: fuera fragmentos sueltos (salvo islas grandes en mapas de mar) y lagunas diminutas rellenas
+  for(let i=0;i<N;i++)if(!IMP(m.terr[i])&&comp[i]!==best&&(!keepIslands||csize[comp[i]]<30))m.terr[i]=LIQ;
+  {const seenL=new Uint8Array(N),stk=[];
+    for(let s0=0;s0<N;s0++){if(seenL[s0]||!IMP(m.terr[s0]))continue;const cells=[];let border=false;stk.push(s0);seenL[s0]=1;
+      while(stk.length){const c=stk.pop();cells.push(c);const cx=c%W,cy=(c/W)|0;if(cx<3||cy<3||cx>=W-3||cy>=H-3)border=true;
+        for(let k=0;k<4;k++){const nx=cx+[1,-1,0,0][k],ny=cy+[0,0,1,-1][k];if(nx<0||ny<0||nx>=W||ny>=H)continue;const ni=ny*W+nx;if(!seenL[ni]&&IMP(m.terr[ni])){seenL[ni]=1;stk.push(ni)}}}
+      if(!border&&cells.length<160)for(const c of cells)m.terr[c]=BASE}}
   label();
-  // 3. masa principal (y, en mapas de mar, islas grandes)
+  // puntos de salida de los jugadores (solo superficie): se eligen sobre la máscara de tierra para poder dar a cada uno su terreno natural
+  let startPts=null,facsPre=null;
+  if(!under){
+    const cand=[];for(let k=0;k<1800&&cand.length<500;k++){const x=14+Math.floor(r()*(W-28)),y=14+Math.floor(r()*(H-28));
+      let okc=true;for(let j=-6;j<=6&&okc;j+=3)for(let i=-6;i<=6;i+=3)if(IMP(m.terr[(y+j)*W+x+i]))okc=false;if(okc)cand.push({x,y})}
+    if(cand.length<spec.players)throw new Error('mapa sin espacio');
+    startPts=[cand[Math.floor(r()*cand.length)]];
+    while(startPts.length<spec.players){let bc=null,bd=-1;for(const c of cand){let d=1e9;for(const s of startPts)d=Math.min(d,Math.hypot(s.x-c.x,s.y-c.y));if(d>bd){bd=d;bc=c}}startPts.push(bc)}
+  }
+  const dStart=(x,y)=>{let d=1e9;if(startPts)for(const s of startPts){const q=Math.hypot(s.x-x,s.y-y);if(q<d)d=q}return d};
+  // 2. macro-regiones: pocas semillas en rejilla con jitter + deformación suave de baja frecuencia (bordes orgánicos y zonas compactas)
+  {const cs=W/Math.round(W/(under?90:100));const ng=Math.round(W/cs);const seeds=[];const totalW=bio.pal.reduce((s,p)=>s+p[1],0);
+    for(let gj=0;gj<ng;gj++)for(let gi=0;gi<ng;gi++){let t=r()*totalW,ty=bio.pal[0][0];for(const[tt,wgt]of bio.pal){t-=wgt;if(t<=0){ty=tt;break}}
+      seeds.push([(gi+.1+.8*r())*cs,(gj+.1+.8*r())*cs,ty])}
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(IMP(m.terr[i]))continue;
+      const px=x+(fbm(nW,x/48,y/48,2)-.5)*56+(nW(x/13,y/13)-.5)*7,py=y+(fbm(nW,x/48+50,y/48+50,2)-.5)*56+(nW(x/13+50,y/13+50)-.5)*7;let bd=1e9,bt=BASE;
+      for(const s of seeds){const d=(s[0]-px)**2+(s[1]-py)**2;if(d<bd){bd=d;bt=s[2]}}
+      m.terr[i]=bt}}
+  modeFilter(m.terr,W,H,5,2);cleanSmall(m.terr,W,H,220,2);
+  // lava / líquido interior solo en cuencas dentro del núcleo de zonas de ceniza (o roca bajo tierra), lejos de los castillos iniciales
+  {const nL=noise2(spec.seed+11+(under?5:0));const volc=!under&&bio.liquid===LAVA;const eligT=t=>under?(t===ROUGH||t===ASH):t===ASH;
+    const el=new Uint8Array(N);for(let i=0;i<N;i++)if(eligT(m.terr[i]))el[i]=1;const core=winCount(el,W,H,6);
+    const th=under?.58:volc?.55:.6;const prevMain=new Uint8Array(N);for(let i=0;i<N;i++)prevMain[i]=comp[i]===best?1:0;
+    const lv=new Uint8Array(N);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!el[i]||core[i]<150||(!under&&dStart(x,y)<18))continue;if(fbm(nL,x/20,y/20,3)>th)lv[i]=1}
+    const lv2=smoothMask(lv,W,H,2);
+    // fuera lagos menores de 45 casillas
+    {const sn=new Uint8Array(N),st=[];for(let s0=0;s0<N;s0++){if(sn[s0]||!lv2[s0])continue;const cells=[];st.push(s0);sn[s0]=1;
+      while(st.length){const c=st.pop();cells.push(c);const cx=c%W,cy=(c/W)|0;for(let k=0;k<4;k++){const nx=cx+[1,-1,0,0][k],ny=cy+[0,0,1,-1][k];if(nx<0||ny<0||nx>=W||ny>=H)continue;const ni=ny*W+nx;if(!sn[ni]&&lv2[ni]){sn[ni]=1;st.push(ni)}}}
+      if(cells.length<45)for(const c of cells)lv2[c]=0}}
+    for(let i=0;i<N;i++)if(lv2[i]&&!IMP(m.terr[i])&&el[i])m.terr[i]=LIQ;
+    // si el lago aísla tierra que antes era continua, se abre un vado a través del líquido
+    label();
+    for(let cid=0;cid<csize.length;cid++){if(cid===best)continue;let first=-1;for(let i=0;i<N;i++)if(comp[i]===cid){first=i;break}
+      if(first<0||!prevMain[first])continue;
+      const par=new Int32Array(N).fill(-2);const q=[];for(let i=0;i<N;i++)if(comp[i]===cid){par[i]=-1;q.push(i)}
+      let hit=-1;for(let h=0;h<q.length&&hit<0;h++){const c=q[h],cx=c%W,cy=(c/W)|0;for(let k=0;k<4;k++){const nx=cx+[1,-1,0,0][k],ny=cy+[0,0,1,-1][k];if(nx<0||ny<0||nx>=W||ny>=H)continue;const ni=ny*W+nx;if(par[ni]!==-2)continue;
+        if(comp[ni]===best){hit=c;par[ni]=c;break}if(m.terr[ni]!==LIQ)continue;par[ni]=c;q.push(ni)}}
+      if(hit>=0){let c=hit;while(c>=0&&par[c]!==-1){if(m.terr[c]===LIQ)m.terr[c]=ASH;c=par[c]}}}
+    label()}
+  // 3. castillos iniciales: facción según el terreno de su zona (mejor emparejamiento) y patria de su terreno nativo con borde irregular
+  if(!under){
+    const near=(a,b)=>a===b?0:(a===DIRT||b===DIRT)?1:((a===GRASS&&(b===SWAMP||b===SAND))||(b===GRASS&&(a===SWAMP||a===SAND))||(a===ASH&&b===ROUGH)||(a===ROUGH&&b===ASH)||(a===SNOW&&b===ROUGH)||(a===ROUGH&&b===SNOW))?1:3;
+    const loc=startPts.map(s=>m.terr[(s.y+1)*W+s.x]);
+    let bestP=null,bestS=1e9;for(let it=0;it<400;it++){const f=[0,1,2,3,4,5,6,7];for(let i=7;i>0;i--){const j=Math.floor(r()*(i+1));[f[i],f[j]]=[f[j],f[i]]}
+      if(opt.fac0!=null){const k=f.indexOf(opt.fac0);[f[0],f[k]]=[f[k],f[0]]}
+      let sc=0;for(let p=0;p<f.length;p++)sc+=near(FDEF[f[p]].terr,loc[p%8]);if(sc<bestS){bestS=sc;bestP=f}}
+    facsPre=bestP;
+    startPts.forEach((s,pi)=>{const nt=FDEF[facsPre[pi%8]].terr;const cx=s.x+1,cy=s.y+1;if(loc[pi]===nt)return;
+      for(let y=cy-16;y<=cy+16;y++)for(let x=cx-16;x<=cx+16;x++){if(x<2||y<2||x>=W-2||y>=H-2)continue;const i=y*W+x;if(IMP(m.terr[i]))continue;
+        const rr=13+(nW(x/8+200,y/8+200)-.5)*10;if(Math.hypot(x-cx,y-cy)<rr)m.terr[i]=nt}});
+  }
+  // cordilleras: crestas largas de ruido dentro de "provincias montañosas"; la garganta se abre después (pasos garantizados)
+  const rdg=new Float32Array(N);const MTH=under?.925:.935;
+  {const nP=noise2(spec.seed+21+(under?5:0)),nQ=noise2(spec.seed+23);
+    const thP=under?.5:spec.biome==='montana'?.44:spec.biome==='boreal'?.49:spec.biome==='volcan'||spec.biome==='yermo'?.51:spec.biome==='archipielago'?.58:.535;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(IMP(m.terr[i]))continue;const t=m.terr[i];
+      let pv=fbm(nP,x/75,y/75,3)+((t===ROUGH||t===SNOW)?.06:t===GRASS||t===SWAMP?-.015:0);
+      if(pv<thP-.05)continue;
+      const wx=x+(nQ(x/30,y/30)-.5)*30,wy=y+(nQ(x/30+70,y/30+70)-.5)*30;
+      const rn=fbm(nR,wx/46,wy/46,3);let v=1-Math.abs(2*rn-1)-Math.max(0,thP+.05-pv)*.5;
+      if(startPts&&v>MTH-.05&&dStart(x,y)<15)v=0;rdg[i]=v}
+    // el terreno bajo la cordillera pasa a roca (nieve se conserva); ladera de tierra en las praderas
+    for(let i=0;i<N;i++){const v=rdg[i];if(v<=MTH-.045)continue;const t=m.terr[i];if(IMP(t))continue;
+      if(v>MTH-.012){if(!under&&t!==SNOW&&t!==ROUGH)m.terr[i]=ROUGH}else if(!under&&(t===GRASS||t===SWAMP))m.terr[i]=DIRT}}
+  // costa: playas continuas (no a trozos) y transiciones graduales entre terrenos incompatibles
+  if(LIQ===WATER&&!under){const wm=new Uint8Array(N);for(let i=0;i<N;i++)wm[i]=m.terr[i]===WATER?1:0;const nb=winCount(wm,W,H,2);
+    for(let y=2;y<H-2;y++)for(let x=2;x<W-2;x++){const i=y*W+x,t=m.terr[i];if((t===GRASS||t===DIRT)&&nb[i]>0&&fbm(nD,x/24,y/24,2)>.5)m.terr[i]=SAND}}
+  if(!under)bridgeTerrain(m.terr,W,H);
+  cleanSmall(m.terr,W,H,60,2);
+  label();
   for(let i=0;i<N;i++)if(!IMP(m.terr[i])&&comp[i]!==best){if(!keepIslands||csize[comp[i]]<30)m.terr[i]=LIQ}
   m.land=bestN;
   const edge=(x,y)=>x<2||y<2||x>=W-2||y>=H-2;
@@ -152,21 +276,19 @@ function genLevel(spec,opt={}){
     const nt=under?SUBT:FDEF[fi].terr;for(let j=-5;j<=8;j++)for(let i=-6;i<=9;i++){const x=cx+i,y=cy+j;if(x<3||y<3||x>=W-3||y>=H-3)continue;const d=Math.hypot(i-1.5,j-1);
       if(d<5.5&&!IMP(m.terr[y*W+x]))m.terr[y*W+x]=nt}
     return addObj({t:'town',x:cx,y:cy,fi,owner,name:TOWN_NAMES[(r()*TOWN_NAMES.length)|0]+' '+FDEF[fi].short,b:{},avail:[],gar:[],spells:[]})};
+  // facción cuyo terreno nativo encaja con el de la zona (si la hay); si no, la dada
+  const fiFor=(x,y,dflt)=>{if(under)return dflt;const t=m.terr[y*W+x];const c=[];for(let f=0;f<8;f++)if(FDEF[f].terr===t)c.push(f);
+    if(!c.length||c.includes(dflt))return dflt;return c[(dflt*7+x+y)%c.length]};
   const used=opt.used||new Set();
   let startList=[],seedPt={x:0,y:0};
   if(!under){
-    const cand=[];for(let k=0;k<1800&&cand.length<500;k++){const x=14+Math.floor(r()*(W-28)),y=14+Math.floor(r()*(H-28));
-      let okc=true;for(let j=-6;j<=6&&okc;j+=3)for(let i=-6;i<=6;i+=3)if(IMP(m.terr[(y+j)*W+x+i]))okc=false;if(okc)cand.push({x,y})}
-    if(cand.length<spec.players)throw new Error('mapa sin espacio');
-    const starts=[cand[Math.floor(r()*cand.length)]];
-    while(starts.length<spec.players){let bc=null,bd=-1;for(const c of cand){const d=mnd(c.x,c.y,starts);if(d>bd){bd=d;bc=c}}starts.push(bc)}
-    const facs=[0,1,2,3,4,5,6,7];for(let i=facs.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[facs[i],facs[j]]=[facs[j],facs[i]]}
-    if(opt.fac0!=null){const k=facs.indexOf(opt.fac0);[facs[0],facs[k]]=[facs[k],facs[0]]}
+    const starts=startPts;
+    const facs=facsPre;
     m.facs=facs;
     starts.forEach((s,pi)=>{const tx=clamp(s.x-1,4,W-9),ty=clamp(s.y-1,4,H-8);for(let j=-1;j<5;j++)for(let i=-1;i<6;i++)m.occ[(ty+j)*W+tx+i]=0;
       const o=placeTown(tx,ty,facs[pi%8],pi);o.start=pi;m.starts.push({x:tx+1,y:ty+3,town:o.id,fac:facs[pi%8]})});
     if(spec.startTowns>=2)m.starts.forEach((s,pi)=>{for(let k=0;k<600;k++){const x=s.x-26+Math.floor(r()*52),y=s.y-26+Math.floor(r()*52);const d=Math.hypot(x-s.x,y-s.y);if(d<13||d>26||!area(x,y,4,3))continue;
-      const o=placeTown(x,y,Math.random()<0?0:facs[(pi+1+Math.floor(r()*7))%8],pi);s.town2=o.id;break}});
+      const o=placeTown(x,y,fiFor(x+2,y+1,facs[(pi+1+Math.floor(r()*7))%8]),pi);s.town2=o.id;break}});
     startList=m.starts.map(s=>({x:s.x,y:s.y}));seedPt={x:m.starts[0].x,y:m.starts[0].y};
     m.starts.forEach(s=>{
       for(const res of ['wood','ore']){for(let k=0;k<200;k++){const x=s.x-12+Math.floor(r()*24),y=s.y-8+Math.floor(r()*18);if(area(x,y,3,2)&&Math.hypot(x-s.x,y-s.y)>5){addObj({t:'mine',res,x,y,owner:-1});break}}}
@@ -190,7 +312,7 @@ function genLevel(spec,opt={}){
   // ciudades neutrales
   const nNeutral=Math.round((W*H)/(150*150)*(under?6:11)); // muchos castillos abandonados por conquistar
   for(let k=0;k<nNeutral;k++){const p=randPos(4,3,{l:m.objs.filter(o=>o.t==='town'),d:24});if(!p)continue;
-    const fi=Math.floor(r()*8);const o=placeTown(p[0],p[1],fi,-1);const dg=danger(p[0],p[1]);
+    const fi=fiFor(p[0]+2,p[1]+1,Math.floor(r()*8));const o=placeTown(p[0],p[1],fi,-1);const dg=danger(p[0],p[1]);
     o.gar=garrison(o.fi,40+dg*dg*2200*spec.monsters*MM,r)}
   const guardOf=(o,pw)=>{const ex=o.x+o.ex,ey=o.y+o.ey;const cands=[[0,1],[1,1],[-1,1],[1,0],[-1,0],[0,2]];
     for(const[dx,dy]of cands){const x=ex+dx,y=ey+dy;if(x>=2&&y>=2&&x<W-2&&y<H-2&&!IMP(m.terr[y*W+x])&&!m.fp[y*W+x]){const mo=makeMonster(x,y,pw,r);if(mo){addObj(mo);return}}}};
@@ -242,18 +364,27 @@ function genLevel(spec,opt={}){
     for(let k=0;k<Math.round(70*sc);k++){const x=4+Math.floor(r()*(W-8)),y=4+Math.floor(r()*(H-8));const i=y*W+x;if(m.terr[i]!==WATER||m.fp[i])continue;let ok=true;for(let j=-1;j<=1&&ok;j++)for(let q=-1;q<=1;q++)if(m.terr[i+j*W+q]!==WATER||m.fp[i+j*W+q])ok=false;if(!ok)continue;
       if(r()<.2)addObj({t:'chest',x,y,isle:1});else{const rs=r()<.3?'gold':pick(r,RES.slice(1));addObj({t:'res',res:rs,n:rs==='gold'?irnd(r,4,12)*100:irnd(r,3,8),x,y,isle:1})}}
   }
-  // decoración / obstáculos (montañas en cordilleras)
+  // decoración / obstáculos: cordilleras (crestas con gargantas), bosquetes (arboleda agrupada) y árboles sueltos muy escasos
   const density=spec.forest*(under?1.1:1);
   const MOUNT=new Set([ROUGH,ASH,SNOW,DIRT,SUBT,SAND]);
+  const nG=noise2(spec.seed+5);
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(IMP(m.terr[i]))continue;
     if(edge(x,y)){m.deco[i]=1+((x*7+y*13)%3);continue}
-    if(m.occ[i]||m.fp[i])continue;
-    const a=fbm(nF,x/9,y/9,3),b=nD(x/3,y/3);const th=.60-.07*density;
-    const rn=fbm(nR,x/15,y/15,3),ridge=1-Math.abs(2*rn-1);
-    if(MOUNT.has(m.terr[i])&&ridge>(under?.9:.94)&&r()<.92)m.deco[i]=4;
-    else if(a>th&&b>.28)m.deco[i]=1+Math.floor(r()*3);
-    else if(r()<(under?.03:.012)*density)m.deco[i]=1+Math.floor(r()*3);
+    if(m.occ[i]||m.fp[i])continue;const t=m.terr[i];
+    if(rdg[i]>MTH&&MOUNT.has(t)&&r()<.97){m.deco[i]=4;continue}
+    const a=fbm(nF,x/17,y/17,3),b=nD(x/2.6,y/2.6);
+    const th=.585-.05*density+(t===SAND||t===SNOW?.07:t===SWAMP?-.015:0)+(under?-.02:0);
+    if(a>th&&b>.2)m.deco[i]=1+Math.floor(r()*3);
+    else if(r()<(t===SAND||t===SNOW?.0012:.0035)*density)m.deco[i]=1+Math.floor(r()*3);
   }
+  // limpieza de cordilleras: fuera los trozos cortos y aperturas (desfiladeros) regulares para que siempre haya pasos
+  {const seenM=new Uint8Array(N),st=[];
+    for(let s0=0;s0<N;s0++){if(seenM[s0]||m.deco[s0]!==4)continue;const cells=[];st.push(s0);seenM[s0]=1;
+      while(st.length){const c=st.pop();cells.push(c);const cx=c%W,cy=(c/W)|0;for(const[dx,dy]of D8){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=W||ny>=H)continue;const ni=ny*W+nx;if(!seenM[ni]&&m.deco[ni]===4){seenM[ni]=1;st.push(ni)}}}
+      if(cells.length<16)for(const c of cells)m.deco[c]=0}
+    const GS=under?22:28,gW=Math.ceil(W/GS);const bestC=new Map();
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(m.deco[y*W+x]!==4)continue;const gx=Math.floor(x/GS),gy=Math.floor(y/GS);const d=Math.hypot(x-(gx+.5)*GS,y-(gy+.5)*GS);const key=gy*gW+gx;const bc=bestC.get(key);if(!bc||d<bc.d)bestC.set(key,{x,y,d})}
+    for(const g of bestC.values()){const rad=2+(r()<.4?1:0);for(let j=-rad;j<=rad;j++)for(let i=-rad;i<=rad;i++){if(i*i+j*j>rad*rad+1)continue;const xx=g.x+i,yy=g.y+j;if(xx>1&&yy>1&&xx<W-2&&yy<H-2&&m.deco[yy*W+xx]===4)m.deco[yy*W+xx]=0}}}
   const towns=m.objs.filter(o=>o.t==='town');const entry=o=>({x:o.x+o.ex,y:o.y+o.ey+1});
   for(const o of m.objs){const ex=o.x+o.ex,ey=o.y+o.ey;for(let j=-1;j<=2;j++)for(let i=-1;i<=1;i++){const x=ex+i,y=ey+j;if(x>0&&y>0&&x<W-1&&y<H-1&&!(m.fp[y*W+x]&&m.fp[y*W+x]!==m.en[y*W+x]))m.deco[y*W+x]=0}}
   for(const t of towns){const near=towns.filter(o=>o!==t).sort((a,b)=>Math.hypot(a.x-t.x,a.y-t.y)-Math.hypot(b.x-t.x,b.y-t.y)).slice(0,2);
@@ -263,6 +394,16 @@ function genLevel(spec,opt={}){
   for(const t of targets){if(t.x===seedPt.x&&t.y===seedPt.y)continue;m.deco[seedPt.y*W+seedPt.x]=0;if(!findPath(m,seedPt.x,seedPt.y,t.x,t.y,{limit:120000}))carve(seedPt.x,seedPt.y,t.x,t.y)}
   const seen=new Uint8Array(N);const stk=[seedPt.y*W+seedPt.x];seen[stk[0]]=1;m.deco[stk[0]]=0;
   while(stk.length){const c=stk.pop();const cx=c%W,cy=(c/W)|0;for(const[dx,dy]of D8){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=W||ny>=H)continue;const ni=ny*W+nx;if(seen[ni])continue;if(!tilePass(m,nx,ny,false)&&!m.en[ni])continue;seen[ni]=1;if(!m.en[ni])stk.push(ni)}}
+  // tierra transitable aislada por montañas/árboles: se abre un paso hasta la red principal (BFS desde lo alcanzable)
+  {const par=new Int32Array(N).fill(-2),q=[];for(let i=0;i<N;i++)if(seen[i]){par[i]=-1;q.push(i)}
+    for(let h=0;h<q.length;h++){const c=q[h],cx=c%W,cy=(c/W)|0;for(let k=0;k<4;k++){const nx=cx+[1,-1,0,0][k],ny=cy+[0,0,1,-1][k];if(nx<1||ny<1||nx>=W-1||ny>=H-1)continue;const ni=ny*W+nx;if(par[ni]!==-2||IMP(m.terr[ni]))continue;par[ni]=c;q.push(ni)}}
+    const vis=new Uint8Array(N),st=[];let opened=0;
+    for(let s0=0;s0<N;s0++){if(seen[s0]||vis[s0]||IMP(m.terr[s0])||m.deco[s0]||m.fp[s0])continue;let cnt=0,bc=-1,bd=1e9;st.push(s0);vis[s0]=1;
+      while(st.length){const c=st.pop();cnt++;if(par[c]>=-1&&q.indexOf&&false){}const cx=c%W,cy=(c/W)|0;
+        for(const[dx,dy]of D8){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=W||ny>=H)continue;const ni=ny*W+nx;if(vis[ni]||seen[ni]||IMP(m.terr[ni])||m.deco[ni]||m.fp[ni])continue;vis[ni]=1;st.push(ni)}
+        if(par[c]!==-2&&par[c]!==-1){let dd=0,z=c;while(z>=0&&!seen[z]&&dd<400){z=par[z];dd++}if(dd<bd){bd=dd;bc=c}}}
+      if(cnt>=40&&bc>=0){let z=bc;while(z>=0&&!seen[z]){m.deco[z]=0;z=par[z]}opened++}}
+    if(opened){seen.fill(0);const stk2=[seedPt.y*W+seedPt.x];seen[stk2[0]]=1;while(stk2.length){const c=stk2.pop();const cx=c%W,cy=(c/W)|0;for(const[dx,dy]of D8){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=W||ny>=H)continue;const ni=ny*W+nx;if(seen[ni])continue;if(!tilePass(m,nx,ny,false)&&!m.en[ni])continue;seen[ni]=1;if(!m.en[ni])stk2.push(ni)}}}}
   for(const o of m.objs){const ei=(o.y+o.ey)*W+o.x+o.ex;if(keepIslands&&(m.terr[ei]===WATER||comp[ei]!==best))o.isle=1;
     let ok=false;for(const[dx,dy]of D8){if(seen[ei+dy*W+dx]){ok=true;break}}
     if(!ok&&o.t!=='town'&&!o.isle)o.dead=1}
