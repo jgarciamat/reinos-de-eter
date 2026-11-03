@@ -322,8 +322,10 @@ function dwellModal(o,h,cb){
     text(`Coste por unidad: ${costText(cr.cost)}`,x+w/2,y+296,{size:14,align:'center',color:'#ffe27a'});
     const mx=Math.min(o.n,maxRecruit(p,o.cr,o.n));
     button(x+60,y+320,40,34,'−',()=>{q=Math.max(0,q-Math.max(1,Math.ceil(mx/10)))},{size:20,disabled:!q});text(String(q),x+w/2,y+345,{size:22,bold:true,align:'center'});button(x+w-100,y+320,40,34,'+',()=>{q=Math.min(mx,q+Math.max(1,Math.ceil(mx/10)))},{size:20,disabled:q>=mx});
-    button(x+w/2-130,y+380,120,38,'Reclutar',()=>{if(q>0&&addToArmy(h.army,o.cr,q)){spend(p,recruitCost(o.cr,q));o.n-=q;sfx('recruit');toast(`${q} × ${cr.name} se unen a ${h.name}`,'good');q=0}else if(q>0)toast('El ejército está completo','bad')},{primary:1,disabled:!q,size:15});
-    button(x+w/2+10,y+380,120,38,'Salir',()=>{Dlg.close();cb&&cb()},{size:15});
+    const buy=n=>{if(n>0&&addToArmy(h.army,o.cr,n)){spend(p,recruitCost(o.cr,n));o.n-=n;sfx('recruit');toast(`${n} × ${cr.name} se unen a ${h.name}`,'good');q=0}else if(n>0)toast('El ejército está completo','bad')};
+    button(x+24,y+380,130,38,'Reclutar',()=>buy(q),{primary:1,disabled:!q,size:15});
+    button(x+w/2-80,y+380,160,38,mx>0?`Reclutar todo (${mx})`:'Reclutar todo',()=>buy(mx),{primary:1,disabled:mx<1,size:15});
+    button(x+w-154,y+380,130,38,'Salir',()=>{Dlg.close();cb&&cb()},{size:15});
   }});
 }
 // ---------- taberna / gremio / mercado ----------

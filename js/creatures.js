@@ -377,6 +377,7 @@ function rat(x,o){
 }
 function cerberus(x,o){
   const cx=48,by=88,c=o.c,dk=shade(c,-.3),fc=o.flame||'#ff8a30';quadSetup(x,o,34);
+  x.translate(-3,5);x.scale(.92,.92); // que las tres cabezas quepan en el lienzo
   pata(x,cx-12,by-24,cx-18,by-13,cx-14,by-3,8,dk,'paw');pata(x,cx+12,by-24,cx+19,by-15,cx+17,by-3,7.4,dk,'paw');
   const body=pSmooth([[cx-28,by-30],[cx-16,by-40],[cx+2,by-42],[cx+16,by-40],[cx+20,by-26],[cx+8,by-18],[cx-10,by-19],[cx-26,by-21]]);solid(x,body,c,{d:2.4});
   pata(x,cx-18,by-25,cx-26,by-13,cx-21,by-3,9,c,'paw');pata(x,cx+14,by-24,cx+16,by-13,cx+12,by-3,8,shade(c,-.05),'paw');
