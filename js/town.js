@@ -105,17 +105,25 @@ function drawTownTop(t,p,F){
 // polvo y chispas mientras se levanta un edificio
 function buildFxTick(s,bl){if(Math.random()<.55)FX.add({x:s.x+8+Math.random()*(s.w-16),y:s.base-2,vx:(Math.random()-.5)*50,vy:-14-Math.random()*26,col:'rgba(214,196,160,.8)',size:3+Math.random()*3,life:.8,drag:.96,shrink:1});
   if(Math.random()<.4)FX.add({x:s.x+10+Math.random()*(s.w-20),y:s.base-s.h*(0.15+0.75*Math.min(1,bl.t/1.4)),vx:(Math.random()-.5)*90,vy:-30-Math.random()*40,g:160,col:'#ffe27a',size:1.8,life:.5,add:true})}
+// un único edificio por cadena: se muestra el más alto construido y la mejora sustituye al anterior en el mismo hueco
+function chainSpot(k,t){
+  const P=UI.ph,back={hall:[111,P?200:190],fort:[330,150],mage:[880,120],tavern:[1000,112],market:[1118,122],shipyard:[1225,110]};
+  if(back[k]){const[cx,w]=back[k],h=w*112/124,base=P?440:446;return{x:cx-w/2,y:base-h,w,h,row:0,base,cx}}
+  const i=+k.slice(2)-1,w=P?116:112,h=w*112/124,base=P?520:530,cx=100+i*180;
+  return{x:cx-w/2,y:base-h,w,h,row:1,base,cx}}
+function chainShown(t,c){let b=null;for(const q of c.ch)if(t.b[q])b=q;return b||c.ch[0]}
 function drawTownBuildings(t,p){
   const c=ctx,tf=S.townFx,bl=tf&&tf.bld,T=S.clock;
-  const list=BUILD_ORDER.filter(b=>(b!=='shipyard'||t.dock)&&!/^hall[234]$/.test(b)).map(b=>{if(b==='hall1')b='hall'+townHalls(t);return{b,s:townSpot(b,t),st:buildStatus(t,b,p),hall:/^hall/.test(b)}}).sort((a,b)=>a.s.base-b.s.base||a.s.x-b.s.x);
+  const list=townChains(t).map(ch=>{const b=chainShown(t,ch),s=chainSpot(ch.k,t),st=buildStatus(t,b,p),nx=ch.ch[ch.ch.indexOf(b)+1],nst=t.b[b]&&nx?buildStatus(t,nx,p):null;return{ch,b,s,st,nx,nst}}).sort((a,b)=>a.s.base-b.s.base||a.s.x-b.s.x);
   let lab=null;
-  for(const{b,s,st,hall}of list){
-    const built=st.built,ok=st.ok;
-    const hov=hit(s.x,s.y,s.w,s.h,hall?()=>townHallModal(t,'hall'):()=>buildDialog(t,b),{tip:hall?[bTitle(b,t.fi)+' (nivel '+townHalls(t)+')',`Ingreso de ${townIncome(t.b)} oro/día`,hallNext(t,p)?'Se puede mejorar hoy':'Mejoras del Ayuntamiento en el menú','Clic: abrir el menú de construcción']:built?[...buildTip(t,b,p,{ok:1},st.cost),'Clic: usar este edificio']:[...buildTip(t,b,p,{ok:ok},st.cost),ok?'Clic: construir':'Clic: ver detalles']});
-    const anim=bl&&(bl.b===b||(hall&&/^hall/.test(bl.b)))&&bl.t<1.7;
-    if(anim){ // obra: el edificio sube desde el suelo entre andamios
-      const pr=Math.min(1,bl.t/1.4),e=1-(1-pr)**2;ell(c,s.cx,s.base-s.w*.04,s.w*.42,s.w*.075,'rgba(0,0,0,.4)');
-      c.save();c.beginPath();c.rect(s.x-4,s.base-s.h*e,s.w+8,s.h*e+6);c.clip();c.drawImage(buildingSprite(b,t.fi),s.x,s.y,s.w,s.h);c.restore();
+  for(const{ch,b,s,st,nx,nst}of list){
+    const built=st.built,ok=st.ok,key=ch.k,isDw=ch.g==='dw'||/^(tavern|market|shipyard)$/.test(key);
+    const nxTip=nst?[`Siguiente: ${bTitle(nx,t.fi)}`+(nst.ok?' (se puede construir hoy)':'')]:[];
+    const hov=hit(s.x,s.y,s.w,s.h,built&&isDw?()=>buildDialog(t,b):()=>townHallModal(t,key),{tip:built?[...buildTip(t,b,p,{ok:1},st.cost),...nxTip,isDw?'Clic: usar este edificio':'Clic: abrir el menú de construcción']:[...buildTip(t,b,p,{ok:ok},st.cost),ok?'Clic: construir':'Clic: ver detalles']});
+    const anim=bl&&ch.ch.includes(bl.b)&&bl.t<1.7;
+    if(anim){
+      const bb=bl.b,pr=Math.min(1,bl.t/1.4),e=1-(1-pr)**2;ell(c,s.cx,s.base-s.w*.04,s.w*.42,s.w*.075,'rgba(0,0,0,.4)');
+      c.save();c.beginPath();c.rect(s.x-4,s.base-s.h*e,s.w+8,s.h*e+6);c.clip();c.drawImage(buildingSprite(bb,t.fi),s.x,s.y,s.w,s.h);c.restore();
       if(pr<1){c.strokeStyle='#8a5a2e';c.lineWidth=2;c.beginPath();for(let i=0;i<4;i++){const px=s.x+6+i*(s.w-12)/3;c.moveTo(px,s.base);c.lineTo(px,s.y+s.h*.1)}for(let i=0;i<4;i++){const py=s.base-i*s.h*.27;c.moveTo(s.x+4,py);c.lineTo(s.x+s.w-4,py)}c.stroke()}
       buildFxTick(s,bl);
       if(bl.t>1.3&&!bl.burst){bl.burst=1;FX.burst(s.cx,s.y+s.h*.4,34,['#ffe27a','#fff','#ffb040'],{spd:170,life:1.1,up:30});FX.add({x:s.cx,y:s.y+s.h*.5,vx:0,vy:-24,col:'#c8ffb0',size:20,life:1.6,text:'¡Construido!'})}
@@ -126,11 +134,11 @@ function drawTownBuildings(t,p){
       if(hov){c.save();c.shadowColor='rgba(255,230,120,.95)';c.shadowBlur=18}
       c.drawImage(buildingSprite(b,t.fi),s.x,s.y,s.w,s.h);
       if(hov)c.restore();
-      const m=/^dw(\d)$/.exec(b);if(m){const av=t.avail[+m[1]-1];if(av>0){const r=UI.ph?12:10;ell(c,s.x+s.w-r-2,s.y+r+4,r,r,'#2a6a2a','#c8ffb0',1.4);text(String(av>99?'99+':av),s.x+s.w-r-2,s.y+r+8,{size:av>99?9:UI.ph?12:10,bold:true,align:'center',color:'#fff'})}}
-      if(hall&&hallNext(t,p)){const bob=Math.sin(T*4)*2.5;ell(c,s.cx,s.y-2+bob,11,11,'#e8b42a','#fff2b0',1.8);text('+',s.cx,s.y+5+bob,{size:19,bold:true,align:'center',color:'#3a2200',shadow:false})}
-      if(t.lastBuilt===b||(hall&&/^hall/.test(t.lastBuilt||''))){const bob=Math.sin(T*3)*1.6;ell(c,s.x+9,s.y+9+bob,8,8,'#3a9a3a','#d0ffc0',1.4);text('★',s.x+9,s.y+13+bob,{size:11,bold:true,align:'center',color:'#fff',shadow:false})}
+      const m=/^dw(\d)$/.exec(b)||/^up(\d)$/.exec(b);if(m){const av=t.avail[+m[1]-1];if(av>0){const r=UI.ph?12:10;ell(c,s.x+s.w-r-2,s.y+r+4,r,r,'#2a6a2a','#c8ffb0',1.4);text(String(av>99?'99+':av),s.x+s.w-r-2,s.y+r+8,{size:av>99?9:UI.ph?12:10,bold:true,align:'center',color:'#fff'})}}
+      if(t.lastBuilt===b){const bob=Math.sin(T*3)*1.6;ell(c,s.x+9,s.y+9+bob,8,8,'#3a9a3a','#d0ffc0',1.4);text('★',s.x+9,s.y+13+bob,{size:11,bold:true,align:'center',color:'#fff',shadow:false})}
+      if(nst&&nst.ok){ // hay una mejora lista para construir en este mismo hueco
+        const bob=Math.sin(T*4+s.x)*2.5,bx=s.cx,by=s.y-14+bob;hit(bx-14,by-14,28,28,()=>townHallModal(t,key),{tip:['Mejorar: '+bTitle(nx,t.fi),'Clic: abrir el menú de construcción']});ell(c,bx,by,11,11,'#e8b42a','#fff2b0',1.8);text('▲',bx,by+5,{size:13,bold:true,align:'center',color:'#3a2200',shadow:false})}
     }else{
-      // silueta: gris si falta algo; en color con brillo pulsante si se puede construir hoy
       const pul=.5+.5*Math.sin(T*3.2+s.x*.02);
       c.save();
       if(ok){c.shadowColor=`rgba(255,226,110,${.55+.4*pul})`;c.shadowBlur=14+8*pul;c.globalAlpha=hov?.95:.6+.12*pul;c.filter='saturate(.6)'}
@@ -140,10 +148,6 @@ function drawTownBuildings(t,p){
     }
     if(hov)lab={s,b,built,ok};
   }
-  // etiquetas de grupo sobre el suelo
-  const P=UI.ph,fs=P?14:12,lt=(s0,x0,y0,al='center')=>text(s0,x0,y0,{size:fs,bold:true,align:al,color:'rgba(255,240,200,.85)',outline:1});
-  const sh=townSpot('fort1',t),sd=townSpot('dw4',t);
-  lt('DEFENSA',200+3*84/2,sh.y-8);const hs=townSpot('hall1',t);lt('AYUNTAMIENTO',hs.cx,hs.y-6);lt('MAGIA Y SERVICIOS',676+7*84/2,sh.y-8);lt('VIVIENDAS Y SUS MEJORAS  (cada mejora, junto a su vivienda)',640,sd.base+(P?15:19));
   if(lab){const{s,b,built,ok}=lab,nm=bTitle(b,t.fi)+(built?'':ok?' · ¡construible!':' (sin construir)'),tw=measure(nm,13,true)+16,ly=s.row?s.y-22:s.base+2;
     rrect(c,s.cx-tw/2,ly,tw,19,5,'rgba(10,6,16,.92)',built||ok?'#e8c25a':'#9a8a6a',1.2);text(nm,s.cx,ly+14,{size:13,bold:true,align:'center',color:built||ok?'#ffe9a0':'#c8b890',shadow:false})}
 }
