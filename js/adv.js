@@ -239,27 +239,45 @@ function drawSidePanel(dt){
   drawTownSel();
   const c=ctx,px=VPW,pw=VW-VPW;const p=G.players[0];
   c.fillStyle=lg(c,px,0,px+pw,0,['#241a1a','#1a1220']);c.fillRect(px,0,pw,VH);c.strokeStyle='#c8a24a';c.lineWidth=3;c.beginPath();c.moveTo(px,0);c.lineTo(px,VH);c.stroke();
-  drawMinimap(px+16,16,240);
+  drawMinimap(px+40,14,200);
   // calendario
   const day=(G.day-1)%7+1,week=Math.floor((G.day-1)/7)%4+1,month=Math.floor((G.day-1)/28)+1;
-  rrect(c,px+10,274,pw-20,30,6,'rgba(0,0,0,.4)','#7a6a48',1.2);text(`Mes ${month} · Semana ${week} · Día ${day}`,px+pw/2,295,{size:15,bold:true,align:'center',color:'#ffe9a0'});
-  if(G.week&&G.week.t!=='normal')text(weekLabel(G.week),px+pw/2,317,{size:11,bold:true,align:'center',color:G.week.t==='plague'?'#ff8a7a':'#9affc8'});
-  // héroes
-  text('HÉROES',px+14,326,{size:12,bold:true,color:'#c8a24a'});
-  const hs=myHeroes();
-  for(let i=0;i<8;i++){const x=px+14+(i%4)*64,y=334+Math.floor(i/4)*72;const h=hs[i];
-    if(h){const sel=h.id===S.sel;const hov=hit(x,y,58,58,()=>{if(sel&&S.lastClick&&S.t-S.lastClick<.4)openHeroScreen(h);else selectHero(h);S.lastClick=S.t},{tip:[h.name,`Nivel ${h.lvl} · ${hstat(h).a}/${hstat(h).d}/${hstat(h).sp}/${hstat(h).kn}`,'Clic: seleccionar · doble clic: ficha']});
-      c.drawImage(portrait(h.fi,h.port,h.cls),x,y,58,58);if(sel){c.strokeStyle='#ffe27a';c.lineWidth=3;c.strokeRect(x-1,y-1,60,60)}if(hov){c.fillStyle='rgba(255,255,255,.12)';c.fillRect(x,y,58,58)}
-      bar(x,y+60,58,7,h.mp/maxMP(h),'#5ad87a','#2a8a4a');if(h.sleep){text('Zzz',x+29,y+18,{size:14,bold:true,align:'center',color:'#bfe8ff'})}}
-    else{rrect(c,x,y,58,58,4,'rgba(0,0,0,.35)','#3a2e22',1)}}
-  // ciudades
-  text('CIUDADES',px+14,490,{size:12,bold:true,color:'#c8a24a'});
-  const ts=ownedTowns(0);
-  for(let i=0;i<8;i++){const x=px+14+(i%4)*64,y=498+Math.floor(i/4)*34;const t=ts[i];
-    if(t){const hov=hit(x,y,58,30,()=>{if(S.selTown===t){S.selTown=null;const hh=heroAt(t.x+t.ex,t.y+t.ey);openTown(t,hh&&hh.pid===0?hh:null)}else{S.selTown=t;S.sel=null;S.path=null;S.target=null;S.exTarget=null;camTo(t.x+2,t.y+1)}},{tip:[t.name,FDEF[t.fi].name,'Clic: seleccionar (suelta al héroe) · otro clic: entrar']});
-      rrect(c,x,y,58,30,4,lg(c,0,y,0,y+30,[hov?'#5a4a30':'#3a2e22','#1a1410']),FDEF[t.fi].col[0],1.4);
-      c.drawImage(townSprite(t.fi).c,x+2,y+2,54,26*1.2,);}
-    else rrect(c,x,y,58,30,4,'rgba(0,0,0,.35)','#3a2e22',1)}
+  rrect(c,px+10,226,pw-20,26,6,'rgba(0,0,0,.4)','#7a6a48',1.2);text(`Mes ${month} · Semana ${week} · Día ${day}`,px+pw/2,244,{size:14,bold:true,align:'center',color:'#ffe9a0'});
+  if(G.week&&G.week.t!=='normal')text(weekLabel(G.week),px+pw/2,266,{size:11,bold:true,align:'center',color:G.week.t==='plague'?'#ff8a7a':'#9affc8'});
+  // listas verticales: héroes (izquierda) y castillos (derecha), con flechas si no caben
+  const ROWS=4,RH=46,LY=286,hs=myHeroes(),ts=ownedTowns(0);
+  S.hOff=S.hOff||0;S.tOff=S.tOff||0;
+  const si=hs.findIndex(q=>q.id===S.sel);if(si>=0&&S.lastSelV!==S.sel){S.lastSelV=S.sel;if(si<S.hOff)S.hOff=si;else if(si>=S.hOff+ROWS)S.hOff=si-ROWS+1}
+  const arrows=(ax,ay,off,n,set)=>{if(n<=ROWS)return;const mx=n-ROWS;
+    [[0,-1],[16,1]].forEach(([dx,d])=>{const ok=d<0?off>0:off<mx;hit(ax+dx,ay-11,14,13,ok?()=>set(clamp(off+d,0,mx)):null,{tip:d<0?'Subir':'Bajar'});
+      c.fillStyle=ok?'#ffe27a':'#5a4a30';c.beginPath();if(d<0){c.moveTo(ax+dx+7,ay-10);c.lineTo(ax+dx+1,ay);c.lineTo(ax+dx+13,ay)}else{c.moveTo(ax+dx+1,ay-10);c.lineTo(ax+dx+13,ay-10);c.lineTo(ax+dx+7,ay)}c.closePath();c.fill()})};
+  text(`HÉROES (${hs.length})`,px+10,LY-8,{size:12,bold:true,color:'#c8a24a'});arrows(px+104,LY-4,S.hOff,hs.length,v=>S.hOff=v);
+  text(`CIUDADES (${ts.length})`,px+150,LY-8,{size:12,bold:true,color:'#c8a24a'});arrows(px+244,LY-4,S.tOff,ts.length,v=>S.tOff=v);
+  if(UI.wheel){if(hovered(px+8,LY,138,ROWS*RH))S.hOff=clamp(S.hOff+UI.wheel,0,Math.max(0,hs.length-ROWS));else if(hovered(px+150,LY,124,ROWS*RH))S.tOff=clamp(S.tOff+UI.wheel,0,Math.max(0,ts.length-ROWS))}
+  S.hOff=clamp(S.hOff,0,Math.max(0,hs.length-ROWS));S.tOff=clamp(S.tOff,0,Math.max(0,ts.length-ROWS));
+  for(let r=0;r<ROWS;r++){const y=LY+r*RH,h=hs[S.hOff+r],x=px+8;
+    if(h){const sel=h.id===S.sel;const hov=hit(x,y,138,RH-4,()=>{if(sel&&S.lastClick&&S.t-S.lastClick<.4)openHeroScreen(h);else selectHero(h);S.lastClick=S.t},{tip:[h.name,`Nivel ${h.lvl} · ${hstat(h).a}/${hstat(h).d}/${hstat(h).sp}/${hstat(h).kn}`,'Clic: seleccionar · doble clic: ficha']});
+      rrect(c,x,y,138,RH-4,5,lg(c,0,y,0,y+RH,[hov?'#4a3a30':'#34281f','#1a1410']),sel?'#ffe27a':'#5a4a30',sel?2.4:1.2);
+      c.drawImage(portrait(h.fi,h.port,h.cls),x+3,y+2,38,38);
+      text(h.name.length>11?h.name.slice(0,10)+'…':h.name,x+46,y+13,{size:11,bold:true,color:sel?'#ffe9a0':'#e8dcc0'});if(h.sleep)text('Zzz',x+130,y+13,{size:11,bold:true,align:'right',color:'#bfe8ff'});
+      bar(x+46,y+18,88,8,h.mp/Math.max(1,maxMP(h)),'#5ad87a','#2a8a4a');bar(x+46,y+28,88,8,h.mana/Math.max(1,maxMana(h)),'#6aa0ff','#2a5ac0')}
+    else rrect(c,x,y,138,RH-4,5,'rgba(0,0,0,.3)','#3a2e22',1);
+    const t=ts[S.tOff+r],tx=px+150;
+    if(t){const cur=S.selTown===t,hh=heroAt(t.x+t.ex,t.y+t.ey);const hov=hit(tx,y,124,RH-4,()=>{if(S.selTown===t){S.selTown=null;openTown(t,hh&&hh.pid===0?hh:null)}else{S.selTown=t;S.sel=null;S.path=null;S.target=null;S.exTarget=null;camTo(t.x+2,t.y+1)}},{tip:[t.name,FDEF[t.fi].name,'Clic: seleccionar (suelta al héroe) · otro clic: entrar']});
+      rrect(c,tx,y,124,RH-4,5,lg(c,0,y,0,y+RH,[hov?'#5a4a30':'#3a2e22','#1a1410']),cur?'#ffe27a':FDEF[t.fi].col[0],cur?2.4:1.3);
+      c.drawImage(townSprite(t.fi).c,tx+3,y+2,54,28*1.2);
+      text(t.name.length>13?t.name.slice(0,12)+'…':t.name,tx+4,y+39,{size:10,bold:true,color:'#e8dcc0'});
+      if(hh&&hh.pid===0){c.drawImage(portrait(hh.fi,hh.port,hh.cls),tx+84,y+3,34,34);c.strokeStyle='#c8a24a';c.lineWidth=1;c.strokeRect(tx+84,y+3,34,34)}}
+    else rrect(c,tx,y,124,RH-4,5,'rgba(0,0,0,.3)','#3a2e22',1)}
+  // héroe seleccionado: movimiento, maná y tropas
+  {const h=selHero(),by0=LY+ROWS*RH+4;
+    if(h&&h.alive){const st=hstat(h);
+      text(`${h.name} · Nv ${h.lvl}`,px+10,by0+12,{size:12,bold:true,color:'#ffe9a0'});text(`${st.a}/${st.d}/${st.sp}/${st.kn}`,px+pw-10,by0+12,{size:11,align:'right',color:'#d8c8a0'});
+      bar(px+10,by0+17,260,9,h.mp/Math.max(1,maxMP(h)),'#5ad87a','#2a8a4a');text(`Mov. ${Math.round(h.mp)}/${maxMP(h)}`,px+140,by0+25,{size:9,bold:true,align:'center',shadow:false});
+      bar(px+10,by0+28,260,9,h.mana/Math.max(1,maxMana(h)),'#6aa0ff','#2a5ac0');text(`Maná ${Math.floor(h.mana)}/${maxMana(h)}`,px+140,by0+36,{size:9,bold:true,align:'center',shadow:false});
+      for(let i=0;i<7;i++){const u=h.army[i],sx=px+10+i*37.4;const sn=u?(u.n>=10000?Math.round(u.n/1000)+'k':String(u.n)):null;
+        slot(sx,by0+42,34,{id:u&&u.id,n:sn,fn:()=>openHeroScreen(h),tip:u?[CR[u.id].name,`${u.n} unidades`,`Ataque ${CR[u.id].atk} · Defensa ${CR[u.id].def}`,'Clic: ficha del héroe']:'Espacio libre'})}}
+    else text(S.selTown?'Castillo seleccionado':'Ningún héroe seleccionado',px+pw/2,by0+40,{size:12,italic:true,align:'center',color:'#9a8a70'})}
   // botones
   const h=selHero(),by=578;
   button(px+12,by,118,32,'Siguiente',()=>nextHero(),{size:14,tip:'Seleccionar el siguiente héroe con movimiento (Espacio)'});
