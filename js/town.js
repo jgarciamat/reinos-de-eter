@@ -43,25 +43,50 @@ function armyRow(x,y,arr,s,gap,o={}){
         if([o.hero,p.hero].some(q=>q&&armyEmpty(q.army))){const t=p.arr[p.i];p.arr[p.i]=arr[i];arr[i]=t;toast('El héroe necesita al menos una criatura','bad')}
         S.pick=null},right:()=>{if(u)creatureInfo(u.id,u.n)}})}
 }
-// huecos fijos de los edificios sobre el panorama (el castillo ocupa la derecha): tres filas de profundidad
-const TOWN_ROWS=[['hall1','hall2','hall3','fort1','fort2','fort3','mage1','mage2','mage3','mage4'],['tavern','market','shipyard','up1','up2','up3','up4','up5','up6','up7'],['dw1','dw2','dw3','dw4','dw5','dw6','dw7','hall4']];
+// ---- disposición de los edificios sobre el panorama ----
+// Fondo: el castillo ocupa el centro (con la puerta libre). Fila trasera: Ayuntamiento y defensa a la izquierda,
+// magia y servicios a la derecha. Delante, las viviendas en una fila y sus mejoras justo debajo de cada una.
+const TOWN_LAYOUT=[['hall1','hall2','hall3','hall4','fort1','fort2','fort3'],['mage1','mage2','mage3','mage4','tavern','market','shipyard'],['dw1','dw2','dw3','dw4','dw5','dw6','dw7'],['up1','up2','up3','up4','up5','up6','up7']];
+const BCATS=[['all','Todo'],['hall','Ayuntamiento'],['fort','Defensa'],['mage','Magia'],['serv','Servicios'],['dw','Viviendas'],['up','Mejoras']];
+const BCATN={hall:'Ayuntamiento y Capitolio',fort:'Fortificaciones',mage:'Gremio de magos',serv:'Servicios',dw:'Viviendas de criaturas',up:'Mejoras de viviendas'};
+function bCat(b){return /^hall/.test(b)?'hall':/^fort/.test(b)?'fort':/^mage/.test(b)?'mage':/^dw/.test(b)?'dw':/^up/.test(b)?'up':'serv'}
 function townSpot(b,t){
-  let row=0,col=0;TOWN_ROWS.forEach((r,i)=>{const j=r.indexOf(b);if(j>=0){row=i;col=j}});
-  const sw=[66,78,92][row]*(UI.ph?1.22:1),base=[444,500,558][row]-(UI.ph?18:0),step=[76,76,108][row]+(UI.ph?6:0);
-  return{x:16+col*step+(row===1?30:0),y:base-sw*112/124,w:sw,h:sw*112/124,row,base}}
+  const P=UI.ph;let row=0,col=0,up=0;TOWN_LAYOUT.forEach((r,i)=>{const j=r.indexOf(b);if(j>=0){row=i;col=j}});
+  // filas 0 y 1: fondo (izquierda/derecha del castillo); filas 2 y 3: cada vivienda con su mejora al lado
+  if(/^hall/.test(b)){const hw=P?160:150,hh=hw*112/124,hb=P?436:442;return{x:16,y:hb-hh,w:hw,h:hh,row:0,base:hb,cx:16+hw/2}} // Ayuntamiento: mitad del castillo
+  const front=row>=2,w=front?(P?92:90):(P?92:90),h=w*112/124,base=front?(P?518:528):(P?436:442);
+  const cx=front?640+(col-3)*172+(row===3?46:-46):(row===0?200+(col-4)*84:676)+(row===0?0:col*84)+w/2;
+  return{x:cx-w/2,y:base-h,w,h,row:front?1:0,base,cx}}
+// estado detallado de un edificio: requisitos y recursos que faltan (para mostrarlos en rojo)
+function buildStatus(t,b,p){
+  const built=!!t.b[b],cost=bCost(b,t.fi),miss=[],low={};
+  if(!built){
+    for(const r of bReq(b,t))if(!t.b[r])miss.push({req:r,txt:'Requiere: '+bTitle(r,t.fi)});
+    if(b==='hall4'&&ownedTowns(p.id).some(q=>q.b.hall4))miss.push({txt:'Solo un Capitolio por jugador'});
+    for(const k in cost)if((p.res[k]||0)<cost[k]){low[k]=1;miss.push({res:k,txt:`Faltan ${cost[k]-(p.res[k]||0)} de ${RESN[k].toLowerCase()}`})}
+  }
+  const day=!built&&!!t.builtToday;
+  return{built,cost,miss,low,day,ready:!built&&!miss.length,ok:!built&&!miss.length&&!day}}
+function hallNext(t,p){const l=townHalls(t);return l<4&&buildStatus(t,'hall'+(l+1),p).ok}
+function buildableCount(t,p){return BUILD_ORDER.filter(b=>(b!=='shipyard'||t.dock)&&buildStatus(t,b,p).ok).length}
+// construir desde la interfaz: marca el último edificio y lanza la animación
+function doBuild(t,b){const p=G.players[0];if(!build(t,b,p))return false;t.lastBuilt=b;sfx('build');toast(`${bTitle(b,t.fi)} construido`,'good');if(S.townFx)S.townFx.bld={b,t:0,burst:0};return true}
+// fila de costes con iconos; en rojo lo que no alcanza. Devuelve el ancho usado
+function costChips(x,y,cost,low,sz=18,fs=13){let cx=x;for(const k of RES){if(!cost[k])continue;ctx.drawImage(resIcon(k,sz),cx,y-sz+3,sz,sz);const s=String(cost[k]);text(s,cx+sz+2,y,{size:fs,bold:true,color:low&&low[k]?'#ff7a68':'#ffe9a0'});cx+=sz+2+measure(s,fs,true)+9}return cx-x}
+function buildBadge(x,y,n){if(!n)return;const r=UI.ph?13:11;ell(ctx,x,y,r,r,'#c83a2a','#ffd0c0',1.6);text(String(n),x,y+4.5,{size:UI.ph?15:13,bold:true,align:'center',color:'#fff',shadow:false})}
 function drawTown(dt){
   if(!S.town){ctx.fillStyle='#120c14';ctx.fillRect(0,0,VW,VH);return}
-  const c=ctx,{t,h}=S.town,p=G.players[0],F=FDEF[t.fi],P=UI.ph;const tf=S.townFx;if(tf)tf.t+=dt;
+  const c=ctx,{t,h}=S.town,p=G.players[0],F=FDEF[t.fi],P=UI.ph;const tf=S.townFx;if(tf){tf.t+=dt;if(tf.bld)tf.bld.t+=dt}
   c.fillStyle='#120c14';c.fillRect(0,0,VW,VH);
   // ---- panorama a todo lo ancho ----
   const PY=42,PH=P?500:522,pan=townPanorama(t.fi);const k=tf?1+.3*Math.max(0,1-tf.t/1.2)**2:1;
   c.save();c.beginPath();c.rect(0,PY,1280,PH);c.clip();c.translate(640,PY+PH*.7);c.scale(k,k);c.translate(-640,-(PY+PH*.7));
-  c.drawImage(pan,0,430-395,960,395,0,PY,1280,PH);
+  const ps=pan.width/960;c.drawImage(pan,0,35*ps,960*ps,395*ps,0,PY,1280,PH); // panorama completo: el castillo queda centrado
   for(let i=0;i<14;i++){const px=(i*137+S.clock*(12+i%5*6))%1280,py=PY+30+((i*61)%170)+Math.sin(S.clock*1.3+i)*6;c.fillStyle=F.id==='brasa'?'rgba(255,170,60,.7)':F.id==='cripta'?'rgba(180,220,255,.45)':'rgba(255,255,255,.35)';c.fillRect(px,py,2.4,2.4)}
   if(F.id==='alba'||F.id==='marea'){for(let i=0;i<3;i++){const bx=(S.clock*30+i*420)%1300;c.strokeStyle='rgba(30,30,40,.7)';c.lineWidth=1.6;c.beginPath();c.moveTo(bx,PY+60+i*22);c.quadraticCurveTo(bx+5,PY+54+i*22+Math.sin(S.clock*8+i)*3,bx+10,PY+60+i*22);c.quadraticCurveTo(bx+15,PY+54+i*22+Math.sin(S.clock*8+i)*3,bx+20,PY+60+i*22);c.stroke()}}
   if(t.owner===0)drawFlag(c,p.col,640-12,PY+14,S.clock);
   c.restore();
-  // edificios construidos, de atrás hacia delante
+  hit(500,PY+30,282,PH*.62,()=>recruitModal(t,h),{tip:[t.name,'Clic: reclutar criaturas (todas las viviendas)'],cursor:'pointer'});
   drawTownBuildings(t,p);
   rrect(c,2,PY,1276,PH,3,null,'#c8a24a',2.4);
   drawTownList(t);
@@ -77,22 +102,50 @@ function drawTownTop(t,p,F){
   const rx0=P?470:430,sp=P?114:118;RES.forEach((r,i)=>{const rx=rx0+i*sp;c.drawImage(resIcon(r,26),rx,8,26,26);text(String(p.res[r]),rx+30,29,{size:P?17:15,bold:true,color:r==='gold'?'#ffe27a':'#fff'});hit(rx,6,sp-4,30,null,{tip:RESN[r]})});
   text(`Día ${G.day}`,1262,29,{size:P?19:17,bold:true,align:'right',color:'#ffe9a0'});
 }
+// polvo y chispas mientras se levanta un edificio
+function buildFxTick(s,bl){if(Math.random()<.55)FX.add({x:s.x+8+Math.random()*(s.w-16),y:s.base-2,vx:(Math.random()-.5)*50,vy:-14-Math.random()*26,col:'rgba(214,196,160,.8)',size:3+Math.random()*3,life:.8,drag:.96,shrink:1});
+  if(Math.random()<.4)FX.add({x:s.x+10+Math.random()*(s.w-20),y:s.base-s.h*(0.15+0.75*Math.min(1,bl.t/1.4)),vx:(Math.random()-.5)*90,vy:-30-Math.random()*40,g:160,col:'#ffe27a',size:1.8,life:.5,add:true})}
 function drawTownBuildings(t,p){
-  const c=ctx,list=BUILD_ORDER.filter(b=>t.b[b]&&(b!=='shipyard'||t.dock)).map(b=>({b,s:townSpot(b,t)})).sort((a,b)=>a.s.base-b.s.base);
-  // edificios aún sin construir: silueta fantasma; al pasar el cursor muestra coste y requisitos, clic para construir
-  for(const b of BUILD_ORDER){if(t.b[b]||(b==='shipyard'&&!t.dock))continue;const s=townSpot(b,t),cb=canBuild(t,b,p);
-    const hov=hit(s.x,s.y,s.w,s.h,()=>buildDialog(t,b),{tip:[...buildTip(t,b,p,cb,bCost(b,t.fi)),cb.ok?'Clic: construir':'Clic: ver detalles']});
-    c.save();c.filter='grayscale(1) brightness(.8)';c.globalAlpha=hov?.75:cb.ok?.38:.2;c.drawImage(buildingSprite(b,t.fi),s.x,s.y,s.w,s.h);c.restore();
-    if(hov){const nm=bTitle(b,t.fi),tw=measure(nm,13,true)+16;rrect(c,s.x+s.w/2-tw/2,s.base+2,tw,19,5,'rgba(10,6,16,.9)','#9a8a6a',1.2);text(nm+' (sin construir)',s.x+s.w/2,s.base+16,{size:13,bold:true,align:'center',color:'#c8b890',shadow:false})}}
-  for(const{b,s}of list){
-    const hov=hit(s.x,s.y,s.w,s.h,()=>buildDialog(t,b),{tip:[...buildTip(t,b,p,{ok:1},bCost(b,t.fi)),'Clic: usar este edificio']});
-    ell(c,s.x+s.w/2,s.base-s.w*.04,s.w*.42,s.w*.075,'rgba(0,0,0,.4)');
-    if(hov){c.save();c.shadowColor='rgba(255,230,120,.95)';c.shadowBlur=18}
-    c.drawImage(buildingSprite(b,t.fi),s.x,s.y,s.w,s.h);
-    if(hov)c.restore();
-    const m=/^dw(\d)$/.exec(b);if(m){const av=t.avail[+m[1]-1];if(av>0){const r=UI.ph?12:10;ell(c,s.x+s.w-r-2,s.y+r+4,r,r,'#2a6a2a','#c8ffb0',1.4);text(String(av>99?'99+':av),s.x+s.w-r-2,s.y+r+8,{size:av>99?9:UI.ph?12:10,bold:true,align:'center',color:'#fff'})}}
-    if(hov){const nm=bTitle(b,t.fi),tw=measure(nm,13,true)+16;rrect(c,s.x+s.w/2-tw/2,s.base+2,tw,19,5,'rgba(10,6,16,.9)','#e8c25a',1.2);text(nm,s.x+s.w/2,s.base+16,{size:13,bold:true,align:'center',color:'#ffe9a0',shadow:false})}
+  const c=ctx,tf=S.townFx,bl=tf&&tf.bld,T=S.clock;
+  const list=BUILD_ORDER.filter(b=>(b!=='shipyard'||t.dock)&&!/^hall[234]$/.test(b)).map(b=>{if(b==='hall1')b='hall'+townHalls(t);return{b,s:townSpot(b,t),st:buildStatus(t,b,p),hall:/^hall/.test(b)}}).sort((a,b)=>a.s.base-b.s.base||a.s.x-b.s.x);
+  let lab=null;
+  for(const{b,s,st,hall}of list){
+    const built=st.built,ok=st.ok;
+    const hov=hit(s.x,s.y,s.w,s.h,hall?()=>townHallModal(t,'hall'):()=>buildDialog(t,b),{tip:hall?[bTitle(b,t.fi)+' (nivel '+townHalls(t)+')',`Ingreso de ${townIncome(t.b)} oro/día`,hallNext(t,p)?'Se puede mejorar hoy':'Mejoras del Ayuntamiento en el menú','Clic: abrir el menú de construcción']:built?[...buildTip(t,b,p,{ok:1},st.cost),'Clic: usar este edificio']:[...buildTip(t,b,p,{ok:ok},st.cost),ok?'Clic: construir':'Clic: ver detalles']});
+    const anim=bl&&(bl.b===b||(hall&&/^hall/.test(bl.b)))&&bl.t<1.7;
+    if(anim){ // obra: el edificio sube desde el suelo entre andamios
+      const pr=Math.min(1,bl.t/1.4),e=1-(1-pr)**2;ell(c,s.cx,s.base-s.w*.04,s.w*.42,s.w*.075,'rgba(0,0,0,.4)');
+      c.save();c.beginPath();c.rect(s.x-4,s.base-s.h*e,s.w+8,s.h*e+6);c.clip();c.drawImage(buildingSprite(b,t.fi),s.x,s.y,s.w,s.h);c.restore();
+      if(pr<1){c.strokeStyle='#8a5a2e';c.lineWidth=2;c.beginPath();for(let i=0;i<4;i++){const px=s.x+6+i*(s.w-12)/3;c.moveTo(px,s.base);c.lineTo(px,s.y+s.h*.1)}for(let i=0;i<4;i++){const py=s.base-i*s.h*.27;c.moveTo(s.x+4,py);c.lineTo(s.x+s.w-4,py)}c.stroke()}
+      buildFxTick(s,bl);
+      if(bl.t>1.3&&!bl.burst){bl.burst=1;FX.burst(s.cx,s.y+s.h*.4,34,['#ffe27a','#fff','#ffb040'],{spd:170,life:1.1,up:30});FX.add({x:s.cx,y:s.y+s.h*.5,vx:0,vy:-24,col:'#c8ffb0',size:20,life:1.6,text:'¡Construido!'})}
+      if(bl.t>1.3){const q=(bl.t-1.3)/.4;c.save();c.globalAlpha=Math.max(0,.6*(1-q));c.strokeStyle='#fff2b0';c.lineWidth=3;c.beginPath();c.ellipse(s.cx,s.base-s.h*.4,s.w*(.5+q*.8),s.h*(.5+q*.6),0,0,6.3);c.stroke();c.restore()}
+      continue}
+    if(built){
+      ell(c,s.cx,s.base-s.w*.04,s.w*.42,s.w*.075,'rgba(0,0,0,.4)');
+      if(hov){c.save();c.shadowColor='rgba(255,230,120,.95)';c.shadowBlur=18}
+      c.drawImage(buildingSprite(b,t.fi),s.x,s.y,s.w,s.h);
+      if(hov)c.restore();
+      const m=/^dw(\d)$/.exec(b);if(m){const av=t.avail[+m[1]-1];if(av>0){const r=UI.ph?12:10;ell(c,s.x+s.w-r-2,s.y+r+4,r,r,'#2a6a2a','#c8ffb0',1.4);text(String(av>99?'99+':av),s.x+s.w-r-2,s.y+r+8,{size:av>99?9:UI.ph?12:10,bold:true,align:'center',color:'#fff'})}}
+      if(hall&&hallNext(t,p)){const bob=Math.sin(T*4)*2.5;ell(c,s.cx,s.y-2+bob,11,11,'#e8b42a','#fff2b0',1.8);text('+',s.cx,s.y+5+bob,{size:19,bold:true,align:'center',color:'#3a2200',shadow:false})}
+      if(t.lastBuilt===b||(hall&&/^hall/.test(t.lastBuilt||''))){const bob=Math.sin(T*3)*1.6;ell(c,s.x+9,s.y+9+bob,8,8,'#3a9a3a','#d0ffc0',1.4);text('★',s.x+9,s.y+13+bob,{size:11,bold:true,align:'center',color:'#fff',shadow:false})}
+    }else{
+      // silueta: gris si falta algo; en color con brillo pulsante si se puede construir hoy
+      const pul=.5+.5*Math.sin(T*3.2+s.x*.02);
+      c.save();
+      if(ok){c.shadowColor=`rgba(255,226,110,${.55+.4*pul})`;c.shadowBlur=14+8*pul;c.globalAlpha=hov?.95:.6+.12*pul;c.filter='saturate(.6)'}
+      else{c.filter=st.ready?'grayscale(.7) brightness(.85)':'grayscale(1) brightness(.8)';c.globalAlpha=hov?.75:st.ready?.34:.2}
+      c.drawImage(buildingSprite(b,t.fi),s.x,s.y,s.w,s.h);c.restore();
+      if(ok){const bob=Math.sin(T*4+s.x)*2.5,bx=s.cx,by=s.y-4+bob;ell(c,bx,by,10,10,'#e8b42a','#fff2b0',1.8);text('+',bx,by+6,{size:17,bold:true,align:'center',color:'#3a2200',shadow:false})}
+    }
+    if(hov)lab={s,b,built,ok};
   }
+  // etiquetas de grupo sobre el suelo
+  const P=UI.ph,fs=P?14:12,lt=(s0,x0,y0,al='center')=>text(s0,x0,y0,{size:fs,bold:true,align:al,color:'rgba(255,240,200,.85)',outline:1});
+  const sh=townSpot('fort1',t),sd=townSpot('dw4',t);
+  lt('DEFENSA',200+3*84/2,sh.y-8);const hs=townSpot('hall1',t);lt('AYUNTAMIENTO',hs.cx,hs.y-6);lt('MAGIA Y SERVICIOS',676+7*84/2,sh.y-8);lt('VIVIENDAS Y SUS MEJORAS  (cada mejora, junto a su vivienda)',640,sd.base+(P?15:19));
+  if(lab){const{s,b,built,ok}=lab,nm=bTitle(b,t.fi)+(built?'':ok?' · ¡construible!':' (sin construir)'),tw=measure(nm,13,true)+16,ly=s.row?s.y-22:s.base+2;
+    rrect(c,s.cx-tw/2,ly,tw,19,5,'rgba(10,6,16,.92)',built||ok?'#e8c25a':'#9a8a6a',1.2);text(nm,s.cx,ly+14,{size:13,bold:true,align:'center',color:built||ok?'#ffe9a0':'#c8b890',shadow:false})}
 }
 function drawTownBottom(t,h,p,F){
   const c=ctx,P=UI.ph,y0=P?546:568,bh=720-y0-4;
@@ -110,11 +163,12 @@ function drawTownBottom(t,h,p,F){
   const bx=aw+10;
   const sel=S.pick&&S.pick.arr[S.pick.i];const up=sel&&upgradeCostFor(t,S.pick.arr,S.pick.i);
   if(!P){const bw=170,bw2=bw+6;panel(bx,y0,bw2*2+14,bh,{plain:1,r:8,noshadow:1});
-    const B=[['Ayuntamiento',()=>townHallModal(t),{primary:1,tip:'Construir y mejorar edificios'}],['Reclutar',()=>recruitModal(t,h),{primary:1,tip:'Reclutar criaturas'}],
+    const B=[['Construir',()=>townHallModal(t),{primary:1,tip:'Menú de construcción: qué construir, coste y requisitos'}],['Reclutar',()=>recruitModal(t,h),{primary:1,tip:'Reclutar criaturas'}],
       ['Taberna',()=>tavernModal(t),{disabled:!t.b.tavern,tip:t.b.tavern?'Contratar héroes (2500 de oro)':'Construye una Taberna'}],['Mercado',()=>marketModal(),{disabled:!t.b.market,tip:t.b.market?null:'Construye un Mercado'}],
       ['Gremio de magos',()=>guildModal(t,h),{disabled:!t.b.mage1,tip:t.b.mage1?null:'Construye un Gremio de magos'}],t.dock?['Astillero',()=>townBoat(t,p),{disabled:!t.b.shipyard,tip:t.b.shipyard?'Comprar barco: 1000 de oro y 10 de madera':'Construye un Astillero'}]:['Resumen',()=>townSummary(t),{tip:'Producción e ingresos de la ciudad'}],
       ['Dividir',()=>townSplit(),{disabled:!sel||sel.n<2,tip:'Divide la pila seleccionada'}],['Mejorar',()=>townUpgrade(t,p),{disabled:!up||!canAfford(p,up.cost),tip:up?`Cuesta ${costText(up.cost)}`:'Selecciona una criatura con mejora disponible'}]];
     B.forEach((q,i)=>button(bx+8+(i%2)*bw2,y0+8+Math.floor(i/2)*((bh-16)/4),bw,(bh-16)/4-4,q[0],q[1],Object.assign({size:14},q[2])));
+    buildBadge(bx+8+bw-6,y0+14,buildableCount(t,p));
     // panel de datos de la ciudad
     const ix=bx+bw2*2+22,iw=1276-ix;panel(ix,y0,iw,bh,{plain:1,r:8,noshadow:1});
     text(F.name,ix+iw/2,y0+24,{size:15,bold:true,align:'center',color:'#ffe9a0'});
@@ -124,10 +178,11 @@ function drawTownBottom(t,h,p,F){
     if(h){const st=hstat(h);text(`${h.name} · Nv ${h.lvl}`,ix+14,y0+110,{size:12,bold:true,color:'#ffe9a0'});text(`Ata ${st.a} · Def ${st.d} · Pod ${st.sp} · Con ${st.kn}`,ix+14,y0+127,{size:12,color:'#bfe8ff'})}
     button(ix+10,y0+bh-48,iw-20,38,'Salir de la ciudad',()=>closeTown(),{size:15})}
   else{const bw=316,bh2=(bh-12)/3-4;panel(bx,y0,1276-bx,bh,{plain:1,r:8,noshadow:1});
-    const B=[['Ayuntamiento',()=>townHallModal(t),{primary:1}],['Reclutar',()=>recruitModal(t,h),{primary:1}],
+    const B=[['Construir',()=>townHallModal(t),{primary:1}],['Reclutar',()=>recruitModal(t,h),{primary:1}],
       sel?['Dividir',()=>townSplit(),{disabled:sel.n<2}]:['Taberna',()=>tavernModal(t),{disabled:!t.b.tavern}],sel?['Mejorar',()=>townUpgrade(t,p),{disabled:!up||!canAfford(p,up.cost)}]:['Mercado',()=>marketModal(),{disabled:!t.b.market}],
       ['Más…',()=>townMore(t,h,p),{}],['Salir',()=>closeTown(),{}]];
-    B.forEach((q,i)=>button(bx+6+(i%2)*(bw+6),y0+6+Math.floor(i/2)*(bh2+4),bw,bh2,q[0],q[1],Object.assign({size:19},q[2])))}
+    B.forEach((q,i)=>button(bx+6+(i%2)*(bw+6),y0+6+Math.floor(i/2)*(bh2+4),bw,bh2,q[0],q[1],Object.assign({size:19},q[2])));
+    buildBadge(bx+bw-6,y0+16,buildableCount(t,p))}
 }
 function townSummary(t){const inc=townIncome(t.b);Dlg.show({title:t.name,w:480,text:`${FDEF[t.fi].name}\nIngreso: +${inc} de oro al día\nEdificios construidos: ${BUILD_ORDER.filter(b=>t.b[b]).length}`,buttons:[{label:'Cerrar',primary:1}]})}
 // móvil: acciones menos frecuentes en un diálogo con botones grandes
@@ -147,38 +202,88 @@ function drawTownList(t){
     rrect(c,x,y,w,hh,4,lg(c,0,y,0,y+hh,[hov?'#5a4a30':'#3a2e22','#1a1410']),cur?'#ffe27a':FDEF[q.fi].col[0],cur?2.6:1.4);
     fitImg(c,townSprite(q.fi).c,x+2,y+2,w-4,(w-4)*.5)});
 }
-// Ayuntamiento: lista completa de edificios para construir (verde = construido)
-function townHallModal(t){
-  const p=G.players[0],P=UI.ph;
-  Dlg.show({w:1060,title:'Ayuntamiento',draw:m=>{
-    const cw=P?140:134,ch=P?124:116,cols=7,w=cols*(cw+6)+26,list=BUILD_ORDER.filter(b=>b!=='shipyard'||t.dock),rows=Math.ceil(list.length/cols),hh=70+rows*(ch+6)+60,x=(1280-w)/2,y=Math.max(6,(720-hh)/2);
-    panel(x,y,w,hh,{title:'Ayuntamiento · '+t.name});
-    text('Clic en un edificio para ver su coste y construirlo. Verde: ya construido.',x+w/2,y+40,{size:fz(13),align:'center',color:'#c8b890'});
-    const inc=townIncome(t.b);
-    list.forEach((b,i)=>{const bx=x+16+(i%cols)*(cw+6),by=y+54+Math.floor(i/cols)*(ch+6);
-      const built=!!t.b[b],cb=canBuild(t,b,p),cost=bCost(b,t.fi);
-      const hov=hit(bx,by,cw,ch,()=>buildDialog(t,b),{tip:buildTip(t,b,p,cb,cost)});
-      rrect(ctx,bx,by,cw,ch,7,lg(ctx,0,by,0,by+ch,[built?'#3a4a30':cb.ok?'#4a3a2e':'#2a2224','#1a1418']),built?'#7ac060':cb.ok?(hov?'#ffe9a0':'#c8a24a'):'#5a4a38',hov?2.4:1.6);
-      ctx.save();ctx.beginPath();ctx.rect(bx+3,by+3,cw-6,ch-6);ctx.clip();if(!built&&!cb.ok)ctx.globalAlpha=.42;else if(!built)ctx.globalAlpha=.85;
-      ctx.drawImage(buildingSprite(b,t.fi),bx+(cw-86)/2,by+2,86,78);ctx.restore();
-      const lines=wrap(bTitle(b,t.fi),cw-8,fz(11),true);lines.slice(0,2).forEach((l,k)=>text(l,bx+cw/2,by+ch-(P?30:26)+k*fz(12)-(lines.length>1?4:0),{size:fz(11),bold:true,align:'center',color:built?'#c8ffb0':'#f2e6c8'}));
-      if(built){ctx.fillStyle='#7ae070';ctx.font='bold 18px '+FONT;ctx.fillText('✔',bx+cw-22,by+20)}
-      else if(cost.gold<900000)text(cost.gold,bx+cw/2,by+ch-3,{size:fz(11),bold:true,align:'center',color:canAfford(p,cost)?'#ffe27a':'#e08070'})});
-    let rx=x+22;for(const r of RES){ctx.drawImage(resIcon(r,24),rx,y+hh-46,24,24);text(String(p.res[r]),rx+27,y+hh-28,{size:fz(13),bold:true});rx+=P?86:80}
-    text(`+${inc} oro/día`,x+w-170,y+hh-28,{size:fz(14),bold:true,align:'right',color:'#ffe27a'});
-    button(x+w-150,y+hh-54,130,40,'Cerrar',()=>Dlg.close(),{size:fz(15),primary:1});
+// Menú de construcción: lista por categorías con icono, coste, requisitos que faltan (en rojo) y botón Construir
+function bBrief(t,b){const L=buildTip(t,b,G.players[0],{ok:1},bCost(b,t.fi));return L.slice(1).filter(l=>!/^(Coste|✖)/.test(l)).join(' · ')}
+function townHallModal(t,c0){
+  const p=G.players[0],P=UI.ph;let cat=c0||'all',only=false,top=0;
+  const ORD=['hall','fort','mage','serv','dw','up'];
+  Dlg.show({w:1060,title:'Construcción',draw:m=>{
+    const x=110,y=34,w=1060,hh=652,RH=P?72:68,HH=28;
+    panel(x,y,w,hh,{title:'Construcción · '+t.name});
+    // pestañas de categoría y filtro de construibles
+    const all=BUILD_ORDER.filter(b=>b!=='shipyard'||t.dock),sts={};all.forEach(b=>sts[b]=buildStatus(t,b,p));
+    const nOk=all.filter(b=>sts[b].ok).length,nReady=all.filter(b=>sts[b].ready).length;
+    BCATS.forEach((q,i)=>{const tx=x+16+i*116,on=cat===q[0],cnt=q[0]==='all'?0:all.filter(b=>bCat(b)===q[0]&&sts[b].ready).length;
+      button(tx,y+24,112,P?42:38,q[1],()=>{cat=q[0];top=0},{size:fz(13),col:on?'#8a3a1a':'#3a2e44',tip:q[0]==='all'?'Todos los edificios':'Solo: '+BCATN[q[0]]});
+      if(cnt)buildBadge(tx+104,y+27,cnt)});
+    button(x+w-196,y+24,180,P?42:38,(only?'☑ ':'☐ ')+`Construibles (${nReady})`,()=>{only=!only;top=0},{size:fz(13),col:only?'#2a6a3a':'#3a2e44',tip:'Mostrar solo lo que ya cumple los requisitos y tiene recursos'});
+    // aviso del día
+    if(t.builtToday)text('Hoy ya has construido aquí: solo se permite un edificio por día. Vuelve mañana.',x+w/2,y+74+(P?4:0)+9,{size:fz(13),bold:true,align:'center',color:'#ffb060'});
+    else text(`Un edificio por día. ${nOk} se pueden construir ahora${t.lastBuilt&&t.b[t.lastBuilt]?' · Último construido: '+bTitle(t.lastBuilt,t.fi):''}`,x+w/2,y+74+(P?4:0)+9,{size:fz(13),align:'center',color:'#c8b890'});
+    // elementos visibles (con cabeceras de grupo)
+    const items=[];let last=null;
+    all.filter(b=>(cat==='all'||bCat(b)===cat)&&(!only||sts[b].ready)).sort((a,b)=>ORD.indexOf(bCat(a))-ORD.indexOf(bCat(b))).forEach(b=>{const c0=bCat(b);if(cat==='all'&&c0!==last){items.push({hdr:c0});last=c0}items.push({b})});
+    const ly=y+(P?104:100),ley=y+hh-58,vh=ley-ly;
+    // cuántos caben desde 'top'
+    const fits=s0=>{let h=0,n=0;for(let i=s0;i<items.length;i++){const ih=items[i].hdr?HH:RH;if(h+ih>vh)break;h+=ih;n++}return n};
+    if(UI.wheel&&hovered(x,ly,w,vh))top+=UI.wheel*2;
+    // mt: mayor desplazamiento útil (hasta ver el final de la lista)
+    let mt=0;while(mt<items.length&&mt+fits(mt)<items.length)mt++;
+    top=clamp(top,0,mt);
+    const n=fits(top);let cy=ly;
+    if(!items.length)text(only?'Nada cumple ahora los requisitos. Quita el filtro para ver qué falta.':'Sin edificios en esta categoría.',x+w/2,ly+60,{size:fz(15),align:'center',color:'#c8b890',italic:true});
+    for(let i=top;i<top+n;i++){const it=items[i];
+      if(it.hdr){text(BCATN[it.hdr].toUpperCase(),x+22,cy+20,{size:fz(13),bold:true,color:'#e8c25a'});ctx.fillStyle='rgba(232,194,90,.4)';ctx.fillRect(x+22+measure(BCATN[it.hdr].toUpperCase(),fz(13),true)+10,cy+15,w-100-measure(BCATN[it.hdr].toUpperCase(),fz(13),true),1.4);cy+=HH;continue}
+      const b=it.b,st=sts[b],rw=w-70,rx=x+16,ry=cy+2,rh=RH-5;
+      const hovR=hit(rx,ry,rw,rh,st.built?()=>{Dlg.close();buildDialog(t,b)}:null,{tip:st.built?'Clic: usar este edificio':buildTip(t,b,p,{ok:st.ok},st.cost)});
+      rrect(ctx,rx,ry,rw,rh,8,lg(ctx,0,ry,0,ry+rh,[st.built?'#2e4a2a':st.ok?'#4e3c2a':'#2c2428','#18121a']),st.built?'#7ac060':st.ok?(hovR?'#fff0b0':'#e8c25a'):'#5a4a38',st.ok?2.2:1.4);
+      if(st.ok){ctx.save();ctx.globalAlpha=.12+.08*Math.sin(S.clock*4);rrect(ctx,rx,ry,rw,rh,8,'#ffe27a');ctx.restore()}
+      ctx.save();ctx.beginPath();ctx.rect(rx+4,ry+3,76,rh-6);ctx.clip();if(!st.built&&!st.ready)ctx.globalAlpha=.5;ctx.drawImage(buildingSprite(b,t.fi),rx+2,ry+rh-70,78,70);ctx.restore();
+      const nm=bTitle(b,t.fi);text(nm,rx+90,ry+22,{size:fz(16),bold:true,color:st.built?'#c8ffb0':st.ready?'#ffe9a0':'#d8c8b0'});
+      const br=bBrief(t,b);text(wrap(br,430,fz(12))[0]||'',rx+90,ry+40,{size:fz(12),color:'#b8a888'});
+      if(st.built){text('✔ Construido'+(t.lastBuilt===b?' (el último)':''),rx+90,ry+rh-8,{size:fz(13),bold:true,color:'#8ae070'})}
+      else{costChips(rx+90,ry+rh-8,st.cost,st.low,18,fz(13));
+        const rl=st.miss.filter(q=>!q.res);
+        rl.slice(0,2).forEach((q,k)=>text('✖ '+q.txt,rx+560,ry+22+k*18,{size:fz(12),bold:true,color:'#ff7a68'}));
+        const lw=st.miss.filter(q=>q.res);if(lw.length&&rl.length<2)text('✖ '+(lw.length>1?`Faltan recursos (${lw.length})`:lw[0].txt),rx+560,ry+22+rl.length*18,{size:fz(12),bold:true,color:'#ff7a68'});
+        if(!st.miss.length&&st.day)text('Disponible mañana',rx+560,ry+22,{size:fz(12),bold:true,color:'#ffb060'});
+        if(st.ok)text('¡Listo para construir!',rx+560,ry+22,{size:fz(12),bold:true,color:'#9aff9a'})}
+      if(!st.built)button(rx+rw-146,ry+(rh-(P?50:46))/2,138,P?50:46,'Construir',()=>{if(doBuild(t,b))Dlg.close()},{size:fz(15),primary:1,disabled:!st.ok,tip:st.ok?'Construir por '+costText(st.cost):st.day?'Ya has construido hoy en esta ciudad':st.miss.map(q=>q.txt)});
+      cy+=RH}
+    // indicador de desplazamiento y botones ▲▼
+    const sx=x+w-48;
+    if(mt>0){button(sx,ly,34,40,'▲',()=>{top=Math.max(0,top-1)},{size:15,disabled:top<=0});button(sx,ley-40,34,40,'▼',()=>{top=Math.min(mt,top+1)},{size:15,disabled:top>=mt});
+      const th=ley-ly-96,ty0=ly+48;rrect(ctx,sx+13,ty0,8,th,4,'rgba(0,0,0,.5)','#5a4a30',1);const kh=Math.max(24,th*n/Math.max(1,items.length));rrect(ctx,sx+12,ty0+(th-kh)*top/mt,10,kh,4,'#c8a24a')}
+    // pie: recursos, ingreso y cerrar
+    let px=x+22;for(const r of RES){ctx.drawImage(resIcon(r,24),px,y+hh-46,24,24);text(String(p.res[r]),px+27,y+hh-28,{size:fz(13),bold:true});px+=P?88:84}
+    text(`+${townIncome(t.b)} oro/día`,x+w-190,y+hh-26,{size:fz(14),bold:true,align:'right',color:'#ffe27a'});
+    button(x+w-170,y+hh-52,150,P?44:40,'Cerrar',()=>Dlg.close(),{size:fz(15),primary:1});
   }});
 }
 function buildTip(t,b,p,cb,cost){const L=[bTitle(b,t.fi)];let m;
   if(m=/^dw(\d)$/.exec(b)){const cr=CR[FDEF[t.fi].units[+m[1]-1]];const ex=dwellExtra(t,+m[1]);L.push(`Cría: ${cr.name} (${cr.grow}${ex?' +'+ex+' de moradas conquistadas':''}/semana)`,`Atq ${cr.atk} · Def ${cr.def} · Vida ${cr.hp} · Daño ${cr.mn}-${cr.mx}`)}
   else if(m=/^up(\d)$/.exec(b)){const cr=CR[FDEF[t.fi].units[+m[1]-1+7]];L.push(`Mejora a: ${cr.name}`,`Atq ${cr.atk} · Def ${cr.def} · Vida ${cr.hp}`)}
   else L.push({shipyard:'Permite comprar barcos (1000 de oro y 10 de madera) para navegar',hall1:`Ingreso de ${HALL_INC[0]} oro/día`,hall2:`Ingreso de ${HALL_INC[1]} oro/día`,hall3:`Ingreso de ${HALL_INC[2]} oro/día`,hall4:`Ingreso de ${HALL_INC[3]} oro/día (solo uno por jugador)`,fort1:'Defensa de la ciudad',fort2:'+50% de crecimiento semanal',fort3:'+100% de crecimiento semanal',tavern:'Permite contratar héroes',market:'Permite comerciar recursos',mage1:'Hechizos de nivel 1',mage2:'Hechizos de nivel 2',mage3:'Hechizos de nivel 3',mage4:'Hechizos de nivel 4'}[b]||'');
-  if(!t.b[b]){L.push('Coste: '+costText(cost));if(!cb.ok)L.push('✖ '+cb.why)}return L}
+  if(!t.b[b]){const st=buildStatus(t,b,p);L.push('Coste: '+costText(cost));st.miss.forEach(q=>L.push('✖ '+q.txt));if(st.day&&!st.miss.length)L.push('✖ Solo una construcción por día')}return L}
+// ficha de un edificio: si ya existe se usa; si no, muestra descripción, requisitos y el botón Construir
 function buildDialog(t,b){
-  const p=G.players[0],cb=canBuild(t,b,p),cost=bCost(b,t.fi);
-  if(t.b[b]){if(/^dw/.test(b))recruitModal(t,S.town.h);else if(b==='tavern')tavernModal(t);else if(b==='market')marketModal();else if(b==='shipyard'){const e=buyBoat(t,p);if(e)toast(e,'bad');else{sfx('build');toast('Barco amarrado en el muelle','good')}}else if(/^mage/.test(b))guildModal(t,S.town.h);else Dlg.show({title:bTitle(b,t.fi),w:480,text:buildTip(t,b,p,cb,cost).slice(1).join('\n'),buttons:[{label:'Cerrar',primary:1}]});return}
-  Dlg.show({title:bTitle(b,t.fi),w:480,text:buildTip(t,b,p,cb,cost).slice(1).join('\n'),buttons:[{label:'Construir',primary:1,disabled:!cb.ok,fn:()=>{if(build(t,b,p)){sfx('build');toast(`${bTitle(b,t.fi)} construido`,'good');FX.burst(640,200,30,['#ffe27a','#fff'],{spd:160,life:1})}}},{label:'Cancelar'}]});
+  const p=G.players[0];
+  if(t.b[b]){if(/^dw/.test(b))recruitModal(t,S.town.h);else if(b==='tavern')tavernModal(t);else if(b==='market')marketModal();else if(b==='shipyard'){const e=buyBoat(t,p);if(e)toast(e,'bad');else{sfx('build');toast('Barco amarrado en el muelle','good')}}else if(/^mage/.test(b))guildModal(t,S.town.h);else Dlg.show({title:bTitle(b,t.fi),w:480,text:buildTip(t,b,p,{ok:1},bCost(b,t.fi)).slice(1).join('\n'),buttons:[{label:'Cerrar',primary:1}]});return}
+  Dlg.show({w:640,title:bTitle(b,t.fi),draw:m=>{
+    const st=buildStatus(t,b,p),x=320,y=120,w=640,hh=P0()?470:450;
+    panel(x,y,w,hh,{title:bTitle(b,t.fi)});
+    rrect(ctx,x+22,y+38,176,160,8,lg(ctx,0,y+38,0,y+198,[SKY[t.fi][1],'#1a1420']),'#c8a24a',1.6);ctx.drawImage(buildingSprite(b,t.fi),x+28,y+44,164,148);
+    const L=buildTip(t,b,p,{ok:1},st.cost).slice(1).filter(l=>!/^(Coste|✖)/.test(l));
+    let ty=y+62;L.forEach(l=>{ty+=paragraph(l,x+216,ty,w-240,{size:fz(14),color:'#e8dcc0'})+4});
+    text('Coste',x+216,y+158,{size:fz(13),bold:true,color:'#e8c25a'});costChips(x+216,y+184,st.cost,st.low,22,fz(15));
+    text('Requisitos',x+22,y+232,{size:fz(14),bold:true,color:'#e8c25a'});
+    const reqs=bReq(b,t),rows=[...reqs.map(r=>({ok:!!t.b[r],txt:bTitle(r,t.fi)})),...(b==='hall4'?[{ok:!ownedTowns(p.id).some(q=>q.b.hall4),txt:'Un solo Capitolio por jugador'}]:[]),{ok:!Object.keys(st.low).length,txt:Object.keys(st.low).length?st.miss.filter(q=>q.res).map(q=>q.txt).join(' · '):'Recursos suficientes'},{ok:!t.builtToday,txt:t.builtToday?'Hoy ya has construido aquí (vuelve mañana)':'Una construcción por día: disponible'}];
+    rows.forEach((r,i)=>text((r.ok?'✔ ':'✖ ')+r.txt,x+30,y+258+i*26,{size:fz(14),bold:true,color:r.ok?'#9aff9a':'#ff7a68'}));
+    button(x+w/2-170,y+hh-62,200,P0()?52:48,'Construir',()=>{if(doBuild(t,b))Dlg.close()},{size:fz(17),primary:1,disabled:!st.ok});
+    button(x+w/2+50,y+hh-62,120,P0()?52:48,'Cerrar',()=>Dlg.close(),{size:fz(16)});
+  }});
 }
+const P0=()=>!!UI.ph;
 // ---------- reclutamiento ----------
 function recruitModal(t,h){
   const p=G.players[0];S.rq={};
