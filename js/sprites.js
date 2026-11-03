@@ -4,7 +4,7 @@
 // =====================================================================
 const IS_TOUCH=('ontouchstart' in window)||(navigator.maxTouchPoints||0)>1; // móvil: menos memoria de canvas
 const IS_PHONE=IS_TOUCH&&Math.min(screen.width,screen.height)<600;
-const TILE=48,SC=IS_PHONE?1:IS_TOUCH?1.5:2;
+const NVAR=10,TILE=48,SC=IS_PHONE?1:IS_TOUCH?1.5:2;
 const FONT='"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif';
 function mkc(w,h,s=SC){const c=document.createElement('canvas');c.width=Math.ceil(w*s);c.height=Math.ceil(h*s);const x=c.getContext('2d');x.scale(s,s);c.lw=w;c.lh=h;c.ctx=x;return c}
 const _shc={};
@@ -265,7 +265,7 @@ function drawFlag(ctx,color,x,y,t){const f=flagSprite(color);const w=Math.sin(t*
 function resIcon(res,s=22){const key='i'+res+s;if(Gfx.cache[key])return Gfx.cache[key];const c=mkc(s,s),x=c.ctx;const p=resPile(res);x.drawImage(p,-s*.05,-s*.15,s*1.1,s*1.15);return Gfx.cache[key]=c}
 function initGfx(){
   if(Gfx.ready)return;
-  for(const t of [GRASS,DIRT,SAND,SNOW,SWAMP,ROUGH,ASH,SUBT]){Gfx.tiles[t]=[];for(let v=0;v<6;v++)Gfx.tiles[t].push(drawTerrainTile(t,v))}
+  for(const t of [GRASS,DIRT,SAND,SNOW,SWAMP,ROUGH,ASH,SUBT]){Gfx.tiles[t]=[];for(let v=0;v<NVAR;v++)Gfx.tiles[t].push(drawTerrainTile(t,v))}
   Gfx.tiles[LAVA]=[];for(let f=0;f<6;f++)Gfx.tiles[LAVA].push(drawTerrainTile(LAVA,f,f));
   Gfx.tiles[WATER]=[];for(let f=0;f<6;f++)Gfx.tiles[WATER].push(drawTerrainTile(WATER,f,f));
   buildEdges();buildRoads();buildLavaShores();Gfx.ready=true;

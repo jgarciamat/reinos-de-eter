@@ -22,7 +22,7 @@ function armyPanel(x,y,arr,label,o={}){
         if([o.hero,p.hero].some(q=>q&&armyEmpty(q.army))){const t=p.arr[p.i];p.arr[p.i]=arr[i];arr[i]=t;toast('El héroe necesita al menos una criatura','bad')}
         S.pick=null},right:()=>{if(u)creatureInfo(u.id,u.n)}})}
 }
-function townHalls(t){return t.b.hall3?3:t.b.hall2?2:1}
+function townHalls(t){return t.b.hall4?4:t.b.hall3?3:t.b.hall2?2:1}
 // tamaño de fuente: en móvil horizontal (lienzo escalado) se agranda para que se lea
 const fz=n=>UI.ph?Math.round(n*1.3):n;
 // ---- acciones compartidas de la ciudad (escritorio y móvil) ----
@@ -44,7 +44,7 @@ function armyRow(x,y,arr,s,gap,o={}){
         S.pick=null},right:()=>{if(u)creatureInfo(u.id,u.n)}})}
 }
 // huecos fijos de los edificios sobre el panorama (el castillo ocupa la derecha): tres filas de profundidad
-const TOWN_ROWS=[['hall1','hall2','hall3','fort1','fort2','fort3','mage1','mage2','mage3','mage4'],['tavern','market','shipyard','up1','up2','up3','up4','up5','up6','up7'],['dw1','dw2','dw3','dw4','dw5','dw6','dw7']];
+const TOWN_ROWS=[['hall1','hall2','hall3','fort1','fort2','fort3','mage1','mage2','mage3','mage4'],['tavern','market','shipyard','up1','up2','up3','up4','up5','up6','up7'],['dw1','dw2','dw3','dw4','dw5','dw6','dw7','hall4']];
 function townSpot(b,t){
   let row=0,col=0;TOWN_ROWS.forEach((r,i)=>{const j=r.indexOf(b);if(j>=0){row=i;col=j}});
   const sw=[66,78,92][row]*(UI.ph?1.22:1),base=[444,500,558][row]-(UI.ph?18:0),step=[76,76,108][row]+(UI.ph?6:0);
@@ -79,6 +79,11 @@ function drawTownTop(t,p,F){
 }
 function drawTownBuildings(t,p){
   const c=ctx,list=BUILD_ORDER.filter(b=>t.b[b]&&(b!=='shipyard'||t.dock)).map(b=>({b,s:townSpot(b,t)})).sort((a,b)=>a.s.base-b.s.base);
+  // edificios aún sin construir: silueta fantasma; al pasar el cursor muestra coste y requisitos, clic para construir
+  for(const b of BUILD_ORDER){if(t.b[b]||(b==='shipyard'&&!t.dock))continue;const s=townSpot(b,t),cb=canBuild(t,b,p);
+    const hov=hit(s.x,s.y,s.w,s.h,()=>buildDialog(t,b),{tip:[...buildTip(t,b,p,cb,bCost(b,t.fi)),cb.ok?'Clic: construir':'Clic: ver detalles']});
+    c.save();c.filter='grayscale(1) brightness(.8)';c.globalAlpha=hov?.75:cb.ok?.38:.2;c.drawImage(buildingSprite(b,t.fi),s.x,s.y,s.w,s.h);c.restore();
+    if(hov){const nm=bTitle(b,t.fi),tw=measure(nm,13,true)+16;rrect(c,s.x+s.w/2-tw/2,s.base+2,tw,19,5,'rgba(10,6,16,.9)','#9a8a6a',1.2);text(nm+' (sin construir)',s.x+s.w/2,s.base+16,{size:13,bold:true,align:'center',color:'#c8b890',shadow:false})}}
   for(const{b,s}of list){
     const hov=hit(s.x,s.y,s.w,s.h,()=>buildDialog(t,b),{tip:[...buildTip(t,b,p,{ok:1},bCost(b,t.fi)),'Clic: usar este edificio']});
     ell(c,s.x+s.w/2,s.base-s.w*.04,s.w*.42,s.w*.075,'rgba(0,0,0,.4)');
@@ -167,7 +172,7 @@ function townHallModal(t){
 function buildTip(t,b,p,cb,cost){const L=[bTitle(b,t.fi)];let m;
   if(m=/^dw(\d)$/.exec(b)){const cr=CR[FDEF[t.fi].units[+m[1]-1]];const ex=dwellExtra(t,+m[1]);L.push(`Cría: ${cr.name} (${cr.grow}${ex?' +'+ex+' de moradas conquistadas':''}/semana)`,`Atq ${cr.atk} · Def ${cr.def} · Vida ${cr.hp} · Daño ${cr.mn}-${cr.mx}`)}
   else if(m=/^up(\d)$/.exec(b)){const cr=CR[FDEF[t.fi].units[+m[1]-1+7]];L.push(`Mejora a: ${cr.name}`,`Atq ${cr.atk} · Def ${cr.def} · Vida ${cr.hp}`)}
-  else L.push({shipyard:'Permite comprar barcos (1000 de oro y 10 de madera) para navegar',hall1:`Ingreso de ${HALL_INC[0]} oro/día`,hall2:`Ingreso de ${HALL_INC[1]} oro/día`,hall3:`Ingreso de ${HALL_INC[2]} oro/día`,fort1:'Defensa de la ciudad',fort2:'+50% de crecimiento semanal',fort3:'+100% de crecimiento semanal',tavern:'Permite contratar héroes',market:'Permite comerciar recursos',mage1:'Hechizos de nivel 1',mage2:'Hechizos de nivel 2',mage3:'Hechizos de nivel 3',mage4:'Hechizos de nivel 4'}[b]||'');
+  else L.push({shipyard:'Permite comprar barcos (1000 de oro y 10 de madera) para navegar',hall1:`Ingreso de ${HALL_INC[0]} oro/día`,hall2:`Ingreso de ${HALL_INC[1]} oro/día`,hall3:`Ingreso de ${HALL_INC[2]} oro/día`,hall4:`Ingreso de ${HALL_INC[3]} oro/día (solo uno por jugador)`,fort1:'Defensa de la ciudad',fort2:'+50% de crecimiento semanal',fort3:'+100% de crecimiento semanal',tavern:'Permite contratar héroes',market:'Permite comerciar recursos',mage1:'Hechizos de nivel 1',mage2:'Hechizos de nivel 2',mage3:'Hechizos de nivel 3',mage4:'Hechizos de nivel 4'}[b]||'');
   if(!t.b[b]){L.push('Coste: '+costText(cost));if(!cb.ok)L.push('✖ '+cb.why)}return L}
 function buildDialog(t,b){
   const p=G.players[0],cb=canBuild(t,b,p),cost=bCost(b,t.fi);

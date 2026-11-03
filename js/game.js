@@ -148,7 +148,7 @@ function marketEff(pid){const n=marketCount(pid);return n<1?.8:Math.min(.95,.8+.
 function ownedTowns(pid){return objsOfType('town').filter(o=>!o.dead&&o.owner===pid)}
 function ownedMines(pid){return objsOfType('mine').filter(o=>!o.dead&&o.owner===pid)}
 function canBuild(t,b,p){
-  if(t.b[b])return{ok:false,why:'Ya construido'};if(t.builtToday)return{ok:false,why:'Solo una construcción por día'};
+  if(t.b[b])return{ok:false,why:'Ya construido'};if(b==='hall4'&&ownedTowns(p.id).some(q=>q.b.hall4))return{ok:false,why:'Solo un Capitolio por jugador'};if(t.builtToday)return{ok:false,why:'Solo una construcción por día'};
   for(const r of bReq(b,t))if(!t.b[r])return{ok:false,why:'Requiere: '+bTitle(r,t.fi)};
   if(/^up\d$/.test(b)&&!t.b['dw'+b[2]])return{ok:false,why:'Requiere la vivienda'};
   if(b==='shipyard'&&!t.dock)return{ok:false,why:'La ciudad no está junto al agua'};
@@ -499,18 +499,19 @@ function aiTrade(p){
 function aiUpgradeArmy(p,t,arr){for(let i=0;i<7;i++){const u=upgradeCostFor(t,arr,i);if(u&&canAfford(p,u.cost)&&p.res.gold>u.cost.gold+1500)doUpgrade(p,t,arr,i)}}
 function aiTowns(p){
   const towns=ownedTowns(p.id);const rich=p.res.gold>12000;
-  const order=['tavern','dw1','dw2','dw3','hall2','dw4','mage1','dw5','up1','up2','up3','dw6','hall3','up4','up5','dw7','market','fort1','fort2','up6','up7','fort3','mage2','mage3'];
+  const order=['tavern','dw1','dw2','dw3','hall2','dw4','mage1','dw5','up1','up2','up3','dw6','hall3','up4','up5','dw7','market','fort1','fort2','up6','up7','fort3','mage2','mage3','mage4','hall4'];
+  const rest=BUILD_ORDER.filter(b=>!order.includes(b));
   towns.sort((a,b)=>Object.keys(b.b).length-Object.keys(a.b).length);
   for(const t of towns){
     const saving=p.heroes.length===0&&t.b.tavern&&!heroAt(t.x+t.ex,t.y+t.ey);
-    if(!t.builtToday&&!saving){const ord=G.day>10?['hall2',...order]:order;for(const b of ord){const cb=canBuild(t,b,p);if(cb.ok&&(b!=='hall3'||p.res.gold>12000)){build(t,b,p);break}}}
+    if((!t.builtToday||p.res.gold>20000)&&!saving){const ord=(G.day>10?['hall2',...order]:order).concat(rest);for(const b of ord){const cb=canBuild(t,b,p);if(cb.ok&&(b!=='hall3'||p.res.gold>12000)){build(t,b,p);t.builtToday=false;if(p.res.gold<20000)t.builtToday=true;break}}}
     const hero=heroAt(t.x+t.ex,t.y+t.ey);const mine=hero&&hero.pid===p.id?hero:null;
     if(!saving)for(let tier=7;tier>=1;tier--){if(!t.b['dw'+tier])continue;const id=townUnit(t,tier);const n=maxRecruit(p,id,t.avail[tier-1]);if(n>0)recruit(t,tier,n,p,mine)}
     if(G.map.spec.sea&&t.dock&&G.day>5){
       if(!t.b.shipyard&&p.res.gold>9000&&canBuild(t,'shipyard',p).ok&&!t.builtToday&&ownedTowns(p.id).filter(q=>q.b.shipyard).length<2)build(t,'shipyard',p);
       if(t.b.shipyard&&p.res.gold>6000&&p.res.wood>=10&&(p.boats||0)<3&&!G.map.objs.some(o=>!o.dead&&o.t==='boat'&&Math.hypot(o.x-t.dock.x,o.y-t.dock.y)<6)){if(buyBoat(t,p)===null)p.boats=(p.boats||0)+1}}
     aiUpgradeArmy(p,t,t.gar);if(mine){aiUpgradeArmy(p,t,mine.army);mergeArmy(mine.army,t.gar);sortArmy(mine.army)}
-    if(p.heroes.length<Math.min(2+Math.floor(G.day/7),8)&&t.b.tavern&&!heroAt(t.x+t.ex,t.y+t.ey)&&p.res.gold>=HIRE_COST+(p.heroes.length?700:0)){const h=hireHero(p,t,Math.max(0,p.pool.findIndex(o=>o.fi===p.fac)));if(h){mergeArmy(h.army,t.gar);sortArmy(h.army)}}
+    if(p.heroes.length<(p.res.gold>15000?8:Math.min(2+Math.floor(G.day/7),8))&&t.b.tavern&&!heroAt(t.x+t.ex,t.y+t.ey)&&p.res.gold>=HIRE_COST+(p.heroes.length?700:0)){const h=hireHero(p,t,Math.max(0,p.pool.findIndex(o=>o.fi===p.fac)));if(h){mergeArmy(h.army,t.gar);sortArmy(h.army)}}
   }
 }
 function threatsTo(p,t){let power=0,who=[];for(const q of G.players){if(q.id===p.id||!q.alive)continue;for(const hid of q.heroes){const e=G.heroes[hid];if(Math.hypot(e.x-(t.x+2),e.y-(t.y+1))<=16){power+=armyPower(e.army);who.push(e)}}}return{power,who}}

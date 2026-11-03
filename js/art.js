@@ -18,7 +18,7 @@ const TPAL={[GRASS]:['#2f6a2c','#4f9a36','#7cc04a','#b4e070'],[DIRT]:['#5e4228',
   [ASH]:['#1e1618','#3c2e2e','#5a4846','#7a6460'],[SUBT]:['#1c1628','#382e48','#554866','#7a6a92']};
 // pinta el suelo (c = canvas de mkc). o.k = contraste, o.rel = fuerza del relieve
 function bakeGround(c,t,seed,o={}){
-  const S=c.width,pal=TPAL[t].map(_hx),n=tnoise(seed),n2=tnoise(seed+91),nc=tnoise(t*31+5),k=o.k||1.3,rel=o.rel==null?34:o.rel;
+  const S=c.width,pal=TPAL[t].map(_hx),n=tnoise(seed),n2=tnoise(seed+91),nc=tnoise(t*31+5),k=o.k||1.55,rel=o.rel==null?46:o.rel;
   const H=new Float32Array(S*S),sm=q=>q*q*(3-2*q);
   for(let y=0;y<S;y++)for(let x=0;x<S;x++){const u=x/S,v=y/S;
     // campo COMÚN a todas las variantes (periodo 1 tile): en el borde vale igual en cualquier variante => sin costuras entre variantes
@@ -40,6 +40,7 @@ function bakeGround(c,t,seed,o={}){
 }
 // dibuja fn en las 9 posiciones necesarias para que los detalles cruzando el borde se enrollen (sin costuras)
 function w9(px,py,m,fn){for(let dx=-1;dx<=1;dx++){if(dx<0&&px<TILE-m)continue;if(dx>0&&px>m)continue;for(let dy=-1;dy<=1;dy++){if(dy<0&&py<TILE-m)continue;if(dy>0&&py>m)continue;fn(px+dx*TILE,py+dy*TILE)}}}
+const dot2=(x,px,py,s,col)=>{x.fillStyle=col;x.beginPath();x.arc(px,py,s,0,6.2832);x.fill()};
 function drawTerrainTile(t,v,frame=0){
   if(t===LAVA||t===SUBT)return drawNewTile(t,v,frame);
   if(t===WATER)return drawWaterTileLegacy?drawWaterTileLegacy(v,frame):mkc(TILE,TILE); // el agua pasa a buildWaterPatches (M5)
@@ -49,13 +50,16 @@ function drawTerrainTile(t,v,frame=0){
   switch(t){
     case GRASS:{
       // macollas: sombra de contacto + 4-6 briznas en abanico con 3 tonos
-      for(let i=0;i<11;i++){const px=r()*TILE,py=r()*TILE,nb=4+(r()*3|0);
+      for(let i=0;i<17;i++){const px=r()*TILE,py=r()*TILE,nb=4+(r()*3|0);
         w9(px,py,9,(X,Y)=>{x.fillStyle='rgba(20,60,20,.28)';x.beginPath();x.ellipse(X,Y+1,4.2,1.6,0,0,6.28);x.fill();
           for(let b=0;b<nb;b++){const a=-1.57+(b-(nb-1)/2)*.42+(r()-.5)*.2,h=4+r()*4.5,ex=X+Math.cos(a)*h,ey=Y+Math.sin(a)*h;
             x.lineCap='round';x.strokeStyle='rgba(18,70,28,.9)';x.lineWidth=1.9;x.beginPath();x.moveTo(X,Y);x.quadraticCurveTo(X+Math.cos(a)*h*.4+1,Y+Math.sin(a)*h*.5,ex,ey);x.stroke();
             x.strokeStyle=b%2?P[2]:P[1];x.lineWidth=1.1;x.stroke();
             x.fillStyle=P[3];x.fillRect(ex-.4,ey-.4,.9,.9)}})}
-      for(let i=0;i<10;i++)dot(r()*TILE,r()*TILE,1+r()*1.2,r()<.5?'rgba(190,235,110,.22)':'rgba(15,60,25,.2)');
+      for(let i=0;i<4;i++){const px=r()*TILE,py=r()*TILE,rr=5+r()*8;w9(px,py,rr+1,(X,Y)=>{x.fillStyle=r()<.5?'rgba(210,235,120,.13)':'rgba(10,50,25,.15)';x.beginPath();x.ellipse(X,Y,rr,rr*.7,r()*3,0,6.28);x.fill()})}
+      for(let i=0;i<14;i++)dot(r()*TILE,r()*TILE,1+r()*1.2,r()<.5?'rgba(190,235,110,.22)':'rgba(15,60,25,.2)');
+      for(let i=0;i<6;i++){const px=r()*TILE,py=r()*TILE;w9(px,py,4,(X,Y)=>{x.strokeStyle='rgba(200,185,100,.65)';x.lineWidth=.8;x.beginPath();x.moveTo(X,Y);x.lineTo(X+(r()-.5)*3,Y-3-r()*3);x.stroke()})}
+      for(let i=0;i<3;i++){const px=r()*TILE,py=r()*TILE;w9(px,py,4,(X,Y)=>{for(let q=0;q<3;q++){const a=q*2.1+r();dot2(x,X+Math.cos(a)*1.6,Y+Math.sin(a)*1.2,1.3,'#3f8a34')}dot2(x,X,Y,.6,'#2a6a28')})}
       if(v%3===0)for(let i=0;i<2;i++){const px=4+r()*40,py=4+r()*40,col=['#fff','#ffe46a','#ff9ac0','#b8a0ff'][r()*4|0];dot(px,py+.9,1.5,'rgba(0,0,0,.25)');dot(px,py,1.3,col);dot(px-.4,py-.4,.5,'#fff')}
       break}
     case DIRT:{

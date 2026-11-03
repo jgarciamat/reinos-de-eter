@@ -208,7 +208,7 @@ const XP_LV=[0,1000,2000,3200,4600,6200,8000,10000,12200,14700,17500,20600,24320
 function xpForLevel(l){if(l<=XP_LV.length)return XP_LV[l-1];let v=XP_LV[XP_LV.length-1];for(let i=XP_LV.length;i<l;i++)v=Math.round(v*1.2);return v}
 
 // ---------- edificios de ciudad ----------
-const BNAME={hall1:'Cabildo',hall2:'Consistorio',hall3:'Alcaldía',fort1:'Empalizada',fort2:'Ciudadela',fort3:'Castillo',
+const BNAME={hall1:'Cabildo',hall2:'Consistorio',hall3:'Alcaldía',hall4:'Capitolio',fort1:'Empalizada',fort2:'Ciudadela',fort3:'Castillo',
  mage1:'Gremio de Magos I',mage2:'Gremio de Magos II',mage3:'Gremio de Magos III',mage4:'Gremio de Magos IV',tavern:'Taberna',market:'Mercado',shipyard:'Astillero',
  dw1:'Viviendas',dw2:'Tiro',dw3:'Cobijo',dw4:'Salón',dw5:'Santuario',dw6:'Palacio',dw7:'Trono'};
 const FBNAME=[ // nombres temáticos para viviendas por facción
@@ -221,8 +221,8 @@ const FBNAME=[ // nombres temáticos para viviendas por facción
  ['Charca','Tolderías Lagarto','Nido Basilisco','Torre de Alas','Choza Chamán','Ciénaga Profunda','Sima Pútrida'],
  ['Campamento Goblin','Palizada Orca','Cubil de Lobos','Cueva de Ogros','Tienda Chamán','Torre Ciclópea','Cumbre del Trueno']];
 // ingresos de oro por día de la casa consistorial (Heroes 3: 500 / 1000 / 2000)
-const HALL_INC=[500,1000,2000];
-function townIncome(b){return b.hall3?HALL_INC[2]:b.hall2?HALL_INC[1]:HALL_INC[0]}
+const HALL_INC=[500,1000,2000,4000];
+function townIncome(b){return b.hall4?HALL_INC[3]:b.hall3?HALL_INC[2]:b.hall2?HALL_INC[1]:HALL_INC[0]}
 // costes de construcción según las tablas del manual de Heroes 3 (viviendas: crecen de 500 a 15000 de oro; el nivel 7 pide 10 de recurso raro)
 const DW_COST=[null,{gold:500,ore:10},{gold:1000,wood:5,ore:5},{gold:1000,ore:5},{gold:2000,ore:5},{gold:3000,wood:5,ore:5},{gold:5000,wood:20},{gold:15000}];
 const UP_COST=[null,{gold:1000,ore:5},{gold:1000,wood:5,ore:5},{gold:1000},{gold:2000,ore:5},{gold:1000,wood:2,ore:2},{gold:3000,wood:10},{gold:2000}];
@@ -231,7 +231,7 @@ function bCost(b,fi){
   const dw=/^dw(\d)$/.exec(b),up=/^up(\d)$/.exec(b);
   if(dw){const t=+dw[1],c=Object.assign({},DW_COST[t]);if(t===5)c[r]=3;if(t===7)c[r]=10;return c}
   if(up){const t=+up[1],c=Object.assign({},UP_COST[t]);if(t===5)c[r]=3;if(t===7)c[r]=10;return c}
-  m={hall1:{gold:2500},hall2:{gold:2500},hall3:{gold:5000},fort1:{gold:5000,wood:20,ore:20},fort2:{gold:2500,ore:5},fort3:{gold:5000,wood:10,ore:10},
+  m={hall1:{gold:2500},hall2:{gold:2500},hall3:{gold:5000},hall4:{gold:5000},fort1:{gold:5000,wood:20,ore:20},fort2:{gold:2500,ore:5},fort3:{gold:5000,wood:10,ore:10},
    mage1:{gold:2000,wood:5,ore:5},mage2:{gold:1000,wood:5,ore:5,mercury:4,sulfur:4,crystal:4,gems:4},mage3:{gold:1000,wood:5,ore:5,mercury:6,sulfur:6,crystal:6,gems:6},mage4:{gold:1000,wood:5,ore:5,mercury:8,sulfur:8,crystal:8,gems:8},
    tavern:{gold:500,wood:5},market:{gold:500,wood:5,ore:5},shipyard:{gold:2000,wood:20}}[b];
   return m||{gold:999999};
@@ -240,12 +240,12 @@ function bReq(b,town){
   const has=x=>town.b[x];let m;
   if(m=/^dw(\d)$/.exec(b)){const t=+m[1];if(t===1)return[];if(t<=3)return['dw1'];return['dw'+(t-2),...(t===5||t>=7?['mage1']:[])]}
   if(m=/^up(\d)$/.exec(b)){return['dw'+m[1],...(+m[1]>=4?['fort1']:[])]}
-  if(b==='hall2')return['hall1','tavern'];if(b==='hall3')return['hall2','fort2'];
+  if(b==='hall2')return['hall1','tavern'];if(b==='hall3')return['hall2','fort2'];if(b==='hall4')return['hall3'];
   if(b==='fort2')return['fort1'];if(b==='fort3')return['fort2'];
   if(b==='mage2')return['mage1'];if(b==='mage3')return['mage2'];if(b==='mage4')return['mage3'];
   return[];
 }
-const BUILD_ORDER=['hall1','hall2','hall3','fort1','fort2','fort3','tavern','market','shipyard','mage1','mage2','mage3','mage4','dw1','dw2','dw3','dw4','dw5','dw6','dw7','up1','up2','up3','up4','up5','up6','up7'];
+const BUILD_ORDER=['hall1','hall2','hall3','hall4','fort1','fort2','fort3','tavern','market','shipyard','mage1','mage2','mage3','mage4','dw1','dw2','dw3','dw4','dw5','dw6','dw7','up1','up2','up3','up4','up5','up6','up7'];
 function bTitle(b,fi){let m;if(m=/^dw(\d)$/.exec(b))return FBNAME[fi][+m[1]-1];if(m=/^up(\d)$/.exec(b))return 'Mejora: '+FBNAME[fi][+m[1]-1];return BNAME[b]}
 function canAfford(p,cost,mul=1){for(const k in cost)if((p.res[k]||0)<cost[k]*mul)return false;return true}
 function spend(p,cost,mul=1){for(const k in cost)p.res[k]-=cost[k]*mul}

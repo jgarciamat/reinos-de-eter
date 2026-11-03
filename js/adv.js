@@ -105,8 +105,8 @@ function advDraw(dt){
   const tc=S.TL.getContext('2d');tc.setTransform(TLS,0,0,TLS,0,0);tc.translate(-x0*TILE,-y0*TILE);tc.imageSmoothingEnabled=true;
   const tlLights=[];let liq=false;
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
-    const i=y*m.w+x,tr=m.terr[i],hv=Math.floor(hash2(x,y,3)*6);const px=x*TILE,py=y*TILE;
-    tc.drawImage((tr===WATER||tr===LAVA)?Gfx.tiles[tr][(wf+hv)%6]:Gfx.tiles[tr][hv],px,py,TILE,TILE);
+    const i=y*m.w+x,tr=m.terr[i],hv=Math.floor(hash2(x,y,3)*NVAR);const px=x*TILE,py=y*TILE;
+    tc.drawImage((tr===WATER||tr===LAVA)?Gfx.tiles[tr][(wf+hv)%6]:Gfx.tiles[tr][hv%NVAR],px,py,TILE,TILE);
     const nb=[terrAt(x,y-1),terrAt(x+1,y),terrAt(x,y+1),terrAt(x-1,y)];
     for(let s=0;s<4;s++){const n=nb[s];if(n<0||n===tr)continue;
       const lq=tr===WATER||tr===LAVA,nq=n===WATER||n===LAVA;
@@ -119,7 +119,16 @@ function advDraw(dt){
   // decoración del suelo (matas, flores, huesos...)
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=y*m.w+x;const tr=m.terr[i];if(m.deco[i]||m.fp[i]||m.road[i]||tr===WATER||tr===LAVA)continue;decalAt(tc,x,y,tr)}
   // variación suave de luz a gran escala
-  if(!S.noTint)for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const n=NZ(x/10,y/10)*.7+NZ(x/5+40,y/5)*.3;if(m.terr[y*m.w+x]===WATER||m.terr[y*m.w+x]===LAVA)continue;tc.fillStyle=n>.5?`rgba(255,255,220,${(n-.5)*.16})`:`rgba(0,0,30,${(.5-n)*.2})`;tc.fillRect(x*TILE,y*TILE,TILE,TILE)}
+  if(!S.noTint){ // sombreado por píxel (8 muestras por casilla, escalado suave): sin cuadrícula visible
+    const R=8,tw=(x1-x0+1)*R,th=(y1-y0+1)*R,mc=document.createElement('canvas');mc.width=tw;mc.height=th;const mg=mc.getContext('2d'),im=mg.createImageData(tw,th),D=im.data;
+    for(let j=0;j<th;j++)for(let i=0;i<tw;i++){const wx=x0+(i+.5)/R,wy=y0+(j+.5)/R,tx=Math.floor(wx),ty=Math.floor(wy),tr=m.terr[ty*m.w+tx],o=(j*tw+i)*4;
+      if(tr===WATER||tr===LAVA)continue;
+      const n=NZ(wx/10,wy/10)*.5+NZ(wx/4.5+40,wy/4.5)*.3+NZ(wx/1.8+9,wy/1.8+3)*.2,dry=NZ(wx/7+90,wy/7+20);
+      let r,g,b,a;if(n>.5){r=255;g=250;b=205;a=(n-.5)*.34}else{r=10;g=10;b=50;a=(.5-n)*.4}
+      if(tr===GRASS&&dry>.56){r=r*.5+215*.5;g=g*.5+190*.5;b=b*.5+70*.5;a=Math.max(a,(dry-.56)*.9)}
+      else if(tr===GRASS&&dry<.38){r=r*.5+20*.5;g=g*.5+120*.5;b=b*.5+60*.5;a=Math.max(a,(.38-dry)*.7)}
+      D[o]=r;D[o+1]=g;D[o+2]=b;D[o+3]=a*255}
+    mg.putImageData(im,0,0);tc.imageSmoothingEnabled=true;tc.drawImage(mc,x0*TILE,y0*TILE,(x1-x0+1)*TILE,(y1-y0+1)*TILE)}
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(!m.road[y*m.w+x])continue;tc.drawImage(Gfx.road[8],x*TILE,y*TILE,TILE,TILE);
     Gfx.roadDirs.forEach((d,k)=>{const nx=x+d[0],ny=y+d[1];if(nx>=0&&ny>=0&&nx<m.w&&ny<m.h&&m.road[ny*m.w+nx])tc.drawImage(Gfx.road[k],x*TILE,y*TILE,TILE,TILE)})}
   S.TLkey=tlKey;S.TLliq=liq;S.TLlights=tlLights}
