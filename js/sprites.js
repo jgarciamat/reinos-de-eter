@@ -152,6 +152,7 @@ function artSprite(){const key='art';if(Gfx.cache[key])return Gfx.cache[key];con
   poly(x,[[24,10],[34,24],[28,38],[20,38],[14,24]],lg(x,14,10,34,38,['#fff4b0','#e8b83a','#9a6a14']),OUT,1.4);poly(x,[[24,10],[34,24],[24,26],[14,24]],'rgba(255,255,255,.55)');ell(x,24,24,4,4,'#fff',null);return Gfx.cache[key]=c}
 // ---------------- sitios ----------------
 function siteSprite(k){
+  if(typeof SITEDEF!=='undefined'&&SITEDEF[k])return siteSprite2(k);
   const key='s'+k;if(Gfx.cache[key])return Gfx.cache[key];const c=mkc(56,84),x=c.ctx,cx=28,by=76;shadowE(x,cx,by+1,22,6,.4);
   const stone=(x0,y0,w,h,col='#8c8a96')=>rrect(x,x0,y0,w,h,2,lg(x,x0,y0,x0+w,y0,[shade(col,.25),col,shade(col,-.35)]),OUT,1.2);
   switch(k){

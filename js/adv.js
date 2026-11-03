@@ -5,7 +5,7 @@
 const VPW=1008,VPH=720;
 const S={scr:'menu',cam:{x:0,y:0},sel:null,path:null,target:null,mov:null,anim:null,later:[],fx:null,ai:null,hov:null,busy:false,mini:null,miniT:0,t:0,banner:null,sync:0,clock:0,flyTo:null,vis:null};
 const objName=o=>{switch(o.t){case'town':return o.name;case'mine':return'Mina de '+RESN[o.res];case'dwell':return'Vivienda: '+CR[o.cr].name;
-  case'site':return{shrine:'Santuario de hechizos',hut:'Cabaña de la bruja',well:'Pozo mágico',stone:'Piedra de aprendizaje',stable:'Establos',mill:'Molino',shop:'Mercader de artefactos'}[o.k];
+  case'site':return(typeof SITEDEF!=='undefined'&&SITEDEF[o.k]?SITEDEF[o.k].n:{shrine:'Santuario de hechizos',hut:'Cabaña de la bruja',well:'Pozo mágico',stone:'Piedra de aprendizaje',stable:'Establos',mill:'Molino',shop:'Mercader de artefactos'}[o.k]);
   case'res':return o.res==='gold'?o.n+' de oro':o.n+' de '+RESN[o.res];case'chest':return'Cofre del tesoro';case'art':return'Artefacto: '+ART[o.art].n;case'mon':return`${sizeLabel(o.n)} de ${CR[o.cr].name}`;case'gate':return levelOf(G.map,o.y)?'Puerta a la superficie':'Puerta al subsuelo';case'mono':return o.dir==='two'?`Monolito ${MONO_N[o.col%8]} (bidireccional)`:o.dir==='in'?`Monolito ${MONO_N[o.col%8]} (entrada)`:`Monolito ${MONO_N[o.col%8]} (salida)`;case'boat':return'Barco'}return'?'};
 const MONO_N=['azul','rojo','verde','amarillo','púrpura','turquesa','naranja','rosa'];
 function curPlayer(){return G.players[0]}
@@ -40,14 +40,14 @@ function drawObjSprite(o,t,under,lights){
       c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.35+.25*Math.sin(t*3+o.id);c.drawImage(glowSprite(pc.replace('#','')?'rgba('+parseInt(pc.slice(1,3),16)+','+parseInt(pc.slice(3,5),16)+','+parseInt(pc.slice(5,7),16)+',.9)':'rgba(255,255,255,.9)',96),px-16,dy+10,96,96);c.restore();
       if(lights)lights.push({x:px+TILE/2,y:dy+50,r:90,col:'rgba('+parseInt(pc.slice(1,3),16)+','+parseInt(pc.slice(3,5),16)+','+parseInt(pc.slice(5,7),16)+',.55)'});return}
     case'boat':{img=boatSprite();const b=Math.sin(t*2+o.id)*2;c.drawImage(img,px-8,(o.y+1)*TILE-img.lh+8+b,img.lw,img.lh);return}
-    case'site':img=o.k==='shop'?shopSprite():siteSprite(o.k);{const dx=px+TILE/2-img.lw/2,dy=(o.y+1)*TILE-img.lh+4;blit(c,o,img,dx,dy,img.lw,img.lh,under);
+    case'site':img=o.k==='shop'?shopSprite():SITEDEF[o.k]?siteSprite2(o.k):siteSprite(o.k);{const dx=px+TILE/2-img.lw/2,dy=(o.y+1)*TILE-img.lh+4;blit(c,o,img,dx,dy,img.lw,img.lh,under);
       if(o.k==='shrine'||o.k==='stone'||o.k==='well'){c.save();c.globalCompositeOperation='lighter';c.fillStyle=rg(c,px+TILE/2,dy+img.lh-36,2,26,[`rgba(150,220,255,${.25+.15*Math.sin(t*3+o.id)})`,'rgba(150,220,255,0)']);c.fillRect(px-10,dy+img.lh-64,TILE+20,56);c.restore();if(lights)lights.push({x:px+TILE/2,y:dy+img.lh-36,r:80,col:'rgba(150,220,255,.5)'})}}return;
     case'res':img=resPile(o.res);c.drawImage(img,px,(o.y+1)*TILE-img.lh+4,img.lw,img.lh);
       if((Math.floor(t*2+o.id)%5)===0){const a=Math.abs(Math.sin(t*6+o.id));c.fillStyle=`rgba(255,255,255,${a*.8})`;const sx=px+10+(o.id*7)%28,sy=(o.y+1)*TILE-30-(o.id*3)%16;c.fillRect(sx-3,sy,6,1.2);c.fillRect(sx-.6,sy-3,1.2,6)}return;
     case'chest':img=chestSprite();c.drawImage(img,px,(o.y+1)*TILE-img.lh+4,img.lw,img.lh);return;
     case'art':{const b=Math.sin(t*2.4+o.id)*3;shadowE(c,px+TILE/2,(o.y+1)*TILE-4,13,4,.4);const ic=artIcon(o.art);c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.4+.2*Math.sin(t*3+o.id);c.drawImage(glowSprite('rgba(255,230,150,.9)',96),px-24,(o.y+1)*TILE-62+b,96,96);c.restore();c.drawImage(ic,px+2,(o.y+1)*TILE-48+b,44,44);return}
     case'mon':{const cr=CR[o.cr];const sp=creatureSprite(o.cr,(o.id&1)===1);const k=(cr.big?1.22:1.02)*(cr.tier>=6?1.1:1);const w=96*k;const bob=Math.sin(t*2.2+o.id*1.7)*1.8;
-      shadowE(c,px+TILE/2,(o.y+1)*TILE-2,22*k,6*k,.5);c.save();c.translate(px+TILE/2,(o.y+1)*TILE+2);c.scale(1,1+Math.sin(t*2.2+o.id*1.7)*.014);c.drawImage(sp,-w/2,-w+bob+4,w,w);c.restore();return}
+      shadowE(c,px+TILE/2,(o.y+1)*TILE-2,22*k,6*k,.5);if(o.fresh&&G.day-o.fresh<=2){c.save();c.translate(px+TILE/2,(o.y+1)*TILE-4);c.scale(1,.42);c.strokeStyle=`rgba(120,255,200,${.55+.35*Math.sin(t*5)})`;c.lineWidth=3;c.beginPath();c.arc(0,0,26+Math.sin(t*3)*3,0,6.28);c.stroke();c.restore()}c.save();c.translate(px+TILE/2,(o.y+1)*TILE+2);c.scale(1,1+Math.sin(t*2.2+o.id*1.7)*.014);c.drawImage(sp,-w/2,-w+bob+4,w,w);c.restore();return}
   }
 }
 function decalAt(tc,x,y,tr){
@@ -219,6 +219,7 @@ function drawSidePanel(dt){
   // calendario
   const day=(G.day-1)%7+1,week=Math.floor((G.day-1)/7)%4+1,month=Math.floor((G.day-1)/28)+1;
   rrect(c,px+10,274,pw-20,30,6,'rgba(0,0,0,.4)','#7a6a48',1.2);text(`Mes ${month} · Semana ${week} · Día ${day}`,px+pw/2,295,{size:15,bold:true,align:'center',color:'#ffe9a0'});
+  if(G.week&&G.week.t!=='normal')text(weekLabel(G.week),px+pw/2,317,{size:11,bold:true,align:'center',color:G.week.t==='plague'?'#ff8a7a':'#9affc8'});
   // héroes
   text('HÉROES',px+14,326,{size:12,bold:true,color:'#c8a24a'});
   const hs=myHeroes();

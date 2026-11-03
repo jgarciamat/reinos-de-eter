@@ -175,14 +175,14 @@ const SPEC_RES=['gold','wood','ore','mercury','sulfur','crystal','gems'];
 
 // ---------- héroes ----------
 const HERO_NAMES=[
- ['Aldric','Corvan','Brenna','Tavish','Rowena','Edmund','Isolde','Lyssa','Orsin','Caldera','Mirabel','Theron'],
- ['Silvan','Faelar','Thalia','Eldrin','Naia','Brandir','Sylwen','Ormuz','Liriel','Vesper','Aelith','Gaelen'],
- ['Mortis','Vexar','Kalthar','Drusa','Nekron','Sethra','Azhar','Morwen','Calix','Lilith','Xandor','Veyra'],
- ['Baal','Ashkar','Zerith','Moloch','Ember','Vulkar','Sorath','Ignis','Kaeda','Pyra','Azrael','Hexa'],
- ['Durgan','Thrain','Brokk','Helga','Gimrik','Borin','Runa','Dwalin','Magna','Kord','Ysolt','Nori'],
- ['Marek','Selene','Coral','Dagon','Nerea','Barbarroja','Tethys','Morgana','Triton','Nixa','Abel','Caspian'],
- ['Szass','Ximbo','Quorra','Gharok','Slithe','Mossa','Dreth','Vorta','Zul','Nagaina','Kaa','Bogg'],
- ['Gruk','Thorgal','Hilda','Ragnar','Skarn','Bjorn','Ylva','Volund','Freya','Odrik','Siv','Hrolf']];
+ ['Aldric','Corvan','Brenna','Tavish','Rowena','Edmund','Isolde','Lyssa','Orsin','Caldera','Mirabel','Theron','Gwendal','Ulric','Seraphine','Lucan','Maelis','Garrick','Odalys','Percival'],
+ ['Silvan','Faelar','Thalia','Eldrin','Naia','Brandir','Sylwen','Ormuz','Liriel','Vesper','Aelith','Gaelen','Haldir','Ithilwen','Camrel','Thandor','Elowen','Myrddin','Fenwick','Aranel'],
+ ['Mortis','Vexar','Kalthar','Drusa','Nekron','Sethra','Azhar','Morwen','Calix','Lilith','Xandor','Veyra','Grimwald','Ossian','Belphe','Mordrake','Zerena','Vaclav','Tenebra','Hadriel'],
+ ['Baal','Ashkar','Zerith','Moloch','Ember','Vulkar','Sorath','Ignis','Kaeda','Pyra','Azrael','Hexa','Draxus','Infernia','Belial','Cinder','Mephis','Karnak','Surtha','Asmodai'],
+ ['Durgan','Thrain','Brokk','Helga','Gimrik','Borin','Runa','Dwalin','Magna','Kord','Ysolt','Nori','Hjalmar','Torvald','Embra','Gorm','Skadi','Rurik','Baldur','Thyra'],
+ ['Marek','Selene','Coral','Dagon','Nerea','Barbarroja','Tethys','Morgana','Triton','Nixa','Abel','Caspian','Calypso','Jolly','Vasco','Perla','Nereus','Ondina','Kraken','Blackmoor'],
+ ['Szass','Ximbo','Quorra','Gharok','Slithe','Mossa','Dreth','Vorta','Zul','Nagaina','Kaa','Bogg','Hissa','Krok','Mudra','Thessk','Ooze','Vyrma','Gargo','Salamandra'],
+ ['Gruk','Thorgal','Hilda','Ragnar','Skarn','Bjorn','Ylva','Volund','Freya','Odrik','Siv','Hrolf','Torgrim','Brunhild','Asgrim','Valka','Ulfric','Dagny','Skoll','Rolf']];
 const HERO_CLASS=[['Caballero del Alba','Clériga Solar'],['Guardabosques','Archidruida'],['Señor Sepulcral','Nigromante'],['Señor Infernal','Hechicero Ígneo'],['Jefe de Clan','Mago Rúnico'],['Capitán Corsario','Hechicero Marino'],['Cazador de Pantano','Chamán Venenoso'],['Jefe Bárbaro','Chamán de Tormenta']];
 const XP_LV=[0,1000,2000,3200,4600,6200,8000,10000,12200,14700,17500,20600,24320,28784,34140,40567,48279,57533,68637,81961,97949,117134,140156,167782,200933,240714,288451,345735,414475,496963];
 function xpForLevel(l){if(l<=XP_LV.length)return XP_LV[l-1];let v=XP_LV[XP_LV.length-1];for(let i=XP_LV.length;i<l;i++)v=Math.round(v*1.2);return v}

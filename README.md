@@ -26,3 +26,13 @@ Abre `index.html` en el navegador (doble clic) o, desde esta carpeta:
 - Cámara: flechas / WASD / borde de pantalla / minimapa.
 - `E` fin de turno · `Espacio` siguiente héroe · `H` ficha del héroe · `T` ciudad · `Esc` menú.
 - Combate: `W` esperar · `D` defender · `S` hechizos · `A` automático.
+
+## Novedades (v3)
+- **Mapas ~10× más grandes** (≈450–570 casillas de lado × 2 niveles), con más de 200 castillos neutrales abandonados, protegidos por criaturas, que se pueden conquistar.
+- **Asedios**: murallas de nivel 1–3 según el Fuerte/Ciudadela/Castillo, puerta, torres de arqueros y catapulta con turno propio. Voladores y criaturas que se teletransportan atraviesan el muro. El **combate rápido** (Sistema → Combate rápido) simula todo esto.
+- **Campeones únicos**: 20 por castillo, 2500 de oro, cambian cada semana, 2 habilidades (nivel 1–3) y tropas de nivel 1–2.
+- **Semanas especiales** (criatura ×2 + manadas nuevas con aro verde en el mapa, o plaga) y crecimiento semanal de manadas.
+- **Barcos**: subir o bajar agota los pasos del día. La IA construye astilleros, navega y explora islas.
+- **Artefactos ×2 (308)** y **fusión de linajes** (arma+escudo+yelmo+anillo → reliquia que bloquea 4 ranuras).
+- **30 sitios nuevos** (arenas, escuelas, fuentes, tesoros custodiados, observatorios, faros…).
+- Guardado por diferencias (mapas gigantes).

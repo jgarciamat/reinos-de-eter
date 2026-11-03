@@ -7,7 +7,7 @@ const hexPx=(x,y)=>[HOX+HW*(x+.5*(y&1))+HW/2,HOY+HS+y*1.5*HS];
 const BU={b:null,q:[],ev:null,t:0,fxs:[],log:[],mode:null,spell:null,auto:false,wait:0,hover:null,done:null,intro:0,shake:0,flash:null,resultShown:false,bg:null};
 G.hooks.battle=(b,done)=>{later(()=>startBattleUI(b,done))};
 function startBattleUI(b,done){
-  BU.b=b;BU.q=[];BU.ev=null;BU.fxs=[];BU.log=[];BU.mode=null;BU.spell=null;BU.auto=false;BU.wait=.6;BU.done=done;BU.intro=0;BU.resultShown=false;BU.over=false;BU.shake=0;BU.flash=null;
+  BU.b=b;BU.wh=null;BU.rock=null;BU.q=[];BU.ev=null;BU.fxs=[];BU.log=[];BU.mode=null;BU.spell=null;BU.auto=false;BU.wait=.6;BU.done=done;BU.intro=0;BU.resultShown=false;BU.over=false;BU.shake=0;BU.flash=null;
   for(const s of b.st){const[px,py]=hexPx(s.x,s.y);s.hx=s.x;s.hy=s.y;s.apx=null;s.dn=s.n;s.dead_=false;s.alpha=1;s.fl=0;s.lx=0;s.ly=0;s.ph=Math.random()*6}
   BU.bg=makeBattleBg(b);S.prevScr=S.scr;S.scr='battle';BU.pull();fadeIn(2.5);sfx('battle');
   BU.log.push(`¡Comienza el combate! (${b.sides[0].name} contra ${b.sides[1].name})`);
@@ -71,6 +71,9 @@ function nextBattleEvent(){
       const dur=spellFx(e.sp,tx,ty,e.side);BU.ev={t:0,dur};break}
     case'text':{const s=e.s;const[px,py]=hexPx(s.hx,s.hy);FX.add({x:px,y:py-48,vy:-22,text:e.txt,col:'#bfe8ff',size:14,life:1.3,drag:.98});break}
     case'morale':{const s=e.s;const[px,py]=hexPx(s.hx,s.hy);FX.burst(px,py-10,14,e.bad?['#8a6aff','#334']:['#ffe27a','#fff'],{spd:80,life:.8,add:1,up:30});break}
+    case'catapult':{const a=e.s,[ax,ay]=hexPx(a.hx,a.hy),[dx,dy]=hexPx(9,e.y);sfx('shoot');bLog(e.hit?`La catapulta golpea el muro (${e.hp}/${e.max})`:'La catapulta falla');
+      BU.ev={t:0,dur:.7,upd:k=>{BU.rock={x:ax+(dx-ax)*k,y:ay+(dy-ay)*k-Math.sin(k*3.14)*120-20}},fin:()=>{BU.rock=null;BU.shake=Math.min(.4,BU.shake+.2);
+        if(e.hit){FX.burst(dx,dy-20,18,['#c8c4d4','#8a8698','#e8e4f0'],{spd:170,life:.7,g:300,size:3.2});sfx('kill');if(BU.wh)BU.wh.set(hk(9,e.y),e.hp)}else FX.add({x:dx,y:dy-40,vy:-22,text:'Falla',col:'#bfe8ff',size:14,life:1,drag:.98})}};break}
     case'round':bLog(`— Ronda ${e.n} —`);break;
     case'sync':for(const s of BU.b.st){s.dn=s.n}break;
     case'end':break;
@@ -112,6 +115,7 @@ function battleDraw(dt){
   // obstáculos
   const terr=b.info.terr==null?GRASS:b.info.terr;
   for(const k of b.obst){const x=k%BW,y=(k/BW)|0;const[px,py]=hexPx(x,y);const d=decorSprite(terr===WATER?GRASS:terr,1+(k%3),k%5);c.drawImage(d,px-34,py-76,68,88)}
+  drawWalls(c,b);
   // objetivo bajo el cursor
   let hint=null,tip=null;
   if(hum&&hov){const t=b.at(hov[0],hov[1]);
@@ -146,6 +150,7 @@ function battleDraw(dt){
       c.save();c.globalAlpha=s.alpha;rrect(c,bx,by2,tw,17,6,lg(c,0,by2,0,by2+17,['rgba(20,14,26,.9)','rgba(8,4,12,.92)']),col,1.8);text(t,bx+tw/2,by2+13,{size:13,bold:true,align:'center',shadow:false,color:'#fff'});c.restore()}
     if(hovered(px-30,py-60,60,90)&&!UI.modals.length&&!UI.nohit){hit(px-30,py-60,60,90,null,{right:()=>creatureInfo(s.id,0),tip:[CR[s.id].name+` ×${s.n}`,`Ataque ${cr.atk+b.hs(s.side).a} · Defensa ${cr.def+b.hs(s.side).d}`,`Daño ${cr.mn}-${cr.mx} · Vida ${cr.hp} (${s.top} en la primera)`,`Velocidad ${b.spd(s)}${cr.shoot?` · Disparos ${s.shots}`:''}`,abilText(cr)]})}
   }
+  if(BU.rock){const p=BU.rock;ell(c,p.x,p.y,7,7,rg(c,p.x-2,p.y-2,1,8,['#d8d4c8','#7a7688','#3a3644']),OUT,1.2)}
   if(BU.proj){const p=BU.proj;c.save();c.translate(p.x,p.y);c.rotate(p.ang);c.fillStyle='#e8e8f0';c.fillRect(-12,-1,16,2);poly(c,[[4,-3],[10,0],[4,3]],'#fff',OUT,.8);c.restore()}
   for(const f of BU.fxs)f.draw(f.t);
   FX.draw(c,0,0);

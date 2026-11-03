@@ -90,14 +90,15 @@ function shopSprite(){
   return Gfx.cache[key]=c;
 }
 // ---------- iconos de artefactos ----------
-const TIERCOL=['#a0a0a0','#b87a44','#c0c8d8','#f0c040','#b070ff','#50e0ff'];
+const TIERCOL=['#a0a0a0','#b87a44','#c0c8d8','#f0c040','#b070ff','#50e0ff','#ff9a3a'];
 function artIcon(id,sz=44){
   const key='ai'+id+sz;if(Gfx.cache[key])return Gfx.cache[key];const a=ART[id],c=mkc(44,44),x=c.ctx,r=mulberry(hash2(id.length,id.charCodeAt(0),3)*1e6|0);
-  const hue=(hash2(id.charCodeAt(1),id.length,5)*360)|0;const col=`hsl(${hue},45%,58%)`,tc=TIERCOL[a.v]||'#c0c8d8';
+  const hue=a.hue!=null?a.hue:(hash2(id.charCodeAt(1)+id.charCodeAt(id.length-1)*7,id.length,5)*360)|0;const col=`hsl(${hue},45%,58%)`,tc=TIERCOL[a.v]||'#c0c8d8';
   x.fillStyle=rg(x,22,22,2,22,[tc+'55',tc+'00']);x.fillRect(0,0,44,44);
   const metal=lg(x,0,0,44,44,['#f4f6fa','#a8b2c4','#5a6478']),gold=lg(x,0,0,44,44,['#fff2a0','#e8b82a','#9a6a14']),leather=lg(x,0,0,44,44,['#a8743c','#6a4426','#3a2412']);
   const gem=(px,py,s)=>{poly(x,[[px-s,py],[px,py-s],[px+s,py],[px,py+s]],col,OUT,1);poly(x,[[px-s,py],[px,py-s],[px,py]],'rgba(255,255,255,.55)')};
   switch(a.slot){
+    case'fusion':{ell(x,22,22,18,18,rg(x,22,22,2,18,['#fff6c0',col,shade(col,-.55)]),OUT,1.8);for(let i=0;i<4;i++){const an=i*1.5708+.785;poly(x,[[22+Math.cos(an)*6,22+Math.sin(an)*6],[22+Math.cos(an-.3)*17,22+Math.sin(an-.3)*17],[22+Math.cos(an)*21,22+Math.sin(an)*21],[22+Math.cos(an+.3)*17,22+Math.sin(an+.3)*17]],lg(x,0,0,44,44,['#fff2a0','#e8b82a','#9a6a14']),OUT,1.1)}gem(22,22,5);break}
     case'weapon':x.save();x.translate(22,22);x.rotate(-.78);poly(x,[[-3,-20],[3,-20],[3,10],[-3,10]],metal,OUT,1.3);poly(x,[[-3,-20],[0,-26],[3,-20]],metal,OUT,1.2);x.fillStyle=gold;x.fillRect(-9,10,18,4);x.strokeStyle=OUT;x.lineWidth=1;x.strokeRect(-9,10,18,4);x.fillStyle=leather;x.fillRect(-2,14,4,8);gem(0,12,3);x.restore();break;
     case'shield':poly(x,[[8,8],[36,8],[36,24],[22,40],[8,24]],lg(x,8,8,36,40,[col,shade(col,-.4)]),OUT,1.6);poly(x,[[12,12],[32,12],[32,23],[22,35],[12,23]],null,'rgba(255,230,150,.9)',1.6);gem(22,22,5);break;
     case'helm':x.beginPath();x.arc(22,24,15,Math.PI,0);x.lineTo(37,34);x.lineTo(7,34);x.closePath();x.fillStyle=metal;x.fill();x.strokeStyle=OUT;x.lineWidth=1.6;x.stroke();x.fillStyle=gold;x.fillRect(20,9,4,22);gem(22,14,3.4);break;

@@ -51,7 +51,7 @@ function drawTown(dt){
   if(h){c.drawImage(portrait(h.fi,h.port,h.cls),998,206+oy,56,56);text(h.name,1062,224+oy,{size:15,bold:true,color:'#ffe9a0'});text(`Nivel ${h.lvl} ${HERO_CLASS[h.fi][h.cls]}`,1062,242+oy,{size:12});const st=hstat(h);text(`Ata ${st.a}  Def ${st.d}  Pod ${st.sp}  Con ${st.kn}`,1062,258+oy,{size:12,color:'#d8c8a0'});
     hit(998,206+oy,56,56,()=>openHeroScreen(h),{tip:'Ver ficha del héroe'});armyPanel(998,286+oy,h.army,'EJÉRCITO DEL HÉROE',{hero:h});
     button(998,418+oy,126,28,'Mover todo →',()=>{mergeArmy(h.army,t.gar);sortArmy(h.army)},{size:12,tip:'Pasar la guarnición al héroe'});button(1130,418+oy,126,28,'← Dejar',()=>{const first=h.army.find(s=>s);for(let i=0;i<7;i++){const s=h.army[i];if(s&&s!==first){if(addToArmy(t.gar,s.id,s.n))h.army[i]=null}}},{size:12,tip:'Dejar todas menos la primera unidad en la guarnición'})}
-  else{text('Sin héroe visitante',998,232+oy,{size:14,italic:true,color:'#9a8a70'});const cnt=p.heroes.length;button(998,248+oy,258,30,'Contratar héroe (Taberna)',()=>tavernModal(t),{size:13,disabled:!t.b.tavern||cnt>=8,tip:t.b.tavern?'1500 de oro':'Construye una Taberna'})}
+  else{text('Sin héroe visitante',998,232+oy,{size:14,italic:true,color:'#9a8a70'});const cnt=p.heroes.length;button(998,248+oy,258,30,'Contratar héroe (Taberna)',()=>tavernModal(t),{size:13,disabled:!t.b.tavern||cnt>=8,tip:t.b.tavern?'2500 de oro':'Construye una Taberna'})}
   let by=460+oy;
   button(998,by,258,34,'Reclutar criaturas',()=>recruitModal(t,h),{primary:1,size:15});by+=40;
   button(998,by,258,30,'Mercado',()=>marketModal(),{size:14,disabled:!t.b.market,tip:t.b.market?null:'Construye un Mercado'});by+=36;
@@ -136,14 +136,17 @@ function dwellModal(o,h,cb){
 // ---------- taberna / gremio / mercado ----------
 function tavernModal(t){
   const p=G.players[0];
-  Dlg.show({w:640,title:'Taberna',draw:m=>{const x=320,y=150,w=640,hh=400;panel(x,y,w,hh,{title:'Taberna de '+t.name});
-    text('Héroes disponibles para contratar (1500 de oro)',x+w/2,y+46,{size:14,align:'center',color:'#c8b890'});
-    p.pool.slice(0,2).forEach((o,i)=>{const cx=x+30+i*300,cy=y+66;rrect(ctx,cx,cy,280,270,8,lg(ctx,0,cy,0,cy+270,['#3a2e3a','#1a1420']),'#c8a24a',1.6);
-      const hh2=o.hero;const fi=hh2?hh2.fi:o.fi,cls=hh2?hh2.cls:o.cls,ni=hh2?hh2.port:o.nameIdx;ctx.drawImage(portrait(fi,ni,cls),cx+88,cy+12,104,104);
-      const nm=hh2?hh2.name:HERO_NAMES[fi][ni];text(nm,cx+140,cy+140,{size:18,bold:true,align:'center',color:'#ffe9a0'});text(HERO_CLASS[fi][cls]+(hh2?` · Nv ${hh2.lvl}`:''),cx+140,cy+160,{size:13,align:'center'});text(FDEF[fi].name,cx+140,cy+178,{size:12,align:'center',color:'#c8b890'});
-      text(cls?'Especialista en magia':'Especialista en combate',cx+140,cy+198,{size:12,align:'center',italic:true,color:'#bfe8ff'});
-      button(cx+60,cy+216,160,36,'Contratar',()=>{const e=heroAt(t.x+t.ex,t.y+t.ey);if(e){toast('La entrada de la ciudad está ocupada','bad');return}const hr=hireHero(p,t,i);if(hr){sfx('recruit');toast(`${hr.name} se une a tu causa`,'good');S.town.h=hr;Dlg.close()}},{primary:1,disabled:p.res.gold<1500||p.heroes.length>=8,tip:p.heroes.length>=8?'Máximo 8 héroes':null})});
-    button(x+w/2-60,y+hh-50,120,34,'Cerrar',()=>Dlg.close())}});
+  Dlg.show({w:980,title:'Taberna',draw:m=>{const x=150,y=120,w=980,hh=470;panel(x,y,w,hh,{title:'Taberna de '+t.name});
+    text(`Campeones únicos disponibles (${HIRE_COST} de oro) · cambian cada semana · héroes ${p.heroes.length}/8`,x+w/2,y+46,{size:14,align:'center',color:'#c8b890'});
+    p.pool.slice(0,4).forEach((o,i)=>{const cx=x+136+i*236,cy=y+62,CW=224;rrect(ctx,cx,cy,CW,340,8,lg(ctx,0,cy,0,cy+340,['#3a2e3a','#1a1420']),'#c8a24a',1.6);
+      const hh2=o.hero;const fi=hh2?hh2.fi:o.fi,cls=hh2?hh2.cls:o.cls,ni=hh2?hh2.port:o.ni;ctx.drawImage(portrait(fi,ni,cls),cx+60,cy+10,104,104);
+      const nm=hh2?hh2.name:HERO_NAMES[fi][ni];text(nm,cx+CW/2,cy+136,{size:18,bold:true,align:'center',color:'#ffe9a0'});text(HERO_CLASS[fi][cls]+(hh2?` · Nv ${hh2.lvl}`:''),cx+CW/2,cy+154,{size:12,align:'center'});text(FDEF[fi].name,cx+CW/2,cy+171,{size:11,align:'center',color:'#c8b890'});
+      const sks=hh2?Object.entries(hh2.skills):o.sk;
+      sks.slice(0,3).forEach(([k,lv],q)=>{const sy=cy+182+q*30;rrect(ctx,cx+12,sy,CW-24,26,5,'rgba(40,30,44,.85)','#7a6a48',1);text(SKILLS[k].n,cx+20,sy+17,{size:12,bold:true});for(let z=0;z<3;z++){ctx.fillStyle=z<lv?'#ffd24a':'#4a4030';ctx.beginPath();ctx.arc(cx+CW-60+z*14,sy+13,4.2,0,6.28);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.stroke()}hit(cx+12,sy,CW-24,26,null,{tip:[SKILLS[k].n+' — '+['Básico','Avanzado','Experto'][lv-1],SKILLS[k].d[lv-1]]})});
+      const u=FDEF[fi].units;text(hh2?'Sin tropas (se retira)':`Tropas: ${o.n1} ${CR[u[0]].name} · ${o.n2} ${CR[u[1]].name}`,cx+CW/2,cy+282,{size:10,align:'center',color:'#d8c8a0'});
+      text(specText(hh2||{spec:o.spec,lvl:1}).slice(0,38),cx+CW/2,cy+298,{size:10,align:'center',italic:true,color:'#bfe8ff'});
+      button(cx+32,cy+304,160,30,'Contratar',()=>{const e=heroAt(t.x+t.ex,t.y+t.ey);if(e){toast('La entrada de la ciudad está ocupada','bad');return}const hr=hireHero(p,t,i);if(hr){sfx('recruit');toast(`${hr.name} se une a tu causa`,'good');S.town.h=hr;Dlg.close()}},{primary:1,size:14,disabled:p.res.gold<HIRE_COST||p.heroes.length>=8,tip:p.heroes.length>=8?'Máximo 8 héroes':null})});
+    button(x+w/2-60,y+hh-52,120,34,'Cerrar',()=>Dlg.close())}});
 }
 function guildModal(t,h){
   const gl=t.b.mage4?4:t.b.mage3?3:t.b.mage2?2:1;
@@ -193,7 +196,7 @@ function inspect(tx,ty){
 // ---------- ficha de héroe ----------
 const EQPOS={helm:[139,4],neck:[80,62],cloak:[198,62],weapon:[14,124],armor:[139,124],shield:[264,124],gloves:[14,196],ring1:[80,196],ring2:[198,196],boots:[139,200],misc1:[14,296],misc2:[94,296],misc3:[174,296],misc4:[254,296]};
 const EQSLOT={helm:'helm',neck:'neck',cloak:'cloak',weapon:'weapon',armor:'armor',shield:'shield',gloves:'gloves',ring1:'ring',ring2:'ring',boots:'boots',misc1:'misc',misc2:'misc',misc3:'misc',misc4:'misc'};
-function artTip(id){const a=ART[id];const L=[a.n,`${SLOTN[a.slot]} · ${['','Tesoro','Menor','Mayor','Reliquia','Conjunto'][a.v]||''}`,...Object.keys(a.b).map(k=>`${BNAMES[k]||k}: ${k==='pf'?'sí':(a.b[k]>0?'+':'')+a.b[k]}`)];if(a.set){const S2=ARTSET[a.set];L.push(`Conjunto: ${S2.n} (${S2.pieces.length} piezas)`)}return L}
+function artTip(id){const a=ART[id];const L=[a.n,`${SLOTN[a.slot]} · ${['','Tesoro','Menor','Mayor','Reliquia','Conjunto','Fusión'][a.v]||''}`,...Object.keys(a.b).map(k=>`${BNAMES[k]||k}: ${k==='pf'?'sí':(a.b[k]>0?'+':'')+a.b[k]}`)];if(a.set){const S2=ARTSET[a.set];L.push(`Conjunto: ${S2.n} (${S2.pieces.length} piezas)`)}if(a.lin)L.push(`Linaje ${LIN[a.lin].short}: arma+escudo+yelmo+anillo = fusión`);if(a.fusion)L.push('Ocupa Arma, Escudo, Yelmo y Anillo');return L}
 function openHeroScreen(h,readonly){
   const mine=h.pid===0&&!readonly;
   Dlg.show({w:1020,title:h.name,draw:m=>{
@@ -214,10 +217,10 @@ function openHeroScreen(h,readonly){
     const ex=x+350,ey=y+44;rrect(ctx,ex-8,ey-8,356,420,8,'rgba(18,12,24,.55)','rgba(200,162,74,.4)',1.2);
     ctx.save();ctx.globalAlpha=.1;ctx.drawImage(portrait(h.fi,h.port,h.cls),ex+60,ey+130,220,220);ctx.restore();
     text('EQUIPO',ex+170,ey-14,{size:12,bold:true,align:'center',color:'#c8a24a'});
-    for(const k of EQKEYS){const[ox,oy]=EQPOS[k],sx=ex+ox,sy=ey+oy,id=h.eq[k];
+    for(const k of EQKEYS){const[ox,oy]=EQPOS[k],sx=ex+ox,sy=ey+oy,id0=h.eq[k],blk=id0&&id0.charCodeAt(0)===35,id=blk?id0.slice(1):id0;
       const hov=hit(sx,sy,52,52,mine&&id?()=>{if(unequip(h,k))sfx('click');else toast('Mochila llena','bad')}:null,{tip:id?[...artTip(id),mine?'Clic: guardar en la mochila':'']:SLOTN[EQSLOT[k]]});
       rrect(ctx,sx,sy,52,52,6,lg(ctx,0,sy,0,sy+52,['#3a3044','#1a1420']),id?TIERCOL[ART[id].v]:hov?'#c8b890':'#6a5a3e',id?2.2:1.4);
-      if(id)ctx.drawImage(artIcon(id),sx+4,sy+4,44,44);else ctx.drawImage(slotGlyph(EQSLOT[k]),sx+4,sy+4,44,44)}
+      if(id){if(blk)ctx.globalAlpha=.35;ctx.drawImage(artIcon(id),sx+4,sy+4,44,44);ctx.globalAlpha=1;if(blk){ctx.fillStyle='rgba(255,170,60,.9)';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.fillText('FUSIÓN',sx+26,sy+30);ctx.textAlign='left'}}else ctx.drawImage(slotGlyph(EQSLOT[k]),sx+4,sy+4,44,44)}
     // mochila
     text('MOCHILA',ex+170,ey+388,{size:12,bold:true,align:'center',color:'#c8a24a'});
     for(let i=0;i<14;i++){const sx=ex+(i%7)*50,sy=ey+398+Math.floor(i/7)*50,id=h.pack[i];
@@ -230,6 +233,11 @@ function openHeroScreen(h,readonly){
     text('LIBRO DE HECHIZOS',rx,y+236,{size:12,bold:true,color:'#c8a24a'});
     h.spells.slice().sort((a,b)=>SPELLS[a].lv-SPELLS[b].lv).forEach((sp,i)=>{const cx=rx+(i%2)*140,cy=y+244+Math.floor(i/2)*32;if(cy>y+470)return;rrect(ctx,cx,cy,134,28,6,'rgba(60,50,90,.8)','#8a7ac0',1.1);text(SPELLS[sp].n,cx+6,cy+13,{size:11,bold:true});text(`Nv ${SPELLS[sp].lv} · ${SPELLS[sp].cost}`,cx+6,cy+24,{size:9,color:'#b8a8e0'});hit(cx,cy,134,28,null,{tip:[SPELLS[sp].n,SPELLS[sp].d,'Coste: '+SPELLS[sp].cost+' de maná']})});
     const sets=setProgress(h);if(sets.length){text('CONJUNTOS DE ARTEFACTOS',rx,y+498,{size:12,bold:true,color:'#c8a24a'});sets.forEach((q,i)=>{text(`${q.name}: ${q.n}/${q.tot}`+(q.n===q.tot?' ✔':''),rx,y+516+i*16,{size:11,color:q.n===q.tot?'#9aff9a':'#d8c8a0'})})}
+    {let fy=y+516+(sets.length?sets.length*16+26:0);if(!sets.length)fy=y+498;text('FUSIÓN DE LINAJES (arma+escudo+yelmo+anillo)',rx,fy,{size:12,bold:true,color:'#ff9a3a'});fy+=8;
+      const fi=fusionInfo(h).slice(0,4);if(!fi.length)text('Reúne las 4 piezas de un linaje para fundirlas',rx,fy+14,{size:11,italic:true,color:'#9a8a70'});
+      fi.forEach((q,i)=>{const yy=fy+4+i*24,done=fusedOf(h).includes(q.id),full=q.n===4;text(`${q.L.short}: ${done?'FUSIONADO':q.n+'/4'}`,rx,yy+14,{size:11,color:done?'#ff9a3a':full?'#9aff9a':'#d8c8a0'});
+        if(mine&&(full||done)){button(rx+170,yy,100,22,done?'Separar':'Fusionar',()=>{const r=done?unfuse(h,q.L.fus):fuseLineage(h,q.id);if(r)toast(r,'bad');else{sfx('level');toast(done?'Piezas separadas':`¡${q.L.name} forjada!`,'good')}},{size:11,primary:!done})}
+        hit(rx,yy,150,22,null,{tip:q.L.pieces.map(pid=>`${hasPiece(h,pid)?'✔':'✘'} ${ART[pid].n}`).concat(['Fusión: '+artText(q.L.fus)])})})}
     button(x+w/2-60,y+hh-48,120,34,'Cerrar',()=>{S.pick=null;Dlg.close()},{size:15});
   }});
 }

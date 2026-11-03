@@ -24,15 +24,26 @@ function rollSpec(fi){const r=Math.random();
   return{t:'spell',id:pick(Math.random,SPELL_IDS)}}
 function specText(h){const s=h.spec;if(!s)return'—';if(s.t==='creature')return`Especialista en ${CR[s.id].name}: +1 de ataque y defensa cada 6 niveles`;if(s.t==='skill')return`Especialista en ${SKILLS[s.id].n}: cuenta un nivel más desde el nivel 5`;
   if(s.t==='res')return s.id==='gold'?'Especialista en oro: +350 de oro al día':`Produce 1 de ${RESN[s.id]} al día`;return`Especialista en ${SPELLS[s.id].n}: +5% de efecto por nivel`}
-function makeHero(fi,cls,nameIdx){
-  const names=HERO_NAMES[fi];const ni=nameIdx!=null?nameIdx:cls*6+Math.floor(Math.random()*6);
-  const h={id:G.heroes.length,name:names[ni%12],fi,cls,port:ni%12,pid:-1,x:-1,y:-1,lvl:1,xp:0,boat:false,
-    a:cls?1:2+(Math.random()<.5?1:0),d:cls?1:2+(Math.random()<.5?1:0),sp:cls?2:1,kn:cls?2:1,mana:0,mp:0,army:padArmy([]),eq:newEquip(),pack:[],skills:{},spells:cls?['chispa','bendicion']:['prisa'],alive:true,path:null,sleep:false,pend:null,visited:{},spec:rollSpec(fi)};
+// ---- campeones únicos: 20 por castillo, ninguno repetido en toda la partida ----
+const HN=20,HIRE_COST=2500;
+function heroKey(fi,ni){return fi*100+ni}
+function freeName(fi,pref){const used=G.usedH||(G.usedH={});const all=[];for(let i=0;i<HN;i++)if(!used[heroKey(fi,i)])all.push(i);if(!all.length)return Math.floor(Math.random()*HN);
+  if(pref!=null&&all.includes(pref%HN))return pref%HN;return all[Math.floor(Math.random()*all.length)]}
+function mkChamp(fi){ // campeón de taberna: 2 habilidades (nivel 1-3) y ejército inicial pequeño de nivel 1 y 2
+  const ni=freeName(fi),cls=ni%2;(G.usedH=G.usedH||{})[heroKey(fi,ni)]='pool';
+  const pool=SK_PREF[cls].filter(s=>!SK_CLASS_ONLY[s]||SK_CLASS_ONLY[s].includes(fi));const sk=[];
+  while(sk.length<2){const s=pool[irnd(Math.random,0,Math.min(9,pool.length-1))];if(!sk.some(q=>q[0]===s))sk.push([s,1+Math.floor(Math.random()*3)])}
+  return{fi,cls,ni,sk,spec:rollSpec(fi),a:cls?1:2+(Math.random()<.5?1:0),d:cls?1:2+(Math.random()<.5?1:0),sp:cls?2:1,kn:cls?2:1,n1:irnd(Math.random,6,12),n2:irnd(Math.random,2,5)};
+}
+function makeHero(fi,cls,nameIdx,pre){
+  const names=HERO_NAMES[fi];const ni=pre?pre.ni:freeName(fi,nameIdx);(G.usedH=G.usedH||{})[heroKey(fi,ni)]='hero';
+  const h={id:G.heroes.length,name:names[ni%HN],fi,cls,port:ni%HN,pid:-1,x:-1,y:-1,lvl:1,xp:0,boat:false,
+    a:pre?pre.a:cls?1:2+(Math.random()<.5?1:0),d:pre?pre.d:cls?1:2+(Math.random()<.5?1:0),sp:pre?pre.sp:cls?2:1,kn:pre?pre.kn:cls?2:1,mana:0,mp:0,army:padArmy([]),eq:newEquip(),pack:[],skills:{},spells:cls?['chispa','bendicion']:['prisa'],alive:true,path:null,sleep:false,pend:null,visited:{},spec:pre?pre.spec:rollSpec(fi)};
   const pool=SK_PREF[cls].filter(s=>!SK_CLASS_ONLY[s]||SK_CLASS_ONLY[s].includes(fi));
-  h.skills[pool[irnd(Math.random,0,3)]]=1;h.skills[pool[irnd(Math.random,4,9)]]=1;
-  if(fi===2)h.skills.necromancia=1;if(h.spec.t==='skill'&&!h.skills[h.spec.id]&&Object.keys(h.skills).length<3)h.skills[h.spec.id]=1;
+  if(pre)for(const[k,l]of pre.sk)h.skills[k]=l;else{h.skills[pool[irnd(Math.random,0,3)]]=1;h.skills[pool[irnd(Math.random,4,9)]]=1}
+  if(fi===2&&!pre)h.skills.necromancia=1;if(h.spec.t==='skill'&&!h.skills[h.spec.id]&&Object.keys(h.skills).length<3)h.skills[h.spec.id]=1;
   if(h.spec.t==='spell'&&!h.spells.includes(h.spec.id)&&SPELLS[h.spec.id].lv<=2)h.spells.push(h.spec.id);
-  const u=FDEF[fi].units;h.army[0]={id:u[0],n:irnd(Math.random,12,22)};h.army[1]={id:u[1],n:irnd(Math.random,5,10)};if(!cls)h.army[2]={id:u[2],n:irnd(Math.random,3,6)};
+  const u=FDEF[fi].units;if(pre){h.army[0]={id:u[0],n:pre.n1};h.army[1]={id:u[1],n:pre.n2}}else{h.army[0]={id:u[0],n:irnd(Math.random,12,22)};h.army[1]={id:u[1],n:irnd(Math.random,5,10)};if(!cls)h.army[2]={id:u[2],n:irnd(Math.random,3,6)}}
   h.mana=maxMana(h);G.heroes.push(h);return h;
 }
 function sk(h,id){let lv=h.skills[id]||0;if(lv&&h.spec&&h.spec.t==='skill'&&h.spec.id===id&&h.lvl>=5)lv=Math.min(3,lv+1);return lv}
@@ -42,13 +53,13 @@ function hstat(h){
   const resB={};for(const r of SPEC_RES)resB[r]=(b[r]||0)+(h.spec&&h.spec.t==='res'&&h.spec.id===r&&r!=='gold'?1:0);if(h.spec&&h.spec.t==='res'&&h.spec.id==='gold')resB.gold=350;
   return{a:h.a+(b.a||0),d:h.d+(b.d||0),sp:h.sp+(b.sp||0),kn:h.kn+(b.kn||0),mp:b.mp||0,mpw:b.mpw||0,vis:(b.vis||0)+sk(h,'exploracion'),exp:0,
     gold:(b.gold||0)+[0,125,250,500][sk(h,'finanzas')],resB,off:sk(h,'ataque'),arch:sk(h,'arqueria'),armor:sk(h,'armadura'),tact:sk(h,'tacticas'),log:sk(h,'logistica'),pf:b.pf?3:sk(h,'orientacion'),nav:sk(h,'navegacion'),
-    lead:sk(h,'liderazgo')+(b.mor||0),luck:sk(h,'suerte')+(b.luck||0),dipLv:sk(h,'diplomacia'),dipA:(b.dip||0)+sk(h,'diplomacia')*8,lear:sk(h,'aprendizaje'),int:sk(h,'inteligencia'),mys:sk(h,'misticismo'),wis:sk(h,'sabiduria'),
+    lead:sk(h,'liderazgo')+(b.mor||0)+(h.tmp&&h.tmp.mor||0),luck:sk(h,'suerte')+(b.luck||0)+(h.tmp&&h.tmp.luck||0),dipLv:sk(h,'diplomacia'),dipA:(b.dip||0)+sk(h,'diplomacia')*8,lear:sk(h,'aprendizaje'),int:sk(h,'inteligencia'),mys:sk(h,'misticismo'),wis:sk(h,'sabiduria'),
     sorc:sk(h,'hechiceria'),resi:Math.min(90,[0,5,10,20][sk(h,'resistencia')]+(b.res||0)),eagle:[0,20,30,40][sk(h,'ojo_aguila')]+(b.eagle||0),necro:sk(h,'necromancia'),necroB:b.necro||0,med:sk(h,'medicina'),
     sch,schA:{fuego:b.sf||0,agua:b.sw||0,tierra:b.se||0,aire:b.sa||0},manaR:b.mana||0,spdB:b.spd||0,hpB:b.hp||0,xpB:b.xp||0,fin:0};
 }
 const maxMana=h=>{const s=hstat(h);return Math.round(Math.max(1,s.kn)*10*[1,1.25,1.5,2][s.int])};
 const MP_BASE=[1300,1360,1430,1500,1560,1630,1700,1760,1830,1900,1960,2000];
-function maxMP(h){const s=hstat(h);if(h.boat)return Math.round(1500*(1+.5*s.nav)+s.mpw);let sl=99;for(const u of h.army)if(u&&u.n>0)sl=Math.min(sl,CR[u.id].spd+s.spdB);if(sl===99)sl=4;return Math.round(MP_BASE[Math.max(0,Math.min(11,sl))]*(1+.1*s.log)+s.mp);}
+function maxMP(h){const s=hstat(h);if(h.boat)return Math.round(1500*(1+.5*s.nav)+s.mpw+(typeof lighthouses==='function'&&lighthouses(h.pid)?500:0));let sl=99;for(const u of h.army)if(u&&u.n>0)sl=Math.min(sl,CR[u.id].spd+s.spdB);if(sl===99)sl=4;return Math.round(MP_BASE[Math.max(0,Math.min(11,sl))]*(1+.1*s.log)+s.mp);}
 const heroVis=h=>5+hstat(h).vis;
 function skillOffers(h){
   const pref=SK_PREF[h.cls];const pool=SKILL_IDS.filter(s=>(h.skills[s]||0)<3&&(!SK_CLASS_ONLY[s]||SK_CLASS_ONLY[s].includes(h.fi))&&((h.skills[s]||0)>0||Object.keys(h.skills).length<8));
@@ -79,7 +90,7 @@ function newPlayer(id,fac,human,diff){
   return{id,fac,human,res,col:PCOL[id],name:PNAME[id],heroes:[],alive:true,fog:null,pool:[],ai:{}};
 }
 function newGame(idx,opt){
-  const spec=mapSpec(idx);const map=genMap(spec,{fac0:opt.fac});G.map=map;G.opt=opt;G.day=1;G.cur=0;G.over=false;G.busy=false;G.heroes=[];G.players=[];
+  const spec=mapSpec(idx);const map=genMap(spec,{fac0:opt.fac});G.map=map;snapMap(map);G.opt=opt;G.day=1;G.cur=0;G.over=false;G.busy=false;G.heroes=[];G.players=[];G.usedH={};G.week={t:'normal',week:1};G.quick=G.quick||false;
   G.hmap=new Int16Array(map.w*map.h);
   const hc=opt.color==null?0:opt.color;const cols=[hc];for(let i=0;i<8;i++)if(i!==hc)cols.push(i);
   for(let i=0;i<8;i++){const p=newPlayer(i,map.starts[i].fac,i===0,opt.diff);p.col=PCOL[cols[i]];p.name=PNAME[cols[i]];p.colIdx=cols[i];G.players.push(p)}
@@ -95,7 +106,11 @@ function newGame(idx,opt){
   return G;
 }
 function recomputeZoc(){const m=G.map,z=new Uint8Array(m.w*m.h);for(const o of m.objs){if(o.dead||o.t!=='mon')continue;for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){const x=o.x+i,y=o.y+j;if(x>=0&&y>=0&&x<m.w&&y<m.h)z[y*m.w+x]++}}m.zoc=z}
-function refreshPool(p){p.pool=[];for(let k=0;k<2;k++){const fi=k?Math.floor(Math.random()*8):p.fac;p.pool.push({fi,cls:Math.floor(Math.random()*2),nameIdx:Math.floor(Math.random()*12)})}}
+function poolKeep(p){return(p.pool||[]).filter(o=>o.hero)}
+function refreshPool(p){ // cada semana cambian los campeones de la taberna
+  for(const o of p.pool||[])if(!o.hero&&G.usedH)delete G.usedH[heroKey(o.fi,o.ni)];
+  p.pool=poolKeep(p);fillPool(p)}
+function fillPool(p){let g=0;while(p.pool.filter(o=>!o.hero).length<3&&g++<9)p.pool.push(mkChamp(Math.random()<.6?p.fac:Math.floor(Math.random()*8)))}
 function placeHero(h,pid,x,y){h.pid=pid;h.x=x;h.y=y;h.alive=true;h.path=null;G.hmap[mapIdx(x,y)]=h.id+1;if(!G.players[pid].heroes.includes(h.id))G.players[pid].heroes.push(h.id);if(G.players[pid].fog)reveal(G.players[pid],x,y,heroVis(h))}
 function removeHero(h){if(h.x>=0&&G.hmap[mapIdx(h.x,h.y)]===h.id+1)G.hmap[mapIdx(h.x,h.y)]=0;const p=G.players[h.pid];if(p)p.heroes=p.heroes.filter(i=>i!==h.id);h.alive=false;h.x=-1;h.y=-1}
 const heroAt=(x,y)=>{const v=G.hmap[mapIdx(x,y)];return v?G.heroes[v-1]:null};
@@ -143,11 +158,13 @@ function upgradeCostFor(t,slotArmy,i){const s=slotArmy[i];if(!s)return null;cons
 function doUpgrade(p,t,arr,i){const u=upgradeCostFor(t,arr,i);if(!u||!canAfford(p,u.cost))return false;spend(p,u.cost);arr[i].id=u.id;return true}
 function learnTownSpells(t,h){const gl=t.b.mage4?4:t.b.mage3?3:t.b.mage2?2:t.b.mage1?1:0;if(!gl)return[];const got=[];for(const s of t.spells)if(SPELLS[s].lv<=Math.min(gl,[2,3,4,4][hstat(h).wis])&&!h.spells.includes(s)){h.spells.push(s);got.push(s)}return got}
 function hireHero(p,town,idx){
-  const o=p.pool[idx];if(!o||p.res.gold<1500||p.heroes.length>=8)return null;
+  const o=p.pool[idx];if(!o||p.res.gold<HIRE_COST||p.heroes.length>=8)return null;
   const ex=town.x+town.ex,ey=town.y+town.ey;if(heroAt(ex,ey))return null;
-  p.res.gold-=1500;let h;if(o.hero){h=o.hero;h.army=padArmy([{id:FDEF[h.fi].units[0],n:irnd(Math.random,6,12)}]);placeHero(h,p.id,ex,ey)}else{h=makeHero(o.fi,o.cls,o.nameIdx);placeHero(h,p.id,ex,ey)}
+  p.res.gold-=HIRE_COST;let h;
+  if(o.hero){h=o.hero;h.army=padArmy([{id:FDEF[h.fi].units[0],n:irnd(Math.random,6,12)}]);placeHero(h,p.id,ex,ey)}
+  else{G.usedH[heroKey(o.fi,o.ni)]='hero';h=makeHero(o.fi,o.cls,o.ni,o);placeHero(h,p.id,ex,ey)}
   h.mp=maxMP(h);h.mana=maxMana(h);
-  p.pool.splice(idx,1);if(p.pool.length<2)p.pool.push({fi:Math.floor(Math.random()*8),cls:Math.floor(Math.random()*2),nameIdx:Math.floor(Math.random()*12)});return h;
+  p.pool.splice(idx,1);fillPool(p);return h;
 }
 
 // ---------- combate ----------
@@ -168,18 +185,20 @@ function runBattle(A,D,info,cb){
   // A,D: sides. cb(winnerSideIndex, battle)
   const humanIn=A.human||D.human;
   info=info||{};if(info.terr==null){const hh=A.hero||D.hero;info.terr=hh&&hh.x>=0?G.map.terr[hh.y*G.map.w+hh.x]:GRASS}
-  const b=new Battle([A,D]);b.info=info;
+  const wl=info.town?(info.town.b.fort3?3:info.town.b.fort2?2:info.town.b.fort1?1:0):0;
+  const b=new Battle([A,D],{siege:wl||0});b.info=info;
   const done=()=>{
+    if(A.hero)A.hero.tmp=null;if(D.hero)D.hero.tmp=null;
     const w=b.winner;const res=b.result();const xA=b.xpFor(0),xD=b.xpFor(1);
     cb(w,b,res,[xA,xD]);
   };
-  if(humanIn&&G.hooks.battle!==undefined&&!G.headless)G.hooks.battle(b,done);else{b.autoPlay();done()}
+  if(humanIn&&G.hooks.battle!==undefined&&!G.headless){if(G.quick){b.autoPlay();if(G.hooks.quickReport)G.hooks.quickReport(b,A,D,done);else done()}else G.hooks.battle(b,done)}else{b.autoPlay();done()}
 }
 function applyArmy(side,res,targetArmy){for(let i=0;i<7;i++)targetArmy[i]=res[i]?{id:res[i].id,n:res[i].n}:null}
 function postBattle(h,b,side){
   const s=hstat(h),enemy=1-side;
   if(b.winner===side){
-    let killed=0;for(const u of b.st)if(u.side===enemy)killed+=u.startN-(u.dead?0:u.n);
+    let killed=0;for(const u of b.st)if(u.side===enemy&&!u.siege)killed+=u.startN-(u.dead?0:u.n);
     const pct=[0,.10,.20,.30][s.necro]+s.necroB/100;
     if(pct>0&&killed>0){const n=Math.floor(killed*pct);if(n>0&&addToArmy(h.army,'f2t1',n))notify(`${h.name} levanta ${n} esqueletos`,'good')}
     if(s.eagle>0&&b.casts&&b.casts[enemy])for(const sp of b.casts[enemy])if(!h.spells.includes(sp)&&SPELLS[sp].lv<=[2,3,4,4][s.wis]&&Math.random()<s.eagle/100){h.spells.push(sp);notify(`${h.name} aprende ${SPELLS[sp].n} del enemigo`,'good')}
@@ -252,7 +271,7 @@ function visit(h,o,cb){
       const take=k=>{if(k==='gold'){p.res.gold+=gold;notify(`Cofre: ${gold} de oro`,'good')}else{gainXp(h,xp);notify(`Cofre: ${xp} de experiencia`,'good')}done()};
       if(human)G.hooks.askChest(h,{gold,xp},take);else take(h.lvl<8?'xp':'gold');break}
     case'art':{const r=giveArtifact(h,o.art);if(!r){notify('Mochila llena','bad');done();break}notify(`${h.name} encuentra: ${ART[o.art].n}`+(r==='pack'?' (a la mochila)':''),'good');removeObj(o);done();break}
-    case'boat':{h.boat=true;removeObj(o);notify(`${h.name} sube al barco`,'good');if(G.hooks.sfx)G.hooks.sfx('boat');done();break}
+    case'boat':{h.boat=true;h.mp=0;h.path=null;removeObj(o);notify(`${h.name} sube al barco: los pasos se agotan hasta mañana`,'good');if(G.hooks.sfx)G.hooks.sfx('boat');done();break}
     case'gate':case'mono':{if(o.dir==='out'){notify('Esta salida es solo de salida','bad');done();break}const dest=o.pair!=null?G.map.objs[o.pair]:null;
       if(!dest||dest.dead||!teleportHero(h,dest)){notify('El portal está bloqueado','bad');done();break}notify(o.t==='gate'?'Cruzas la puerta entre mundos':'El monolito te transporta','good');done();break}
     case'mine':{if(o.owner!==h.pid){o.owner=h.pid;notify(`${p.name} captura una mina de ${RESN[o.res]}`,'good')}done();break}
@@ -262,7 +281,7 @@ function visit(h,o,cb){
         if(human)G.hooks.town(o,h,done);else done()}
       else fightTown(h,o,won=>{if(won&&human)G.hooks.town(o,h,done);else done()});
       break}
-    case'site':if(o.k==='shop'){if(human)G.hooks.shop(o,h,done);else{aiShop(p,h,o);done()}}else{visitSite(h,o,p);done()}break;
+    case'site':if(o.k==='shop'){if(human)G.hooks.shop(o,h,done);else{aiShop(p,h,o);done()}}else{if(SITEDEF[o.k])visitSite2(h,o,p);else visitSite(h,o,p);done()}break;
   }
 }
 function visitSite(h,o,p){
@@ -315,7 +334,7 @@ function stepHero(h,cb){
     fightHero(h,eh,won=>{if(won&&h.alive){moveTo(h,nx.x,nx.y)}cb(h.alive?'stop':'dead')});return}
   if(obj&&obj.t==='mon'){h.mp-=Math.min(h.mp,cost);h.path=null;engage(h,obj,won=>{cb(won&&h.alive?'stop':'dead')});return}
   const px0=h.x,py0=h.y;moveTo(h,nx.x,nx.y);h.mp=Math.max(0,h.mp-cost);st.shift();
-  if(h.boat&&m.terr[nx.y*m.w+nx.x]!==WATER){h.boat=false;addMapObj({t:'boat',x:px0,y:py0,isle:1});notify(`${h.name} desembarca`)}
+  if(h.boat&&m.terr[nx.y*m.w+nx.x]!==WATER){h.boat=false;addMapObj({t:'boat',x:px0,y:py0,isle:1});h.mp=0;h.path=null;st.length=0;notify(`${h.name} desembarca: los pasos se agotan hasta mañana`)}
   // zona de control
   if(m.zoc[nx.y*m.w+nx.x]){for(const[dx,dy]of D8){const x=nx.x+dx,y=nx.y+dy;if(x<0||y<0||x>=m.w||y>=m.h)continue;const o2=objAt(x,y);if(o2&&o2.t==='mon'&&!o2.dead){h.path=null;engage(h,o2,won=>{
     if(won&&h.alive&&obj&&target){visit(h,obj,()=>cb('arrived'))}else cb(won&&h.alive?'stop':'dead')});return}}}
@@ -332,13 +351,42 @@ function startDayFor(p){
 function endDayAll(){
   G.day++;
   for(const p of G.players){if(!p.alive)continue;const inc=incomeOf(p);const bonus=p.human?1:[.8,1,1.25,1.6][G.opt.diff==null?1:G.opt.diff];for(const k in inc)p.res[k]+=Math.round(inc[k]*bonus)}
-  if((G.day-1)%7===0){ // semana nueva: crecimiento de criaturas
-    for(const o of G.map.objs){if(o.dead)continue;
-      if(o.t==='town'){const mul=1+(o.b.fort2?.5:0)+(o.b.fort3?.5:0);for(let t=1;t<=7;t++)if(o.b['dw'+t])o.avail[t-1]+=Math.round(CR[FDEF[o.fi].units[t-1]].grow*mul)}
-      else if(o.t==='dwell')o.n+=CR[o.cr].grow}
-    for(const p of G.players)refreshPool(p);
-    notify(`Comienza la semana ${Math.floor((G.day-1)/7)+1}`);
-  }
+  if((G.day-1)%7===0)newWeek();
+}
+// ---- semanas especiales (como en Heroes 3): semana de una criatura o plaga ----
+function rollWeek(week){
+  if(week<=1)return{t:'normal',week};
+  const r=mulberry((G.map.spec.seed|0)*131+week*7919);const x=r();
+  if(x<.1)return{t:'plague',week};
+  if(x<.72){const ids=ALL_BY_VAL.filter(id=>CR[id].tier<=6||r()<.3);return{t:'creature',cr:ids[Math.floor(r()*ids.length)],week}}
+  return{t:'normal',week};
+}
+function weekLabel(w){return w.t==='creature'?`Semana de ${CR[w.cr].name}`:w.t==='plague'?'Semana de la Plaga':`Semana ${w.week}`}
+function newWeek(){
+  const week=Math.floor((G.day-1)/7)+1;const ev=G.week=rollWeek(week);const m=G.map;let spawned=0,boosted=0;
+  const cid=ev.t==='creature'?ev.cr:null;
+  for(const o of m.objs){if(o.dead)continue;
+    if(o.t==='town'){const mul=1+(o.b.fort2?.5:0)+(o.b.fort3?.5:0);
+      for(let t=1;t<=7;t++)if(o.b['dw'+t]){const id=FDEF[o.fi].units[t-1];let add=Math.round(CR[id].grow*mul);
+        if(cid&&(id===cid||FDEF[o.fi].units[t-1+7]===cid)){add=add*2+5;boosted++}
+        o.avail[t-1]+=add;if(ev.t==='plague')o.avail[t-1]=Math.floor(o.avail[t-1]/2)}}
+    else if(o.t==='dwell'){let add=CR[o.cr].grow;if(cid&&o.cr===cid){add=add*2+5;boosted++}o.n+=add;if(ev.t==='plague')o.n=Math.floor(o.n/2)}
+    else if(o.t==='mon'){ // las manadas crecen cada semana; las de la criatura de la semana se duplican
+      if(!o.n0)o.n0=o.n;let add=Math.max(1,Math.round(o.n*.05));if(o.n<o.n0*2.2)o.n+=add;
+      if(cid&&o.cr===cid){o.n=Math.round(o.n*2);o.fresh=G.day;boosted++}}}
+  if(cid){ // aparecen nuevas manadas de esa criatura por todo el mapa
+    const want=Math.round(6+m.w/30),cr=CR[cid];let tries=0;const r=Math.random;
+    while(spawned<want&&tries++<want*60){const lv=Math.random()<.5?0:1;const lh=m.lh||m.h;
+      const x=3+Math.floor(r()*(m.w-6)),y=3+Math.floor(r()*(lh-6))+(lv?lh+2:0);
+      const k=y*m.w+x;if(!tilePass(m,x,y,false)||m.fp[k]||m.en[k]||m.road[k]||G.hmap[k])continue;
+      if(m.terr[k]===WATER)continue;
+      let near=false;for(const q of m.objs)if(!q.dead&&q.t==='town'&&Math.abs(q.x-x)<8&&Math.abs(q.y-y)<8){near=true;break}if(near)continue;
+      const pw=(180+G.day*40)*(.6+r()*.8);const n=Math.max(2,Math.round(pw/cr.val));
+      addMapObj({t:'mon',cr:cid,n,x,y,fresh:G.day,n0:n});spawned++}
+    recomputeZoc()}
+  for(const p of G.players)refreshPool(p);
+  if(G.hooks.weekBanner&&G.players[0].alive)G.hooks.weekBanner(ev,{spawned,boosted});
+  else notify(`Comienza la semana ${week}`);
 }
 // ---------- IA ----------
 const defer=fn=>{if(G.sync)fn();else setTimeout(fn,0)};
@@ -361,12 +409,12 @@ function runPath(h,done){
   next();
 }
 // simulación rápida de un combate para decidir si merece la pena
-function evalFight(h,enemyArmy,enemyHero,n=2){
+function evalFight(h,enemyArmy,enemyHero,n=2,town){
   let wins=0,loss=0;const mine=armyPower(h.army)||1;
   for(let k=0;k<n;k++){
     const hc={...h,mana:h.mana,spells:h.spells.slice()};const ec=enemyHero?{...enemyHero,mana:enemyHero.mana,spells:enemyHero.spells.slice()}:null;
     const A=mkSide(hc,h.army,h.pid),D=mkSide(ec,enemyArmy,enemyHero?enemyHero.pid:-1);A.human=false;D.human=false;
-    const b=new Battle([A,D]);b.autoPlay();const res=b.result()[0];if(b.winner===0)wins++;loss+=1-armyPower(res)/mine}
+    const b=new Battle([A,D],{siege:town&&town.b?(town.b.fort3?3:town.b.fort2?2:town.b.fort1?1:0):0});b.autoPlay();const res=b.result()[0];if(b.winner===0)wins++;loss+=1-armyPower(res)/mine}
   return{win:wins/n,loss:loss/n};
 }
 function dangerMask(h,power){
@@ -392,15 +440,33 @@ function aiTowns(p){
     if(!t.builtToday){const ord=G.day>10?['hall2',...order]:order;for(const b of ord){const cb=canBuild(t,b,p);if(cb.ok&&(b!=='hall3'||p.res.gold>12000)){build(t,b,p);break}}}
     const hero=heroAt(t.x+t.ex,t.y+t.ey);const mine=hero&&hero.pid===p.id?hero:null;
     for(let tier=7;tier>=1;tier--){if(!t.b['dw'+tier])continue;const id=townUnit(t,tier);const n=maxRecruit(p,id,t.avail[tier-1]);if(n>0)recruit(t,tier,n,p,mine)}
+    if(G.map.spec.sea&&t.dock&&G.day>5){
+      if(!t.b.shipyard&&p.res.gold>9000&&canBuild(t,'shipyard',p).ok&&!t.builtToday&&ownedTowns(p.id).filter(q=>q.b.shipyard).length<2)build(t,'shipyard',p);
+      if(t.b.shipyard&&p.res.gold>6000&&p.res.wood>=10&&(p.boats||0)<3&&!G.map.objs.some(o=>!o.dead&&o.t==='boat'&&Math.hypot(o.x-t.dock.x,o.y-t.dock.y)<6)){if(buyBoat(t,p)===null)p.boats=(p.boats||0)+1}}
     aiUpgradeArmy(p,t,t.gar);if(mine){aiUpgradeArmy(p,t,mine.army);mergeArmy(mine.army,t.gar);sortArmy(mine.army)}
-    if(p.heroes.length<Math.min(2+Math.floor(G.day/9),6)&&t.b.tavern&&!heroAt(t.x+t.ex,t.y+t.ey)&&p.res.gold>=2200){const h=hireHero(p,t,0);if(h){mergeArmy(h.army,t.gar);sortArmy(h.army)}}
+    if(p.heroes.length<Math.min(2+Math.floor(G.day/9),6)&&t.b.tavern&&!heroAt(t.x+t.ex,t.y+t.ey)&&p.res.gold>=HIRE_COST+700){const h=hireHero(p,t,Math.max(0,p.pool.findIndex(o=>o.fi===p.fac)));if(h){mergeArmy(h.army,t.gar);sortArmy(h.army)}}
   }
 }
 function threatsTo(p,t){let power=0,who=[];for(const q of G.players){if(q.id===p.id||!q.alive)continue;for(const hid of q.heroes){const e=G.heroes[hid];if(Math.hypot(e.x-(t.x+2),e.y-(t.y+1))<=16){power+=armyPower(e.army);who.push(e)}}}return{power,who}}
+// masas de tierra y de agua (para que la IA sepa cuándo necesita barco)
+function mapComps(m){
+  if(m.comp)return m.comp;const W=m.w,H=m.h,n=W*H,comp=new Int32Array(n);let L=0,Wt=0;const st=[];
+  for(let i=0;i<n;i++){if(comp[i])continue;const t=m.terr[i];
+    if(t===WATER){Wt--;comp[i]=Wt;st.push(i);while(st.length){const c=st.pop(),cx=c%W,cy=(c/W)|0;for(const[dx,dy]of D8){const x=cx+dx,y=cy+dy;if(x<0||y<0||x>=W||y>=H)continue;const q=y*W+x;if(!comp[q]&&m.terr[q]===WATER){comp[q]=Wt;st.push(q)}}}}
+    else if(!IMP(t)&&!m.deco[i]){L++;comp[i]=L;st.push(i);while(st.length){const c=st.pop(),cx=c%W,cy=(c/W)|0;for(const[dx,dy]of D8){const x=cx+dx,y=cy+dy;if(x<0||y<0||x>=W||y>=H)continue;const q=y*W+x;if(!comp[q]&&!IMP(m.terr[q])&&!m.deco[q]){comp[q]=L;st.push(q)}}}}}
+  return m.comp=comp;
+}
+function waterNear(m,comp,x,y,wc){for(const[dx,dy]of D8){const q=(y+dy)*m.w+x+dx;if(x+dx>=0&&x+dx<m.w&&y+dy>=0&&y+dy<m.h&&comp[q]===wc)return true}return false}
+function aiFindBoat(p,h,comp,hc){
+  const m=G.map;let best=null,bd=1e9;
+  for(const o of m.objs){if(o.dead||o.t!=='boat'||levelOf(m,o.y)!==levelOf(m,h.y))continue;const d=Math.hypot(o.x-h.x,o.y-h.y);if(d>=bd)continue;
+    let ok=false;for(const[dx,dy]of D8){const x=o.x+dx,y=o.y+dy;if(x>=0&&y>=0&&x<m.w&&y<m.h&&comp[y*m.w+x]===hc){ok=true;break}}if(ok){bd=d;best=o}}
+  if(!best)return null;return planPath(h,best.x,best.y);
+}
 function aiHeroAct(p,h,cb){
   const m=G.map,power=armyPower(h.army),dif=G.opt.diff==null?1:G.opt.diff,aggr=[.9,.8,.7,.6][dif];
   const lowArmy=power<250+G.day*30;const danger=dangerMask(h,power);const cands=[];
-  const myTowns=ownedTowns(p.id);
+  const myTowns=ownedTowns(p.id);const comp=mapComps(m),hc=comp[h.y*m.w+h.x],sea=!!m.spec.sea;
   // 1. defensa de ciudades amenazadas
   const inTown=objAtTownTile(h);
   for(const t of myTowns){const th=threatsTo(p,t);if(!th.who.length)continue;const gp=armyPower(t.gar)+power*0.5;
@@ -410,25 +476,33 @@ function aiHeroAct(p,h,cb){
           if(Math.hypot(e.x-h.x,e.y-h.y)<=8&&evalFight(h,e.army,e,2).win>=.7)cands.push({o:{x:e.x,y:e.y,ex:0,ey:0},v:1e6,hero:e});else{h.mp=0;return cb(false)}}
         else cands.push({o:{x:t.x+t.ex,y:t.y+t.ey,ex:0,ey:0},v:5e5/(1+d)})}}}
   for(const o of m.objs){
-    if(o.dead||o.isle||o.t==='boat')continue;if(levelOf(m,o.y)!==levelOf(m,h.y))continue;const d=Math.hypot(o.x+o.ex-h.x,o.y+o.ey-h.y);if(d>90&&h.mp<1400)continue;let val=0;
+    if(o.dead||o.t==='boat')continue;if(levelOf(m,o.y)!==levelOf(m,h.y))continue;const d=Math.hypot(o.x+o.ex-h.x,o.y+o.ey-h.y);if(d>140&&h.mp<1400)continue;let val=0;
+    {const ex=o.x+o.ex,ey=o.y+o.ey,ec=comp[ey*m.w+ex];
+      if(h.boat){if(ec<0){if(ec!==hc)continue}else if(!waterNear(m,comp,ex,ey,hc))continue}else if(ec!==hc)continue}
     switch(o.t){
       case'res':val=(o.res==='gold'?o.n:o.n*220);break;
       case'chest':val=900;break;
-      case'art':val=1700;break;
+      case'art':val=ART[o.art]&&ART[o.art].lin?4200:1700;break;
       case'mine':if(o.owner!==p.id)val=(o.res==='gold'?3800:2400)*(o.owner>=0?1.4:1);break;
       case'dwell':{const c=CR[o.cr];if(o.n>0&&p.res.gold>=c.cost.gold*2)val=300+o.n*c.val*1.5;break}
       case'mon':{const mp=sizeVal(o);if(power>mp*1.25)val=200+mp*.6+CR[o.cr].hp*o.n*.2;else val=-1;break}
       case'town':if(o.owner===p.id){if(lowArmy&&o.gar.some(s=>s))val=2600;else if(o.b.mage1&&h.mana<maxMana(h)*.4)val=500}
         else{const eh=heroAt(o.x+o.ex,o.y+o.ey);const gp=armyPower(o.gar)+(eh?armyPower(eh.army)*1.2:0);if(o.owner>=0&&G.day<9)val=-1;else if(power>gp*1.3)val=o.owner>=0?9000:6000;else val=-1}break;
       case'gate':case'mono':if(o.dir!=='out'&&o.pair!=null&&G.day>4&&(o.id*7+G.day)%9===0)val=800;break;
-      case'site':{if(o.k==='shop'){if(p.res.gold>8000)val=900;break}if(o.k==='well'){if(h.mana<maxMana(h)*.5&&h.visited.well!==G.day)val=600}else if(!h.visited[o.id])val=o.k==='stone'?1200:o.k==='stable'?200:o.k==='mill'?800:700;break}
+      case'site':{if(SITEDEF[o.k]){val=siteAIValue(h,o,p);break}if(o.k==='shop'){if(p.res.gold>8000)val=900;break}if(o.k==='well'){if(h.mana<maxMana(h)*.5&&h.visited.well!==G.day)val=600}else if(!h.visited[o.id])val=o.k==='stone'?1200:o.k==='stable'?200:o.k==='mill'?800:700;break}
     }
     if(val>0)cands.push({o,v:val/(8+d)});
   }
   for(const q of G.players)if(q.id!==p.id&&q.alive)for(const hid of q.heroes){const e=G.heroes[hid];const d=Math.hypot(e.x-h.x,e.y-h.y);if(d<45&&power>armyPower(e.army)*1.2)cands.push({o:{x:e.x,y:e.y,ex:0,ey:0},v:4000/(8+d),hero:e})}
   cands.sort((a,b)=>b.v-a.v);
+  if(sea&&!h.boat&&h.mp>=1000){ // ¿hay tesoros en otras tierras? entonces conviene subir a un barco
+    let far=false;for(const o of m.objs){if(o.dead||o.t==='boat'||levelOf(m,o.y)!==levelOf(m,h.y))continue;if(!['res','chest','art','mine','dwell','site','town'].includes(o.t))continue;
+      const ec=comp[(o.y+o.ey)*m.w+o.x+o.ex];if(ec>0&&ec!==hc&&(o.t!=='town'||o.owner<0)){far=true;break}}
+    if(far&&(!cands.length||cands[0].v<70||Math.random()<.1)){let bb=null,bd=1e9;
+      for(const o of m.objs){if(o.dead||o.t!=='boat'||levelOf(m,o.y)!==levelOf(m,h.y))continue;const d=Math.hypot(o.x-h.x,o.y-h.y);if(d<bd&&d<110){bd=d;bb=o}}
+      if(bb)cands.unshift({o:bb,v:1e5})}}
   const finish=(s)=>{const t=objAtTownTile(h);if(t&&h.alive){mergeArmy(h.army,t.gar);sortArmy(h.army);learnTownSpells(t,h);if(t.b.mage1)h.mana=Math.max(h.mana,maxMana(h))}
-    if(h.alive)autoEquipBest(h);cb(h.alive&&s!=='dead')};
+    if(h.alive){autoEquipBest(h);aiFuse(h)}cb(h.alive&&s!=='dead')};
   let tries=0;
   for(const c of cands){
     if(tries>=6)break;
@@ -438,9 +512,19 @@ function aiHeroAct(p,h,cb){
     const ob=c.o.t==='mon'?c.o:c.o.t==='town'&&c.o.owner!==p.id?c.o:null;
     if(c.hero||ob){tries++;let enemyArmy,enemyHero=null;
       if(c.hero){enemyArmy=c.hero.army;enemyHero=c.hero}else if(ob.t==='mon')enemyArmy=[{id:ob.cr,n:ob.n}];else{const eh=heroAt(ob.x+ob.ex,ob.y+ob.ey);enemyHero=eh&&eh.pid===ob.owner?eh:null;enemyArmy=townDefenders(ob,enemyHero).map(o=>o.s)}
-      const r=evalFight(h,padArmy(enemyArmy),enemyHero,2);const need=c.v>=1e5?.5:aggr;
+      const r=evalFight(h,padArmy(enemyArmy),enemyHero,2,c.o.t==='town'?c.o:null);const need=c.v>=1e5?.5:aggr;
       if(r.win<need||(r.loss>.55&&c.o.t==='mon'&&r.win<1))continue}
     h.path=path;runPath(h,finish);return;
+  }
+  // navegación: embarcar para llegar a otras tierras, o desembarcar si no queda nada que hacer en el mar
+  if(sea){
+    if(h.boat){const coast=[];const R=26;for(let k=0;k<60;k++){const x=h.x+Math.floor((Math.random()*2-1)*R),y=h.y+Math.floor((Math.random()*2-1)*R);
+        if(x<2||y<2||x>=m.w-2||y>=m.h-2||levelOf(m,y)!==levelOf(m,h.y))continue;const c=comp[y*m.w+x];if(c>0&&waterNear(m,comp,x,y,hc)&&!m.en[y*m.w+x])coast.push([x,y])}
+      coast.sort((a,b2)=>Math.hypot(a[0]-h.x,a[1]-h.y)-Math.hypot(b2[0]-h.x,b2[1]-h.y));
+      for(const[x,y]of coast.slice(0,5)){const path=planPath(h,x,y);if(path){h.path=path;runPath(h,finish);return}}}
+    else{let far=false;for(const o of m.objs){if(o.dead||o.t==='boat'||levelOf(m,o.y)!==levelOf(m,h.y))continue;if(!['res','chest','art','mine','dwell','site','town'].includes(o.t))continue;
+        const ex=o.x+o.ex,ey=o.y+o.ey;if(comp[ey*m.w+ex]!==hc&&comp[ey*m.w+ex]>0&&(o.t!=='town'||o.owner<0)){far=true;break}}
+      if(far&&(!cands.length||Math.random()<.5)){const bp=aiFindBoat(p,h,comp,hc);if(bp){h.path=bp;runPath(h,finish);return}}}
   }
   // sin objetivos útiles: explorar hacia un punto lejano seguro, o volver a casa
   if(lowArmy&&myTowns.length&&!inTown){const t=myTowns[0];const path=planPath(h,t.x+t.ex,t.y+t.ey,(x,y)=>!danger[y*m.w+x]);if(path){h.path=path;runPath(h,finish);return}}
@@ -453,17 +537,20 @@ function aiHeroAct(p,h,cb){
 function saveState(){
   const m=G.map;return JSON.stringify({idx:m.spec.i,opt:G.opt,day:G.day,cur:G.cur,
     players:G.players.map(p=>({...p,fog:null})),fog:G.players[0].fog?packFog(G.players[0].fog):null,
-    heroes:G.heroes,objs:m.objs.map(o=>o.dead?{dead:1,id:o.id}:o)});
+    heroes:G.heroes,usedH:G.usedH,week:G.week,objs:diffObjs(m)});
 }
+// solo se guardan los objetos que cambiaron respecto al mundo generado por la semilla
+function snapMap(m){m.snap=m.objs.map(o=>JSON.stringify(o))}
+function diffObjs(m){const out=[];m.objs.forEach((o,i)=>{if(i<(m.snap?m.snap.length:0)){if(o.dead){if(m.snap[i].indexOf('"dead":1')<0)out.push({dead:1,id:o.id})}else if(JSON.stringify(o)!==m.snap[i])out.push(o)}else out.push(o.dead?{dead:1,id:o.id}:o)});return out}
 function packFog(f){let s='';const out=[];for(let i=0;i<f.length;i+=8){let b=0;for(let k=0;k<8;k++)if(f[i+k])b|=1<<k;out.push(b)}for(let i=0;i<out.length;i+=4096)s+=String.fromCharCode.apply(null,out.slice(i,i+4096));return btoa(s)}
 function unpackFog(s,n){const raw=atob(s),f=new Uint8Array(n);for(let i=0;i<raw.length;i++){const b=raw.charCodeAt(i);for(let k=0;k<8;k++)if(b&(1<<k))f[i*8+k]=1}return f}
 function loadState(str){
-  const d=JSON.parse(str);const spec=mapSpec(d.idx);const map=genMap(spec,{fac0:d.opt.fac});G.map=map;G.opt=d.opt;G.day=d.day;G.cur=d.cur;G.over=false;G.busy=false;
+  const d=JSON.parse(str);const spec=mapSpec(d.idx);const map=genMap(spec,{fac0:d.opt.fac});G.map=map;snapMap(map);G.opt=d.opt;G.day=d.day;G.cur=d.cur;G.over=false;G.busy=false;
   // sustituir objetos dinámicos
   for(const o of d.objs){if(o.id>=map.objs.length){if(o.dead)map.objs.push({t:'void',dead:1,id:o.id,x:0,y:0,w:1,h:1,ex:0,ey:0});else addMapObj(o);continue}
     if(o.dead){const real=map.objs[o.id];if(real&&!real.dead)removeObj(real)}else Object.assign(map.objs[o.id],o)}
   for(const o of map.objs)if(!o.dead&&o.t==='town')o.gar=padArmy(o.gar);
-  G.heroes=d.heroes;G.players=d.players;G.hmap=new Int16Array(map.w*map.h);
+  G.heroes=d.heroes;G.players=d.players;G.usedH=d.usedH||{};G.week=d.week||{t:'normal',week:Math.floor((d.day-1)/7)+1};G.hmap=new Int16Array(map.w*map.h);
   for(const h of G.heroes)if(h.alive&&h.x>=0)G.hmap[mapIdx(h.x,h.y)]=h.id+1;
   G.players[0].fog=d.fog?unpackFog(d.fog,map.w*map.h):new Uint8Array(map.w*map.h);
   for(let i=1;i<G.players.length;i++)G.players[i].fog=null;

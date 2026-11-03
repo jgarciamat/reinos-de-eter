@@ -2,8 +2,8 @@
 // =====================================================================
 //  Artefactos: 14 ranuras de equipo, ~140 objetos y 11 conjuntos
 // =====================================================================
-const SLOTKEYS={weapon:['weapon'],shield:['shield'],helm:['helm'],armor:['armor'],neck:['neck'],cloak:['cloak'],boots:['boots'],gloves:['gloves'],ring:['ring1','ring2'],misc:['misc1','misc2','misc3','misc4']};
-const SLOTN={weapon:'Arma',shield:'Escudo',helm:'Yelmo',armor:'Armadura',neck:'Amuleto',cloak:'Capa',boots:'Botas',gloves:'Guantes',ring:'Anillo',misc:'Objeto'};
+const SLOTKEYS={fusion:[],weapon:['weapon'],shield:['shield'],helm:['helm'],armor:['armor'],neck:['neck'],cloak:['cloak'],boots:['boots'],gloves:['gloves'],ring:['ring1','ring2'],misc:['misc1','misc2','misc3','misc4']};
+const SLOTN={fusion:'Fusión',weapon:'Arma',shield:'Escudo',helm:'Yelmo',armor:'Armadura',neck:'Amuleto',cloak:'Capa',boots:'Botas',gloves:'Guantes',ring:'Anillo',misc:'Objeto'};
 const EQKEYS=['helm','neck','weapon','armor','shield','gloves','cloak','boots','ring1','ring2','misc1','misc2','misc3','misc4'];
 const BNAMES={a:'Ataque',d:'Defensa',sp:'Poder',kn:'Conocimiento',mp:'Movimiento',mpw:'Movimiento marítimo',vis:'Visión',gold:'Oro/día',mor:'Moral',luck:'Suerte',mana:'Maná/día',spd:'Velocidad de unidades',hp:'Vida de unidades',necro:'% Nigromancia',res:'% Resistencia mágica',xp:'% Experiencia',eagle:'% Ojo de águila',dip:'% Diplomacia',sf:'% daño de Fuego',sw:'% daño de Agua',se:'% daño de Tierra',sa:'% daño de Aire',pf:'Sin penalización de terreno',wood:'Madera/día',ore:'Mineral/día',gems:'Gemas/día',crystal:'Cristal/día',sulfur:'Azufre/día',mercury:'Mercurio/día'};
 const ART={};
@@ -69,7 +69,7 @@ const ARTSET={
 for(const id in ART){const s=ART[id].set;if(s){(ARTSET[s].pieces=ARTSET[s].pieces||[]).push(id)}}
 // ---- ayudantes de equipo ----
 function newEquip(){const e={};for(const k of EQKEYS)e[k]=null;return e}
-function equippedList(h){return EQKEYS.map(k=>h.eq[k]).filter(Boolean)}
+function equippedList(h){return EQKEYS.map(k=>h.eq[k]).filter(id=>id&&id.charCodeAt(0)!==35)}
 function artBonus(h){
   const out={};const add=b=>{for(const k in b)out[k]=(out[k]||0)+b[k]};
   const eq=equippedList(h);for(const id of eq)add(ART[id].b);
@@ -80,8 +80,8 @@ function setProgress(h){const eq=equippedList(h),out=[];for(const sid in ARTSET)
 function freeSlotFor(h,id){const keys=SLOTKEYS[ART[id].slot];return keys.find(k=>!h.eq[k])||null}
 function giveArtifact(h,id){const k=freeSlotFor(h,id);if(k){h.eq[k]=id;return 'eq'}if(h.pack.length<14){h.pack.push(id);return 'pack'}return null}
 function equipFromPack(h,i,key){const id=h.pack[i];if(!id)return false;const keys=SLOTKEYS[ART[id].slot];if(!keys.includes(key))return false;const old=h.eq[key];h.eq[key]=id;h.pack.splice(i,1);if(old)h.pack.push(old);return true}
-function unequip(h,key){const id=h.eq[key];if(!id||h.pack.length>=14)return false;h.pack.push(id);h.eq[key]=null;return true}
+function unequip(h,key){const id=h.eq[key];if(!id)return false;if(id.charCodeAt(0)===35||ART[id].fusion)return unfuse(h,id.charCodeAt(0)===35?id.slice(1):id)===null;if(h.pack.length>=14)return false;h.pack.push(id);h.eq[key]=null;return true}
 function autoEquipBest(h){for(let i=h.pack.length-1;i>=0;i--){const id=h.pack[i];const keys=SLOTKEYS[ART[id].slot];const free=keys.find(k=>!h.eq[k]);if(free){h.eq[free]=id;h.pack.splice(i,1)}else{
   // reemplazar si el nuevo es de mayor nivel
-  const worst=keys.map(k=>[k,ART[h.eq[k]].v]).sort((a,b)=>a[1]-b[1])[0];if(ART[id].v>worst[1]){const old=h.eq[worst[0]];h.eq[worst[0]]=id;h.pack.splice(i,1);h.pack.push(old)}}}}
+  const worst=keys.map(k=>[k,h.eq[k].charCodeAt(0)===35||ART[h.eq[k]].fusion?99:ART[h.eq[k]].v]).sort((a,b)=>a[1]-b[1])[0];if(ART[id].v>worst[1]){const old=h.eq[worst[0]];h.eq[worst[0]]=id;h.pack.splice(i,1);h.pack.push(old)}}}}
 function artText(id){const a=ART[id];const l=Object.keys(a.b).map(k=>`${BNAMES[k]||k} ${a.b[k]>0&&k!=='pf'?'+':''}${k==='pf'?'':a.b[k]}`);return l.join(' · ')}

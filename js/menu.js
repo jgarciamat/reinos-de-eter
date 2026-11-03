@@ -13,7 +13,7 @@ function buildList(){
 }
 function openSelect(){S.scr='select';buildList();pickMap(SEL.list[0]?SEL.list[0].i:0)}
 function pickMap(i){SEL.idx=i;SEL.prev=null;SEL.loading=true;const my=++SEL.token||(SEL.token=1);SEL.token=my;
-  setTimeout(()=>{if(SEL.token!==my)return;try{const m=genMap(mapSpec(i),{fac0:SEL.fac,surfaceOnly:true});SEL.prev=previewOf(m);SEL.prevIdx=i}catch(e){SEL.prev=null;console.error(e)}SEL.loading=false},40)}
+  setTimeout(()=>{if(SEL.token!==my)return;try{const sp0=mapSpec(i),m=genMap(Object.assign({},sp0,{size:Math.round(sp0.size/MAP_SCALE/2)*2}),{fac0:SEL.fac,surfaceOnly:true});SEL.prev=previewOf(m);SEL.prevIdx=i}catch(e){SEL.prev=null;console.error(e)}SEL.loading=false},40)}
 function previewOf(m){
   const c=document.createElement('canvas');c.width=m.w;c.height=m.h;const x=c.getContext('2d'),img=x.createImageData(m.w,m.h);
   for(let i=0;i<m.w*m.h;i++){const col=TCOLM[m.terr[i]];let r=col[0],g=col[1],b=col[2];if(m.deco[i]){r*=.55;g*=.62;b*=.55}if(m.road[i]){r=176;g=140;b=96}img.data[i*4]=r;img.data[i*4+1]=g;img.data[i*4+2]=b;img.data[i*4+3]=255}
@@ -107,7 +107,7 @@ function initWorldUI(){
 }
 // ---------- guardado / carga ----------
 function saveSlot(n){try{localStorage.setItem('reinos_save_'+n,saveState());toast(`Partida guardada en la ranura ${n}`,'good')}catch(e){toast('No se pudo guardar (espacio lleno)','bad')}}
-function loadSlot(n,key){try{const s=localStorage.getItem(key||('reinos_save_'+n));if(!s)return;loadState(s);G.sync=false;initWorldUI();for(const p of G.players)if(p.alive)p.human=p.id===0;toast('Partida cargada','good')}catch(e){console.error(e);toast('Error al cargar','bad')}}
+function loadSlot(n,key){const s=localStorage.getItem(key||('reinos_save_'+n));if(!s)return;S.loading='Cargando partida…';setTimeout(()=>{try{loadState(s);G.sync=false;initWorldUI();for(const p of G.players)if(p.alive)p.human=p.id===0;toast('Partida cargada','good')}catch(e){console.error(e);toast('Error al cargar','bad')}S.loading=null},40)}
 function slotInfo(key){try{const s=localStorage.getItem(key);if(!s)return null;const d=JSON.parse(s.slice(0,400)+'}').x}catch(e){}
   try{const m=/"idx":(\d+).*?"day":(\d+)/.exec(localStorage.getItem(key));if(m)return`${mapSpec(+m[1]).name} · día ${m[2]}`}catch(e){}return localStorage.getItem(key)?'Partida guardada':null}
 function loadMenu(){
@@ -117,10 +117,11 @@ function loadMenu(){
     button(x+w/2-60,y+hh-52,120,36,'Cerrar',()=>Dlg.close())}});
 }
 function openSystemMenu(){
-  Dlg.show({title:'Sistema',w:420,draw:m=>{const x=430,y=150,w=420,hh=430;panel(x,y,w,hh,{title:'Sistema'});let by=y+34;
+  Dlg.show({title:'Sistema',w:420,draw:m=>{const x=430,y=120,w=420,hh=490;panel(x,y,w,hh,{title:'Sistema'});let by=y+34;
     button(x+40,by,w-80,40,'Continuar',()=>Dlg.close(),{primary:1});by+=50;
     for(let n=1;n<=3;n++){button(x+40,by,(w-80)/2-4,36,`Guardar ${n}`,()=>{saveSlot(n)},{size:14});button(x+40+(w-80)/2+4,by,(w-80)/2-4,36,`Cargar ${n}`,()=>{Dlg.close();loadSlot(n)},{size:14,disabled:!localStorage.getItem('reinos_save_'+n)});by+=42}
     button(x+40,by,w-80,36,S.sound===false?'Sonido: NO':'Sonido: SÍ',()=>{S.sound=S.sound===false},{size:14});by+=42;
+    button(x+40,by,w-80,36,G.quick?'Combate rápido: SÍ':'Combate rápido: NO',()=>toggleQuick(),{size:14,tip:['Combate rápido','El resultado se calcula al instante (muros, catapulta y torres incluidos) sin entrar en la pantalla de combate']});by+=42;
     button(x+40,by,w-80,36,'Ayuda',()=>helpDlg(),{size:14});by+=42;
     button(x+40,by,w-80,36,'Salir al menú principal',()=>Dlg.show({title:'¿Salir?',text:'Se perderá el progreso no guardado.',buttons:[{label:'Salir',primary:1,fn:()=>{UI.modals.length=0;S.scr='menu'}},{label:'Cancelar'}]}),{size:14})}});
 }

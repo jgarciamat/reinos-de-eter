@@ -26,9 +26,10 @@ const SPEC_BIOME=(()=>{const a=[];const r=mulberry(4242);for(let i=0;i<MAP_COUNT
 const SPEC_NAME=(()=>{const used=new Set(),a=[],r=mulberry(777);const roots=NAME_ROOT.slice();for(let i=roots.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[roots[i],roots[j]]=[roots[j],roots[i]]}
   for(let i=0;i<MAP_COUNT;i++){const pre=NAME_PRE[SPEC_BIOME[i]];let n=pre[Math.floor(r()*pre.length)]+' '+roots[i%roots.length];if(used.has(n))n+=' '+['II','III','IV','V','VI'][Math.floor(i/roots.length)-1]||'';let k=2;while(used.has(n)){n+=' '+k++}used.add(n);a.push(n)}return a})();
 
+const MAP_SCALE=3.15; // ~10 veces más superficie que antes
 function mapSpec(i){
   const r=mulberry(9001+i*7919);
-  const size=[144,144,150,156,162,168,174,180][Math.floor(r()*8)];
+  const size=Math.round([144,144,150,156,162,168,174,180][Math.floor(r()*8)]*MAP_SCALE/2)*2;
   const biome=SPEC_BIOME[i],name=SPEC_NAME[i],B=BIOMES[biome];
   const wl=B.wl+(r()-.5)*.06;
   const sea=!!B.sea||(!B.liquid&&r()<.3);
@@ -167,7 +168,7 @@ function genLevel(spec,opt={}){
     const one=k===nPair;const col=k%8,key=`${under?1:0}.${k}`;
     addObj({t:'mono',col,dir:one?'in':'two',key,x:p1[0],y:p1[1]});addObj({t:'mono',col,dir:one?'out':'two',key,x:p2[0],y:p2[1]});monoList.push({x:p1[0],y:p1[1]},{x:p2[0],y:p2[1]})}
   // ciudades neutrales
-  const nNeutral=under?Math.round(W/36):Math.round(spec.players*1.4+W/30);
+  const nNeutral=Math.round((W*H)/(150*150)*(under?6:11)); // muchos castillos abandonados por conquistar
   for(let k=0;k<nNeutral;k++){const p=randPos(4,3,{l:m.objs.filter(o=>o.t==='town'),d:24});if(!p)continue;
     const fi=Math.floor(r()*8);const o=placeTown(p[0],p[1],fi,-1);const dg=danger(p[0],p[1]);
     o.gar=garrison(o.fi,40+dg*dg*2200*spec.monsters*MM,r)}
@@ -180,14 +181,19 @@ function genLevel(spec,opt={}){
     const maxT=dg<.25?3:dg<.55?5:7,tier=irnd(r,1,maxT),fi=Math.floor(r()*8);const cid=`f${fi}t${tier}`;
     const o=addObj({t:'dwell',cr:cid,n:CR[cid].grow*2,x:p[0],y:p[1],owner:-1});guardOf(o,30+dg*dg*1500*spec.monsters*MM)}
   const sites=['shrine','hut','well','stone','stable','mill','shrine','stone','shop','hut'];
-  for(let k=0;k<Math.round(46*sc);k++){const p=randPos(1,1,{l:startList,d:6});if(!p)continue;const kk=pick(r,sites);
+  for(let k=0;k<Math.round(84*sc);k++){const p=randPos(1,1,{l:startList,d:6});if(!p)continue;const kk=r()<.38?pick(r,sites):pickNewSite(r);
     const o=addObj({t:'site',k:kk,x:p[0],y:p[1],used:{},spell:pick(r,SPELL_IDS),skill:pick(r,SKILL_IDS)});
-    if(kk==='shop'){const dg=danger(p[0],p[1]);const pool=ART_IDS.filter(a=>!used.has(a)&&ART[a].v<=2+(dg>.5?1:0)&&!ART[a].set);o.stock=[];for(let q=0;q<4&&pool.length;q++){const a=pool.splice(Math.floor(r()*pool.length),1)[0];o.stock.push(a)}}
-    if(r()<.5)guardOf(o,40+danger(p[0],p[1])**2*900*spec.monsters*MM)}
-  const takeArt=(lvl)=>{let pool=ART_IDS.filter(a=>!used.has(a)&&ART[a].v<=lvl+1&&ART[a].v>=Math.max(1,lvl-1)&&(!ART[a].set||lvl>=3));if(!pool.length)pool=ART_IDS.filter(a=>!used.has(a));if(!pool.length)return null;const a=pool[Math.floor(r()*pool.length)];used.add(a);return a};
+    if(kk==='shop'){const dg=danger(p[0],p[1]);const pool=ART_WORLD().filter(a=>!used.has(a)&&ART[a].v<=2+(dg>.5?1:0)&&!ART[a].set);o.stock=[];for(let q=0;q<4&&pool.length;q++){const a=pool.splice(Math.floor(r()*pool.length),1)[0];o.stock.push(a)}}
+    const sd=SITEDEF[kk];if(sd&&sd.guard)guardOf(o,(1800+danger(p[0],p[1])**2*5200)*sd.guard*spec.monsters*MM);else if(r()<.5)guardOf(o,40+danger(p[0],p[1])**2*900*spec.monsters*MM)}
+  const takeArt=(lvl)=>{let pool=ART_WORLD().filter(a=>!used.has(a)&&ART[a].v<=lvl+1&&ART[a].v>=Math.max(1,lvl-1)&&(!ART[a].set||lvl>=3));if(!pool.length)pool=ART_WORLD().filter(a=>!used.has(a));if(!pool.length)return null;const a=pool[Math.floor(r()*pool.length)];used.add(a);return a};
   for(let k=0;k<Math.round(34*sc*(under?1.3:1));k++){const p=randPos(1,1,{l:startList,d:12});if(!p)continue;const dg=danger(p[0],p[1]);
     const lvl=(dg<.35?1:dg<.65?2:3)+(under?1:0);const a=takeArt(Math.min(4,lvl));if(!a)break;
     const o=addObj({t:'art',art:a,x:p[0],y:p[1]});guardOf(o,100+dg*dg*3500*spec.monsters*MM)}
+  // linajes: las 4 piezas (arma, escudo, yelmo, anillo) de varios linajes, muy custodiadas
+  {const lids=Object.keys(LIN);const nLin=Math.max(2,Math.round(sc*(under?1.2:2.2)));
+    for(let q=0;q<nLin;q++){const lid=lids[Math.floor(r()*lids.length)];if(used.has('L'+lid))continue;used.add('L'+lid);
+      for(const pid of LIN[lid].pieces){let best=null,bd=-1;for(let t=0;t<6;t++){const p=randPos(1,1,{l:startList,d:14});if(!p)continue;const dg=danger(p[0],p[1]);if(dg>bd){bd=dg;best=p}}
+        if(!best)continue;used.add(pid);const o=addObj({t:'art',art:pid,x:best[0],y:best[1]});guardOf(o,(900+bd*bd*6500)*spec.monsters*MM)}}}
   for(let k=0;k<Math.round(120*sc*spec.rich);k++){const p=randPos(1,1,null,60);if(!p)continue;const dg=danger(p[0],p[1]);
     addObj({t:'chest',x:p[0],y:p[1]});if(r()<.6)guardOf(m.objs[m.objs.length-1],20+dg*dg*1200*spec.monsters*MM)}
   for(let k=0;k<Math.round(430*sc*spec.rich);k++){const p=randPos(1,1,null,60);if(!p)continue;
@@ -200,6 +206,7 @@ function genLevel(spec,opt={}){
       let land=0,wat=0;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const t=m.terr[i+dy*W+dx];if(t===WATER)wat++;else if(!IMP(t))land++}if(land>=1&&wat>=2)coast.push({x,y})}
     for(const s of startList){const c=coast.filter(c=>Math.hypot(c.x-s.x,c.y-s.y)<34&&!m.fp[c.y*W+c.x]).sort((a,b)=>Math.hypot(a.x-s.x,a.y-s.y)-Math.hypot(b.x-s.x,b.y-s.y))[0];if(c)addObj({t:'boat',x:c.x,y:c.y,isle:1})}
     if(coast.length)for(let k=0;k<Math.round(W/12);k++){const c=coast[Math.floor(r()*coast.length)];if(c&&!m.fp[c.y*W+c.x])addObj({t:'boat',x:c.x,y:c.y,isle:1})}
+    for(let k=0;k<Math.round(40*sc);k++){const x=4+Math.floor(r()*(W-8)),y=4+Math.floor(r()*(H-8));const i=y*W+x;if(m.terr[i]!==WATER||m.fp[i]||m.en[i])continue;addObj({t:'site',k:pick(r,['buoy','mermaids','wreck']),x,y,isle:1,used:{}})}
     for(let k=0;k<Math.round(70*sc);k++){const x=4+Math.floor(r()*(W-8)),y=4+Math.floor(r()*(H-8));const i=y*W+x;if(m.terr[i]!==WATER||m.fp[i])continue;let ok=true;for(let j=-1;j<=1&&ok;j++)for(let q=-1;q<=1;q++)if(m.terr[i+j*W+q]!==WATER||m.fp[i+j*W+q])ok=false;if(!ok)continue;
       if(r()<.2)addObj({t:'chest',x,y,isle:1});else{const rs=r()<.3?'gold':pick(r,RES.slice(1));addObj({t:'res',res:rs,n:rs==='gold'?irnd(r,4,12)*100:irnd(r,3,8),x,y,isle:1})}}
   }

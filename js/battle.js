@@ -21,10 +21,11 @@ class Battle{
       arr.forEach((o,k)=>{const hsb=sd.hs||{};const cr0=CR[o.a.id];const cr=(hsb.hpB||hsb.spdB)?Object.assign({},cr0,{hp:cr0.hp+(hsb.hpB||0),spd:cr0.spd+(hsb.spdB||0)}):cr0;const y=pos[k],x=si===0?0:BW-1;this.obst.delete(hk(x,y));this.obst.delete(hk(x+(si?-1:1),y));
         const s={side:si,slot:o.slot,id:o.a.id,cr,n:o.a.n,startN:o.a.n,top:cr.hp,x,y,ret:true,defend:false,waited:false,buff:{},shots:cr.shots,idx:this.st.length,dead:false,killed:0,fresh:true};
         this.st.push(s);this.grid.set(hk(x,y),s)})});
+    if(opt.siege)this.initSiege(opt.siege);
     this.startRound();
   }
   // ---- consultas ----
-  alive(side){return this.st.filter(s=>!s.dead&&(side===undefined||s.side===side))}
+  alive(side,all){return this.st.filter(s=>!s.dead&&(all||!s.siege)&&(side===undefined||s.side===side))}
   at(x,y){return this.grid.get(hk(x,y))||null}
   hs(side){return this.sides[side].hs||{a:0,d:0,sp:0,kn:0,off:0,arch:0,armor:0,mana:0}}
   spd(s){let v=s.cr.spd;if(this.round<=2)v+=this.hs(s.side).tact||0;if(s.buff.haste)v+=3;if(s.buff.slow)v=Math.max(1,v-Math.ceil(v*.4));return v}
@@ -37,11 +38,12 @@ class Battle{
   startRound(){
     this.round++;this.cast=[false,false];
     for(const s of this.st){if(s.dead)continue;s.ret=true;s.waited=false;s.defend=false;for(const k in s.buff){s.buff[k]--;if(s.buff[k]<=0)delete s.buff[k]}}
-    this.queue=this.alive().sort((a,b)=>this.spd(b)-this.spd(a)||a.side-b.side||a.idx-b.idx);this.waitQ=[];
-    this.ev.push({t:'round',n:this.round});this.beginTurn();
+    this.queue=this.alive(undefined,true).sort((a,b)=>this.spd(b)-this.spd(a)||a.side-b.side||a.idx-b.idx);this.waitQ=[];
+    this.ev.push({t:'round',n:this.round});this.beginTurn();if(this.cur()&&this.cur().skip&&!this.over)this.nextTurn();
   }
   morale(s){if(s.cr.arch==='golem'||s.cr.arch==='undead'||s.cr.arch==='ghost'||s.cr.arch==='lich'||s.cr.arch==='skel')return 0;return Math.max(-3,Math.min(3,this.hs(s.side).lead||0))}
   beginTurn(){const s=this.cur();if(!s)return;
+    if(s.siege){this.siegeAct(s);s.skip=true;return}
     if(s.cr.regen&&s.top<s.cr.hp){s.top=s.cr.hp;this.ev.push({t:'text',s,txt:'Regenera'})}
     const mo=this.morale(s);if(mo<0&&!s.bonus&&Math.random()<[0,1/12,1/6,1/4][-mo]){this.ev.push({t:'text',s,txt:'¡Moral baja!'});this.ev.push({t:'morale',s,bad:true});s.skip=true}}
   nextTurn(){
@@ -60,11 +62,12 @@ class Battle{
   reach(s){
     const dist=new Map(),par=new Map(),max=this.spd(s);dist.set(hk(s.x,s.y),0);let q=[[s.x,s.y]];
     for(let d=1;d<=max;d++){const nq=[];for(const[x,y]of q)for(const[nx,ny]of hexNb(x,y)){const k=hk(nx,ny);if(dist.has(k))continue;
-      const blocked=this.obst.has(k)||this.grid.has(k);
-      if(blocked&&!s.cr.fly)continue;
+      const w=this.wall&&this.wall.get(k),wb=w&&w.hp>0&&!(w.gate&&s.side===1);
+      const blocked=this.obst.has(k)||this.grid.has(k)||wb;
+      if(blocked&&!(s.cr.fly||s.cr.tele))continue;
       dist.set(k,d);par.set(k,hk(x,y));nq.push([nx,ny])}q=nq}
     // los voladores no pueden terminar sobre obstáculos o unidades
-    if(s.cr.fly)for(const k of [...dist.keys()])if(k!==hk(s.x,s.y)&&(this.obst.has(k)||this.grid.has(k)))dist.delete(k);
+    for(const k of [...dist.keys()])if(k!==hk(s.x,s.y)&&(this.obst.has(k)||this.grid.has(k)||(this.wall&&this.wall.has(k)&&this.wall.get(k).hp>0)))dist.delete(k);
     return{dist,par};
   }
   pathTo(R,s,x,y){const p=[];let k=hk(x,y);const sk=hk(s.x,s.y);while(k!==sk&&R.par.has(k)){p.push([k%BW,(k/BW)|0]);k=R.par.get(k)}p.reverse();return p}
@@ -72,7 +75,7 @@ class Battle{
   // posiciones desde las que s puede golpear a t
   attackHexes(s,t,R){const r=[];for(const[x,y]of hexNb(t.x,t.y)){const k=hk(x,y);if(R.dist.has(k)||(x===s.x&&y===s.y))r.push([x,y])}return r}
   moveTo(s,x,y){if(x===s.x&&y===s.y)return;const R=this.reach(s);if(!R.dist.has(hk(x,y)))return false;
-    const path=s.cr.fly?[[x,y]]:this.pathTo(R,s,x,y);this.grid.delete(hk(s.x,s.y));this.ev.push({t:'move',s,from:[s.x,s.y],to:[x,y],path});s.x=x;s.y=y;this.grid.set(hk(x,y),s);return true}
+    const path=(s.cr.fly||s.cr.tele)?[[x,y]]:this.pathTo(R,s,x,y);this.grid.delete(hk(s.x,s.y));this.ev.push({t:'move',s,from:[s.x,s.y],to:[x,y],path});s.x=x;s.y=y;this.grid.set(hk(x,y),s);return true}
   // ---- daño ----
   rollDmg(a,d,ranged,avg){
     const cr=a.cr,N=a.n;let base=0;
@@ -87,6 +90,7 @@ class Battle{
     let m=(1+I)*(1-R);
     const hd=this.hs(d.side);if(hd.armor)m*=1-.05*hd.armor;
     if(!ranged&&d.buff.shield)m*=.75;
+    if(ranged&&this.wallBetween(a,d))m*=.5;
     if(ranged&&a.cr.shoot&&(this.enemiesAdj(a).length||hexDist(a.x,a.y,d.x,d.y)>=10))m*=.5;
     return Math.max(1,Math.floor(base*m));
   }
@@ -125,7 +129,7 @@ class Battle{
   }
   actDefend(s){if(this.over||s!==this.cur())return;s.defend=true;this.ev.push({t:'text',s,txt:'Defiende'});this.nextTurn()}
   actWait(s){if(this.over||s!==this.cur()||s.waited)return false;s.waited=true;this.queue.shift();this.waitQ.push(s);
-    if(!this.queue.length){this.queue=this.waitQ.sort((a,b)=>this.spd(a)-this.spd(b)||b.side-a.side);this.waitQ=[]}this.beginTurn();return true}
+    if(!this.queue.length){this.queue=this.waitQ.sort((a,b)=>this.spd(a)-this.spd(b)||b.side-a.side);this.waitQ=[]}this.beginTurn();if(this.cur()&&this.cur().skip&&!this.over)this.nextTurn();return true}
   // ---- magia ----
   heroMana(side){const h=this.sides[side].hero;return h?h.mana:0}
   canCast(side,sp){const h=this.sides[side].hero;return !!h&&!this.cast[side]&&h.mana>=SPELLS[sp].cost&&(h.spells||[]).includes(sp)}
@@ -153,6 +157,35 @@ class Battle{
     }
     this.ev.push({t:'sync'});this.checkEnd();return true;
   }
+  // ---- asedio: murallas, torres y catapulta ----
+  wallUp(){if(!this.wall)return false;for(const w of this.wall.values())if(w.hp>0)return true;return false}
+  wallBetween(a,d){if(!this.wall||a.side!==0||d.side!==1||a.x>=9||d.x<=9)return false;for(let y=Math.max(0,d.y-1);y<=Math.min(BH-1,d.y+1);y++){const w=this.wall.get(hk(9,y));if(w&&w.hp>0)return true}return false}
+  siegeUnit(side,id,x,y,kind,wy){const cr=CR[id];const s={side,slot:-1,id,cr,n:1,startN:1,top:cr.hp,x,y,ret:false,defend:false,waited:false,buff:{},shots:99,idx:this.st.length,dead:false,killed:0,fresh:true,siege:kind,wy};this.st.push(s);this.grid.set(hk(x,y),s);return s}
+  initSiege(lvl){
+    const hp=[0,2,3,4][lvl];this.siege={lvl,hp};this.wall=new Map();
+    for(let x=7;x<=11;x++)for(let y=0;y<BH;y++)this.obst.delete(hk(x,y));
+    for(let y=0;y<BH;y++)this.wall.set(hk(9,y),{hp,max:hp,gate:y===5});
+    for(const y of[[],[2],[2,8],[1,3,7,9]][lvl])this.siegeUnit(1,'tower',10,y,'tower',y);
+    let cy=[4,6,3,7,2,8,1,9,0,10].find(y=>!this.grid.has(hk(1,y)));if(cy==null)cy=5;
+    this.siegeUnit(0,'catapult',1,cy,'catapult');
+  }
+  siegeAct(s){
+    if(s.siege==='catapult'){
+      const segs=[...this.wall].filter(([k,w])=>w.hp>0);if(!segs.length)return;
+      const tw=this.alive(1,true).filter(u=>u.siege==='tower');
+      let pick=null;if(tw.length&&Math.random()<.5){const t=tw[Math.floor(Math.random()*tw.length)];pick=segs.find(([k])=>k===hk(9,t.wy))}
+      if(!pick&&Math.random()<.45)pick=segs.find(([k,w])=>w.gate);
+      if(!pick)pick=segs[Math.floor(Math.random()*segs.length)];
+      const[k,w]=pick,hit=Math.random()<.85;if(hit)w.hp--;
+      this.ev.push({t:'catapult',s,x:9,y:(k/BW)|0,hit,hp:w.hp,max:w.max});
+      if(hit&&w.hp<=0){this.ev.push({t:'text',s,txt:'¡Muro derribado!'});
+        for(const u of this.alive(1,true))if(u.siege==='tower'&&u.wy===((k/BW)|0)){this.applyDmg(u,1e9,null);this.ev.push({t:'hit',a:null,d:u,dmg:0,kills:0,spell:true,dead:true,na:0,ta:0})}}
+    }else if(s.siege==='tower'){
+      const foes=this.alive(0);if(!foes.length)return;
+      const t=foes.sort((a,b)=>b.cr.val*b.n-a.cr.val*a.n)[0];const dmg=Math.floor((10+Math.random()*10)*(1+this.siege.lvl*.3)*(1-.03*(this.hs(0).armor||0)));
+      const kills=this.applyDmg(t,dmg,null);this.ev.push({t:'hit',a:s,d:t,dmg,kills,ranged:true,dead:t.dead,na:t.n,ta:t.top});this.checkEnd();
+    }
+  }
   // ---- IA ----
   expected(a,d,ranged){const dmg=this.rollDmg(a,d,ranged,true);const tot=this.total(d);const k=dmg>=tot?d.n:Math.floor(dmg/d.cr.hp);return{dmg,kills:k,val:Math.min(dmg,tot)/d.cr.hp*d.cr.val}}
   aiAct(){
@@ -163,7 +196,7 @@ class Battle{
     if(this.canShoot(s)){let bt=null,bv=-1;for(const t of foes){const e=this.expected(s,t,true).val;if(e>bv){bv=e;bt=t}}this.actShoot(s,bt);return}
     const R=this.reach(s);let best=null,bs=-1e9;
     for(const t of foes){
-      const hexes=this.attackHexes(s,t,R);if(!hexes.length)continue;
+      let hexes=this.attackHexes(s,t,R);if(me===1&&this.wallUp())hexes=hexes.filter(q=>q[0]>=10);if(!hexes.length)continue;
       const e=this.expected(s,t,false),ret=(t.ret&&!s.cr.noret&&e.kills<t.n)?this.expected(t,s,false).val*.7:0;
       let sc=e.val-ret+(e.kills>=t.n?e.val*.3:0)+(t.cr.shoot?t.cr.val*.4:0);
       if(sc>bs){bs=sc;
@@ -174,7 +207,7 @@ class Battle{
     // acercarse al enemigo más cercano
     let near=null,nd=1e9;for(const t of foes){const d=hexDist(s.x,s.y,t.x,t.y);if(d<nd){nd=d;near=t}}
     if(s.cr.shoot&&s.shots>0&&!adj.length){this.actShoot(s,near);return}
-    let bh=null,bdist=nd;for(const[k,d]of R.dist){const x=k%BW,y=(k/BW)|0;const dd=hexDist(x,y,near.x,near.y);if(dd<bdist){bdist=dd;bh=[x,y]}}
+    let bh=null,bdist=nd;if(me===1&&this.wallUp()){this.actDefend(s);return}for(const[k,d]of R.dist){const x=k%BW,y=(k/BW)|0;const dd=hexDist(x,y,near.x,near.y);if(dd<bdist){bdist=dd;bh=[x,y]}}
     if(bh&&(bh[0]!==s.x||bh[1]!==s.y)){this.moveTo(s,bh[0],bh[1]);s.fresh=false;this.nextTurn();return}
     this.actDefend(s);
   }
@@ -194,7 +227,7 @@ class Battle{
     if(best)this.castSpell(side,best.sp,best.t,0,0);
   }
   // ---- resultado ----
-  xpFor(side){let x=0;for(const s of this.st)if(s.side!==side)x+=(s.startN-(s.dead?0:s.n))*s.cr.hp;return x}
+  xpFor(side){let x=0;for(const s of this.st)if(s.side!==side&&!s.siege)x+=(s.startN-(s.dead?0:s.n))*s.cr.hp;return x}
   result(){// devuelve ejércitos resultantes por bando
     return this.sides.map((sd,si)=>sd.army.map((a,slot)=>{if(!a)return null;const s=this.st.find(u=>u.side===si&&u.slot===slot);if(!s)return a;return s.dead||s.n<=0?null:{id:a.id,n:s.n}}));
   }
