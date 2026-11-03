@@ -14,12 +14,12 @@ function armyPanel(x,y,arr,label,o={}){
     const sel=S.pick&&S.pick.arr===arr&&S.pick.i===i;
     slot(sx,sy,s,{id:u&&u.id,n:u&&u.n,sel,tip:u?[CR[u.id].name,`Ataque ${CR[u.id].atk} · Defensa ${CR[u.id].def}`,`Daño ${CR[u.id].mn}-${CR[u.id].mx} · Vida ${CR[u.id].hp} · Vel. ${CR[u.id].spd}`,'Clic: mover · Clic derecho: información']:'Espacio libre',
       fn:()=>{const p=S.pick;
-        if(!p){if(u)S.pick={arr,i};return}
+        if(!p){if(u)S.pick={arr,i,hero:o.hero};return}
         if(p.arr===arr&&p.i===i){S.pick=null;return}
         const a=p.arr[p.i],b=arr[i];if(!a){S.pick=null;return}
         if(b&&a.id===b.id){b.n+=a.n;p.arr[p.i]=null}else{p.arr[p.i]=b;arr[i]=a}
         // un héroe no puede quedarse sin ejército
-        if(o.hero&&armyEmpty(o.hero.army)){const t=p.arr[p.i];p.arr[p.i]=arr[i];arr[i]=t;toast('El héroe necesita al menos una criatura','bad')}
+        if([o.hero,p.hero].some(q=>q&&armyEmpty(q.army))){const t=p.arr[p.i];p.arr[p.i]=arr[i];arr[i]=t;toast('El héroe necesita al menos una criatura','bad')}
         S.pick=null},right:()=>{if(u)creatureInfo(u.id,u.n)}})}
 }
 function townHalls(t){return t.b.hall3?3:t.b.hall2?2:1}
@@ -293,4 +293,42 @@ function shopModal(o,h,cb){
       Object.keys(ART[id].b).forEach((k,q)=>text(`${BNAMES[k]||k}: ${k==='pf'?'sí':(ART[id].b[k]>0?'+':'')+ART[id].b[k]}`,cx+90,cy+66+q*14,{size:11}));
       button(cx+200,cy+112,140,30,`Comprar ${price}`,()=>{const e=buyArt(h,o,i,p);if(e)toast(e,'bad');else{sfx('coin');toast(`${ART[id].n} comprado`,'good')}},{size:13,primary:1,disabled:p.res.gold<price})});
     button(x+w/2-60,y+hh-46,120,34,'Salir',()=>{Dlg.close();cb&&cb()})}});
+}
+
+// ---------- intercambio entre dos héroes ----------
+function exMoveArt(from,to,src,key){
+  if(to.pack.length>=14){toast('La mochila del otro héroe está llena','bad');return}
+  let id;
+  if(src==='pack'){id=from.pack[key];if(!id)return;from.pack.splice(key,1);to.pack.push(id)}
+  else{const id0=from.eq[key];if(!id0)return;if(id0.charCodeAt(0)===35||ART[id0].fusion){toast('Separa la fusión antes de traspasarla','bad');return}
+    if(from.pack.length>=14){toast('Tu mochila está llena','bad');return}
+    if(!unequip(from,key)){toast('Mochila llena','bad');return}
+    const i=from.pack.lastIndexOf(id0);if(i<0)return;from.pack.splice(i,1);to.pack.push(id0)}
+  sfx('click');
+}
+function openExchange(a,b){
+  S.pick=null;
+  Dlg.show({w:1100,title:'Intercambio',draw:m=>{
+    const x=90,y=30,w=1100,hh=660;panel(x,y,w,hh,{title:`Intercambio · ${a.name} y ${b.name}`});
+    [[a,b,x+22],[b,a,x+w/2+12]].forEach(([h,o,cx])=>{
+      const st=hstat(h);ctx.drawImage(portrait(h.fi,h.port,h.cls),cx,y+44,64,64);rrect(ctx,cx,y+44,64,64,4,null,'#c8a24a',1.6);
+      text(h.name,cx+76,y+66,{size:17,bold:true,color:'#ffe9a0'});text(`Nivel ${h.lvl} ${HERO_CLASS[h.fi][h.cls]}`,cx+76,y+86,{size:12});
+      text(`Ata ${st.a}  Def ${st.d}  Pod ${st.sp}  Con ${st.kn}`,cx+76,y+104,{size:12,color:'#d8c8a0'});
+      armyPanel(cx,y+142,h.army,'EJÉRCITO',{hero:h});
+      text('EQUIPO (clic: pasar al otro héroe)',cx,y+300,{size:12,bold:true,color:'#c8a24a'});
+      EQKEYS.forEach((k,i)=>{const sx=cx+(i%7)*44,sy=y+308+Math.floor(i/7)*44,id0=h.eq[k],blk=id0&&id0.charCodeAt(0)===35,id=blk?id0.slice(1):id0;
+        hit(sx,sy,40,40,id&&!blk?()=>exMoveArt(h,o,'eq',k):null,{tip:id?[...artTip(id),blk?'Parte de una fusión':'Clic: pasar al otro héroe']:SLOTN[EQSLOT[k]]});
+        rrect(ctx,sx,sy,40,40,5,lg(ctx,0,sy,0,sy+40,['#3a3044','#1a1420']),id?TIERCOL[ART[id].v]:'#5a4a38',id?2:1.2);
+        if(id){if(blk)ctx.globalAlpha=.35;ctx.drawImage(artIcon(id),sx+2,sy+2,36,36);ctx.globalAlpha=1}else ctx.drawImage(slotGlyph(EQSLOT[k]),sx+2,sy+2,36,36)});
+      text('MOCHILA (clic: pasar al otro héroe)',cx,y+414,{size:12,bold:true,color:'#c8a24a'});
+      for(let i=0;i<14;i++){const sx=cx+(i%7)*44,sy=y+422+Math.floor(i/7)*44,id=h.pack[i];
+        hit(sx,sy,40,40,id?()=>exMoveArt(h,o,'pack',i):null,{tip:id?[...artTip(id),'Clic: pasar al otro héroe']:'Mochila'});
+        rrect(ctx,sx,sy,40,40,5,'rgba(30,24,36,.9)',id?TIERCOL[ART[id].v]:'#4a3e34',id?2:1.2);if(id)ctx.drawImage(artIcon(id),sx+2,sy+2,36,36)}
+      button(cx,y+524,150,30,'Equipar lo mejor',()=>{autoEquipBest(h);sfx('level')},{size:12,tip:'Equipa automáticamente los mejores objetos de la mochila'});
+      button(cx+160,y+524,140,30,'Ver ficha',()=>openHeroScreen(h),{size:12});
+    });
+    ctx.fillStyle='rgba(200,162,74,.35)';ctx.fillRect(x+w/2,y+44,2,500);
+    text('Clic en una criatura y luego en otra casilla (también del otro héroe) para moverla. Cada héroe necesita al menos una criatura.',x+w/2,y+hh-62,{size:12,align:'center',color:'#c8b890'});
+    button(x+w/2-70,y+hh-48,140,34,'Cerrar',()=>{S.pick=null;Dlg.close()},{size:15,primary:1});
+  }});
 }

@@ -11,7 +11,7 @@ const MONO_N=['azul','rojo','verde','amarillo','púrpura','turquesa','naranja','
 function curPlayer(){return G.players[0]}
 function selHero(){return S.sel!=null?G.heroes[S.sel]:null}
 function myHeroes(){return G.players[0].heroes.map(i=>G.heroes[i])}
-function selectHero(h,center=true){S.sel=h.id;S.path=null;S.target=null;if(center)camTo(h.x,h.y)}
+function selectHero(h,center=true){S.sel=h.id;S.path=null;S.target=null;S.exTarget=null;if(center)camTo(h.x,h.y)}
 function camTo(x,y,instant){S.flyTo={x:x*TILE+TILE/2-VPW/2,y:y*TILE+TILE/2-VPH/2};if(instant){S.cam.x=S.flyTo.x;S.cam.y=S.flyTo.y;clampCam()}}
 function clampCam(){const m=G.map;S.cam.x=clamp(S.cam.x,0,m.w*TILE-VPW);S.cam.y=clamp(S.cam.y,0,m.h*TILE-VPH)}
 // ---------- visibilidad ----------
@@ -333,7 +333,7 @@ G.hooks.heroStep=(h,fx,fy,tx,ty)=>{
   if(h.pid!==0||!S.mov||S.mov.h!==h)return;const road=G.map.road[ty*G.map.w+tx];const dx=tx-fx,dy=ty-fy;h.face=dx<0?-1:dx>0?1:(h.face||1);
   h.moving=true;h.ax=fx;h.ay=fy;S.anim={h,fx,fy,tx,ty,t:0,dur:(road?.085:.13)*(dx&&dy?1.25:1),next:null};
 };
-function advEndMove(){const h=S.mov&&S.mov.h;S.mov=null;G.busy=false;if(h){h.moving=false;h.ax=null;h.ay=null;if(h.path&&!h.path.length)h.path=null}S.path=null;S.target=null;checkMine()}
+function advEndMove(){const h=S.mov&&S.mov.h;S.mov=null;const exId=S.exTarget;S.exTarget=null;G.busy=false;if(h){h.moving=false;h.ax=null;h.ay=null;if(h.path&&!h.path.length)h.path=null}S.path=null;S.target=null;checkMine();if(exId!=null&&h&&h.alive){const eh=G.heroes[exId];if(eh&&eh.alive&&eh.pid===0&&Math.max(Math.abs(eh.x-h.x),Math.abs(eh.y-h.y))<=1)setTimeout(()=>openExchange(h,eh),150)}}
 function checkMine(){}
 function startMove(h){
   if(!h.path||!h.path.length)return;h.sleep=false;S.mov={h,wait:false,cont:true};h.moving=true;
@@ -344,7 +344,14 @@ function advClick(c){
   const fp=m.fp[ty*m.w+tx];let o=fp?m.objs[fp-1]:null;if(o&&o.dead)o=null;
   const h=selHero();
   // héroe propio bajo el ratón: seleccionar
-  const eh=vis?heroAt(tx,ty):null;
+  const eh=vis?heroAt(tx,ty):null;const ex0=S.exTarget;S.exTarget=null;
+  // otro héroe propio con uno seleccionado: ir hasta él (1º ruta, 2º mover) y abrir el intercambio
+  if(eh&&eh.pid===0&&h&&eh!==h){
+    if(Math.max(Math.abs(eh.x-h.x),Math.abs(eh.y-h.y))<=1){openExchange(h,eh);return}
+    if(ex0===eh.id&&S.path&&S.path.length){S.exTarget=eh.id;h.path=S.path.slice();startMove(h);return}
+    let best=null;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=eh.x+dx,ny=eh.y+dy;if(nx<0||ny<0||nx>=m.w||ny>=m.h||G.hmap[ny*m.w+nx])continue;const pth=planPath(h,nx,ny);if(pth&&(!best||pth.length<best.p.length))best={p:pth,x:nx,y:ny}}
+    if(!best){toast('No hay camino hasta ese héroe','bad');S.path=null;S.target=null;return}
+    S.path=best.p;S.target={x:best.x,y:best.y};S.exTarget=eh.id;h.path=null;return}
   if(eh&&eh.pid===0){if(S.sel===eh.id&&S.lastClick&&S.t-S.lastClick<.5){const t=objAtTownTile(eh);if(t)openTown(t,eh);else openHeroScreen(eh)}else selectHero(eh,false);S.lastClick=S.t;return}
   // ciudad propia: un clic la selecciona, otro clic entra (con o sin héroe)
   if(!(o&&o.t==='town'&&o.owner===0))S.selTown=null;
@@ -434,7 +441,10 @@ function hoverReach(){
   return S.hovOk;
 }
 function drawHoverCursor(c){
-  const hv=S.hov,ok=S.mov||S.ai?true:hoverReach();
+  const hv=S.hov,sh=selHero(),oh=!S.mov&&!S.ai&&sh&&isVis(hv.tx,hv.ty)?heroAt(hv.tx,hv.ty):null;
+  if(oh&&oh.pid===0&&oh!==sh){const cx=hv.tx*TILE+TILE/2,cy=hv.ty*TILE+TILE/2;c.save();c.translate(cx,cy);c.fillStyle='rgba(30,20,10,.65)';c.beginPath();c.arc(0,0,TILE*.46,0,6.29);c.fill();c.strokeStyle='#ffe27a';c.lineWidth=2.4;c.lineCap='round';c.lineJoin='round';
+    const arrow=(y,d)=>{c.beginPath();c.moveTo(-14*d,y);c.lineTo(14*d,y);c.moveTo(14*d-7*d,y-6);c.lineTo(14*d,y);c.lineTo(14*d-7*d,y+6);c.stroke()};arrow(-7,1);arrow(7,-1);c.restore();return}
+  const ok=S.mov||S.ai?true:hoverReach();
   if(ok===null){c.strokeStyle='rgba(255,240,170,.85)';c.lineWidth=2;c.strokeRect(hv.tx*TILE+1,hv.ty*TILE+1,TILE-2,TILE-2);return}
   if(ok){const k=TILE*.9/100,x=hv.tx*TILE+TILE*.05,y=hv.ty*TILE+TILE*.05;c.save();c.translate(x,y);c.scale(k,k);c.shadowColor='rgba(0,0,0,.5)';c.shadowBlur=4;c.fillStyle='rgba(255,226,110,.92)';c.fill(horsePath());c.shadowBlur=0;c.strokeStyle='#3a2a08';c.lineWidth=2.6;c.stroke(horsePath());c.restore();return}
   UI.cursor='none';const ax=UI.mx+S.cam.x,ay=UI.my+S.cam.y;c.save();c.translate(ax,ay);c.fillStyle='#ffe27a';c.strokeStyle='#3a2a08';c.lineWidth=1.8;c.beginPath();c.moveTo(0,0);c.lineTo(0,19);c.lineTo(5,14.5);c.lineTo(9,23);c.lineTo(12.5,21.5);c.lineTo(8.5,13);c.lineTo(15,13);c.closePath();c.fill();c.stroke();c.restore();
