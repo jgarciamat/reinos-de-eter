@@ -335,8 +335,11 @@ function advClick(c){
   // ciudad propia: un clic la selecciona, otro clic entra (con o sin héroe)
   if(!(o&&o.t==='town'&&o.owner===0))S.selTown=null;
   if(o&&o.t==='town'&&o.owner===0){const hh=heroAt(o.x+o.ex,o.y+o.ey);
-    if(S.selTown===o){S.selTown=null;openTown(o,hh&&hh.pid===0?hh:null);return}
-    S.selTown=o;S.path=null;S.target=null;if(hh&&hh.pid===0)selectHero(hh,false);if(G.hooks.sfx)G.hooks.sfx('click');return}
+    const goHero=h&&!(h.x===o.x+o.ex&&h.y===o.y+o.ey)&&planPath(h,o.x+o.ex,o.y+o.ey);
+    if(goHero){S.selTown=o} // con un héroe seleccionado, el clic lo manda hacia la ciudad (1º ruta, 2º mover); el botón «Entrar» abre la ciudad sin héroe
+    else{
+      if(S.selTown===o){S.selTown=null;openTown(o,hh&&hh.pid===0?hh:null);return}
+      S.selTown=o;S.path=null;S.target=null;if(hh&&hh.pid===0)selectHero(hh,false);if(G.hooks.sfx)G.hooks.sfx('click');return}}
   if(!h)return;
   if(!expl){toast('Territorio inexplorado','bad');return}
   let gx=tx,gy=ty;if(o){gx=o.x+o.ex;gy=o.y+o.ey}

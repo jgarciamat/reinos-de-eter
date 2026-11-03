@@ -3,7 +3,7 @@
 //  Ciudad, ficha de héroe y diálogos (reclutar, mercado, taberna…)
 // =====================================================================
 S.pick=null;S.town=null;S.townFx=null;
-function openTown(t,h){
+function openTown(t,h){S.selTown=null;
   if(S.scr==='adv'){startCastleEntry(t,h,()=>{S.town={t,h:h&&h.pid===t.owner?h:null};S.pick=null})}
   else{S.town={t,h:h&&h.pid===t.owner?h:null};S.scr='town';S.townFx={t:0}}
 }

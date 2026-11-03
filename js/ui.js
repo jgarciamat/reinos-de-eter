@@ -7,7 +7,7 @@ const UI={hits:[],mx:-1,my:-1,down:false,clicks:[],rclicks:[],wheel:0,nohit:fals
 let cv,ctx;
 function setupCanvas(){
   cv=document.getElementById('c');ctx=cv.getContext('2d');
-  const fit=()=>{const dpr=Math.min(2,window.devicePixelRatio||1);const s=Math.min(innerWidth/VW,innerHeight/VH);cv.style.width=VW*s+'px';cv.style.height=VH*s+'px';cv.width=Math.round(VW*s*dpr);cv.height=Math.round(VH*s*dpr);UI.scale=s*dpr};
+  const fit=()=>{const dpr=Math.min(IS_TOUCH?1.5:2,window.devicePixelRatio||1);const s=Math.min(innerWidth/VW,innerHeight/VH);cv.style.width=VW*s+'px';cv.style.height=VH*s+'px';cv.width=Math.round(VW*s*dpr);cv.height=Math.round(VH*s*dpr);UI.scale=s*dpr};
   addEventListener('resize',fit);fit();
   const pos=e=>{const r=cv.getBoundingClientRect();UI.mx=(e.clientX-r.left)/r.width*VW;UI.my=(e.clientY-r.top)/r.height*VH};
   cv.addEventListener('mousemove',e=>{pos(e);if(UI.onDrag)UI.onDrag(e)});

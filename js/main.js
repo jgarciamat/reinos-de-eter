@@ -60,6 +60,9 @@ function frame(now){
 }
 addEventListener('pointerdown',()=>audio(),{once:true});
 addEventListener('visibilitychange',()=>{if(document.hidden&&S.scr==='adv'&&G.map&&!G.over)autosave()});
+addEventListener('pagehide',()=>{if(S.scr==='adv'&&G.map&&!G.over)autosave()});
+addEventListener('error',e=>{UI.err=String(e.message)+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno});
+addEventListener('unhandledrejection',e=>{UI.err='Promesa rechazada: '+String(e.reason)});
 addEventListener('beforeunload',()=>{if(S.scr==='adv'&&G.map&&!G.over)autosave()});
 function boot(){setupCanvas();initGfx();S.mapClicks=[];requestAnimationFrame(frame)}
 boot();
