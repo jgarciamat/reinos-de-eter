@@ -8,19 +8,24 @@ const RESN={gold:'Oro',wood:'Madera',ore:'Mineral',mercury:'Mercurio',sulfur:'Az
 const RESC={gold:'#ffd24a',wood:'#b5834f',ore:'#a9b2c0',mercury:'#d4dff0',sulfur:'#ece64a',crystal:'#6ae6ff',gems:'#ff6aae'};
 const WATER=0,GRASS=1,DIRT=2,SAND=3,SNOW=4,SWAMP=5,ROUGH=6,ASH=7,LAVA=8,SUBT=9;
 const IMP=t=>t===WATER||t===LAVA;
-const TERR=[{n:'Agua',cost:0},{n:'Pradera',cost:100},{n:'Tierra',cost:100},{n:'Arena',cost:150},{n:'Nieve',cost:150},{n:'Pantano',cost:175},{n:'Roca',cost:125},{n:'Ceniza',cost:110},{n:'Lava',cost:0},{n:'Subterráneo',cost:100}];
+// coste de movimiento por terreno (100 = 1 casilla) según nivel de Orientación [ninguna, básica, avanzada, experta] — tabla del manual de Heroes 3
+const TERR=[{n:'Agua',cost:0,pf:[0,0,0,0]},{n:'Pradera',cost:100,pf:[100,100,100,100]},{n:'Tierra',cost:100,pf:[100,100,100,100]},{n:'Arena',cost:150,pf:[150,125,100,100]},{n:'Nieve',cost:150,pf:[150,125,100,100]},{n:'Pantano',cost:175,pf:[175,150,125,100]},{n:'Roca',cost:125,pf:[125,100,100,100]},{n:'Ceniza',cost:110,pf:[110,100,100,100]},{n:'Lava',cost:0,pf:[0,0,0,0]},{n:'Subterráneo',cost:100,pf:[100,100,100,100]}];
 const PCOL=['#3f7fe0','#e0443c','#3fb85a','#e0b83a','#9a4fd0','#2fc0c0','#e07a2a','#d86aa8'];
 const PNAME=['Azul','Rojo','Verde','Amarillo','Púrpura','Turquesa','Naranja','Rosa'];
 
 // ---------- criaturas ----------
+// Esquema por nivel de criatura (promedios de las tablas de criaturas de Heroes 3: ataque/defensa, daño, vida, velocidad, crecimiento semanal y coste)
 const TIER=[null,
- {a:4,d:4,mn:1,mx:3,hp:5,sp:4,gr:16,g:60},
- {a:6,d:5,mn:2,mx:4,hp:11,sp:5,gr:10,g:120},
- {a:8,d:8,mn:3,mx:7,hp:22,sp:6,gr:8,g:250},
- {a:10,d:9,mn:6,mx:10,hp:36,sp:6,gr:6,g:400},
- {a:12,d:12,mn:9,mx:15,hp:55,sp:7,gr:4,g:700},
- {a:16,d:15,mn:15,mx:25,hp:110,sp:8,gr:3,g:1500},
- {a:20,d:20,mn:30,mx:45,hp:200,sp:10,gr:1,g:3500}];
+ {a:4,d:4,mn:1,mx:3,hp:6,sp:4,gr:14,g:55},
+ {a:6,d:5,mn:2,mx:3,hp:13,sp:4,gr:9,g:110},
+ {a:8,d:7,mn:3,mx:5,hp:22,sp:6,gr:7,g:200},
+ {a:10,d:10,mn:6,mx:9,hp:34,sp:5,gr:4,g:300},
+ {a:12,d:11,mn:11,mx:15,hp:48,sp:6,gr:3,g:500},
+ {a:15,d:14,mn:15,mx:22,hp:95,sp:7,gr:2,g:950},
+ {a:19,d:18,mn:35,mx:50,hp:170,sp:9,gr:1,g:2500}];
+// mejora de cada nivel (valores medios de Heroes 3): +ataque, +defensa, ×vida, +velocidad, ×daño, ×coste
+const UPG=[null,{a:2,d:1,hp:1.15,sp:1,dm:1,c:1.25},{a:1,d:1,hp:1.1,sp:1,dm:1,c:1.4},{a:1,d:1,hp:1.1,sp:2,dm:1,c:1.25},{a:2,d:1,hp:1.1,sp:1,dm:1.05,c:1.33},
+ {a:1,d:1,hp:1.1,sp:1,dm:1.05,c:1.3},{a:1,d:1,hp:1.1,sp:2,dm:1.05,c:1.2},{a:5,d:5,hp:1.4,sp:4,dm:1.1,c:1.5}];
 // [nombre, arquetipo, paleta[3], mods]  — 7 base + 7 mejoradas por facción
 const FDEF=[
  {id:'alba',name:'Ciudadela del Alba',short:'Alba',terr:GRASS,rare:'crystal',col:['#e8c25a','#3b6fd0','#f4f0e0'],
@@ -94,51 +99,66 @@ const NEUTRAL=[['Rata Gigante','beast',['#7a6a5a','#4a3a2a','#d8b0a0'],{},1],['B
  ['Elemental de Fuego','ghost',['#ff8a30','#ffd060','#fff0c0'],{ab:'F'},5],['Mantícora','bird',['#b08a4a','#7a2a2a','#e8d0a0'],{ab:'F',big:1},6],['Dragón Rojo','dragon',['#c0301a','#ff8a50','#ffe080'],{ab:'FB',big:1},7],
  ['Dragón Negro','dragon',['#2a2a38','#6a4a7a','#ff6a6a'],{ab:'FB',big:1,hp:1.2},7],['Gólem de Cristal','golem',['#8ae0f0','#4a9ac0','#ffffff'],{ab:'N',big:1},6]];
 
+// ---- esquema anterior (solo se usa para regenerar mapas de partidas guardadas v1-v2 con el mismo reparto de guardianes) ----
+const LEG_TIER=[null,
+ {a:4,d:4,mn:1,mx:3,hp:5,sp:4,gr:16,g:60},{a:6,d:5,mn:2,mx:4,hp:11,sp:5,gr:10,g:120},{a:8,d:8,mn:3,mx:7,hp:22,sp:6,gr:8,g:250},{a:10,d:9,mn:6,mx:10,hp:36,sp:6,gr:6,g:400},
+ {a:12,d:12,mn:9,mx:15,hp:55,sp:7,gr:4,g:700},{a:16,d:15,mn:15,mx:25,hp:110,sp:8,gr:3,g:1500},{a:20,d:20,mn:30,mx:45,hp:200,sp:10,gr:1,g:3500}];
 const CR={};       // id -> criatura
 const CRLIST=[];
-function buildCreature(id,fi,idx,def,tier,neutral){
-  const up=!neutral&&idx>=7,b=TIER[tier],m=Object.assign({},def[3]);
+const CRL={};      // id -> criatura según el esquema anterior (mapas v1-v2)
+const CRLIST_L=[];
+function buildCreature(id,fi,idx,def,tier,neutral,leg){
+  const up=!neutral&&idx>=7,b=(leg?LEG_TIER:TIER)[tier],m=Object.assign({},def[3]);
   if(up){const base=FDEF[fi].cr[idx-7][3];for(const k in base)if(!(k in m)||k==='ab')m[k]=k==='ab'?(base.ab||'')+(m.ab||''):base[k]}
   let a=b.a+(m.a||0),d=b.d+(m.d||0),hp=Math.round(b.hp*(m.hp||1)),dm=m.dm||1,mn=Math.max(1,Math.round(b.mn*dm)),mx=Math.max(mn,Math.round(b.mx*dm)),sp=b.sp+(m.sp||0);
-  if(up){a+=2;d+=2;hp=Math.round(hp*1.25);mn=Math.round(mn*1.12);mx=Math.round(mx*1.12);sp+=1}
-  const cost={gold:Math.round(b.g*(m.cost||1)*(up?1.25:1)/5)*5};
-  if(!neutral&&tier>=6)cost[FDEF[fi].rare]=tier===6?1:3;
+  const U=UPG[tier];
+  if(up){if(leg){a+=2;d+=2;hp=Math.round(hp*1.25);mn=Math.round(mn*1.12);mx=Math.round(mx*1.12);sp+=1}else{a+=U.a;d+=U.d;hp=Math.round(hp*U.hp);mn=Math.round(mn*U.dm);mx=Math.round(mx*U.dm);sp+=U.sp}}
+  const cost={gold:Math.round(b.g*(m.cost||1)*(up?(leg?1.25:U.c):1)/5)*5};
+  if(!neutral&&tier>=(leg?6:7))cost[FDEF[fi].rare]=leg?(tier===6?1:3):(up?2:1); // solo el nivel 7 pide recurso raro (1 la base, 2 la mejorada)
   const ab=m.ab||'';
-  const c={id,f:neutral?-1:fi,tier,up,name:def[0],arch:def[1],pal:def[2],atk:a,def:d,mn,mx,hp,spd:sp,shots:ab.includes('S')?(m.sh||12):0,
+  const c={id,f:neutral?-1:fi,tier,up,name:def[0],arch:def[1],pal:def[2],atk:a,def:d,mn,mx,hp,spd:sp,shots:ab.includes('S')?(!leg&&up&&(m.sh||12)<=12?24:(m.sh||12)):0,
     fly:ab.includes('F'),shoot:ab.includes('S'),dbl:ab.includes('D'),noret:ab.includes('N'),regen:ab.includes('R'),drain:ab.includes('V'),breath:ab.includes('B'),area:ab.includes('A'),
     big:!!m.big,grow:Math.max(1,Math.round(b.gr*(m.gr||1))),cost};
   c.val=Math.max(1,Math.round(Math.pow(c.hp*((mn+mx)/2),.7)*(1+(a+d)/40)*(c.shoot?1.25:1)*(c.fly?1.15:1)*(c.dbl?1.4:1)));
-  CR[id]=c;CRLIST.push(c);return c;
+  if(leg){CRL[id]=c;CRLIST_L.push(c)}else{CR[id]=c;CRLIST.push(c)}return c;
 }
-FDEF.forEach((f,fi)=>{f.cr.forEach((d,i)=>buildCreature(`f${fi}t${i%7+1}${i>=7?'u':''}`,fi,i,d,i%7+1,false));
-  f.units=f.cr.map((d,i)=>`f${fi}t${i%7+1}${i>=7?'u':''}`);});
-NEUTRAL.forEach((d,i)=>buildCreature('n'+i,-1,i,d,d[4],true));
+for(const leg of[false,true]){
+  FDEF.forEach((f,fi)=>{f.cr.forEach((d,i)=>buildCreature(`f${fi}t${i%7+1}${i>=7?'u':''}`,fi,i,d,i%7+1,false,leg));
+    if(!leg)f.units=f.cr.map((d,i)=>`f${fi}t${i%7+1}${i>=7?'u':''}`);});
+  NEUTRAL.forEach((d,i)=>buildCreature('n'+i,-1,i,d,d[4],true,leg));
+}
 const NEUT_BY_VAL=CRLIST.filter(c=>c.f<0).sort((a,b)=>a.val-b.val).map(c=>c.id);
 const ALL_BY_VAL=CRLIST.slice().sort((a,b)=>a.val-b.val).map(c=>c.id);
+const ALL_BY_VAL_L=CRLIST_L.slice().sort((a,b)=>a.val-b.val).map(c=>c.id);
 function abilText(c){const t=[];if(c.fly)t.push('Vuela');if(c.shoot)t.push(`Dispara (${c.shots})`);if(c.dbl)t.push('Ataca dos veces');if(c.noret)t.push('Sin represalia');
   if(c.regen)t.push('Regenera');if(c.drain)t.push('Drena vida');if(c.breath)t.push('Aliento');if(c.area)t.push('Golpea a todos los adyacentes');return t.join(' · ')||'—'}
 
-// ---------- hechizos de combate ----------
+// ---------- hechizos de combate (costes y fórmulas del manual de Heroes 3) ----------
+// base = efecto con dominio básico; bon = [básico, avanzado, experto]; per = por punto de Poder. Daño = bon[nivel] + per×Poder.
+// mag = magnitud de beneficios/penalizaciones según dominio de la escuela [básico, avanzado, experto]
 const SPELLS={
- chispa:{n:'Chispa Mágica',lv:1,cost:5,k:'dmg',base:10,per:10,d:'Daño a una criatura: 10 + 10×Poder.'},
+ chispa:{n:'Chispa Mágica',lv:1,cost:5,k:'dmg',base:10,bon:[10,20,30],per:10,d:'Daño a una criatura: 10 + 10×Poder (20/30 con dominio avanzado/experto).'},
  bendicion:{n:'Bendición',lv:1,cost:5,k:'buff',buff:'bless',dur:3,d:'Una criatura causa el daño máximo.'},
  maldicion:{n:'Maldición',lv:1,cost:6,k:'debuff',buff:'curse',dur:3,d:'Una criatura enemiga causa el daño mínimo.'},
- prisa:{n:'Prisa',lv:1,cost:6,k:'buff',buff:'haste',dur:3,d:'+3 de velocidad a una criatura aliada.'},
- pielpiedra:{n:'Piel de Piedra',lv:2,cost:6,k:'buff',buff:'stone',dur:3,d:'+4 de defensa a una criatura aliada.'},
- lentitud:{n:'Lentitud',lv:2,cost:8,k:'debuff',buff:'slow',dur:3,d:'Reduce la velocidad de una criatura enemiga.'},
- curar:{n:'Curar',lv:2,cost:8,k:'heal',base:10,per:10,d:'Cura 10 + 10×Poder puntos de vida.'},
- rayo:{n:'Rayo',lv:2,cost:10,k:'dmg',base:25,per:20,d:'Daño a una criatura: 25 + 20×Poder.'},
- escudo:{n:'Escudo',lv:2,cost:8,k:'buff',buff:'shield',dur:3,d:'-25% de daño cuerpo a cuerpo recibido.'},
- bola:{n:'Bola de Fuego',lv:3,cost:15,k:'area',base:15,per:12,d:'Daño en área (objetivo y adyacentes).'},
- cadena:{n:'Cadena de Rayos',lv:3,cost:18,k:'chain',base:40,per:25,d:'Salta entre hasta 4 criaturas enemigas.'},
- resucitar:{n:'Resurrección',lv:3,cost:18,k:'res',base:40,per:30,d:'Revive criaturas aliadas caídas.'},
- implosion:{n:'Implosión',lv:4,cost:25,k:'dmg',base:100,per:75,d:'Gran daño a una criatura.'},
- armagedon:{n:'Armagedón',lv:4,cost:30,k:'all',base:30,per:15,d:'Daño a TODAS las criaturas del campo.'},
- llamarada:{n:'Llamarada',lv:2,cost:9,k:'dmg',base:20,per:15,d:'Daño de fuego a una criatura: 20 + 15×Poder.'},
- hielo:{n:'Rayo de Hielo',lv:2,cost:9,k:'dmgslow',base:20,per:15,d:'Daño de hielo y ralentiza a la criatura.'},
- tormenta:{n:'Tormenta de Meteoros',lv:3,cost:20,k:'area',base:25,per:14,d:'Lluvia de fuego en área (objetivo y adyacentes).'}
+ prisa:{n:'Prisa',lv:1,cost:6,k:'buff',buff:'haste',dur:3,mag:[3,5,5],d:'+3 de velocidad a una criatura aliada (+5 con dominio avanzado).'},
+ pielpiedra:{n:'Piel de Piedra',lv:1,cost:5,k:'buff',buff:'stone',dur:3,mag:[3,6,6],d:'+3 de defensa a una criatura aliada (+6 con dominio avanzado).'},
+ lentitud:{n:'Lentitud',lv:1,cost:6,k:'debuff',buff:'slow',dur:3,mag:[25,50,50],d:'Reduce un 25% la velocidad de una criatura enemiga (50% con dominio avanzado).'},
+ curar:{n:'Curar',lv:1,cost:6,k:'heal',base:10,bon:[10,20,30],per:5,d:'Cura 10 + 5×Poder puntos de vida.'},
+ rayo:{n:'Rayo',lv:2,cost:10,k:'dmg',base:10,bon:[10,20,50],per:25,d:'Daño a una criatura: 10 + 25×Poder.'},
+ escudo:{n:'Escudo',lv:1,cost:5,k:'buff',buff:'shield',dur:3,mag:[25,50,50],d:'-25% de daño cuerpo a cuerpo recibido (-50% con dominio avanzado).'},
+ bola:{n:'Bola de Fuego',lv:3,cost:15,k:'area',base:15,bon:[15,30,60],per:10,d:'Daño en área (objetivo y adyacentes): 15 + 10×Poder.'},
+ cadena:{n:'Cadena de Rayos',lv:4,cost:24,k:'chain',base:25,bon:[25,50,100],per:40,d:'Salta entre hasta 4 criaturas enemigas (mitad de daño en cada salto).'},
+ resucitar:{n:'Resurrección',lv:3,cost:20,k:'res',base:40,bon:[40,80,160],per:50,d:'Revive criaturas aliadas caídas: 40 + 50×Poder de vida.'},
+ implosion:{n:'Implosión',lv:4,cost:30,k:'dmg',base:100,bon:[100,200,300],per:75,d:'Gran daño a una criatura: 100 + 75×Poder.'},
+ armagedon:{n:'Armagedón',lv:4,cost:24,k:'all',base:30,bon:[30,60,120],per:50,d:'Daño a TODAS las criaturas del campo: 30 + 50×Poder.'},
+ llamarada:{n:'Llamarada',lv:2,cost:9,k:'dmg',base:20,bon:[20,35,50],per:15,d:'Daño de fuego a una criatura: 20 + 15×Poder.'},
+ hielo:{n:'Rayo de Hielo',lv:2,cost:8,k:'dmgslow',base:10,bon:[10,20,50],per:20,d:'Daño de hielo (10 + 20×Poder) y ralentiza a la criatura.'},
+ tormenta:{n:'Tormenta de Meteoros',lv:4,cost:16,k:'area',base:25,bon:[25,50,100],per:25,d:'Lluvia de fuego en área (objetivo y adyacentes): 25 + 25×Poder.'}
 };
-const SCHOOL={chispa:'aire',bendicion:'agua',maldicion:'tierra',prisa:'aire',pielpiedra:'tierra',lentitud:'tierra',curar:'agua',rayo:'aire',escudo:'aire',bola:'fuego',cadena:'aire',resucitar:'agua',implosion:'tierra',armagedon:'fuego',llamarada:'fuego',hielo:'agua',tormenta:'fuego'};
+// escuela de magia de cada hechizo (Aire, Agua, Fuego, Tierra)
+const SCHOOL={chispa:'aire',bendicion:'agua',maldicion:'fuego',prisa:'aire',pielpiedra:'tierra',lentitud:'tierra',curar:'agua',rayo:'aire',escudo:'tierra',bola:'fuego',cadena:'aire',resucitar:'agua',implosion:'tierra',armagedon:'fuego',llamarada:'fuego',hielo:'agua',tormenta:'tierra'};
+// nivel de cofradía en que aparece cada hechizo al generar un mapa (se mantiene el reparto anterior para no alterar los mapas de las partidas guardadas)
+const GUILD_LV={chispa:1,bendicion:1,maldicion:1,prisa:1,pielpiedra:2,lentitud:2,curar:2,rayo:2,escudo:2,bola:3,cadena:3,resucitar:3,implosion:4,armagedon:4,llamarada:2,hielo:2,tormenta:3};
 const SPELL_IDS=Object.keys(SPELLS);
 
 // ---------- habilidades secundarias (basadas en la serie Heroes 1-5) ----------
@@ -159,15 +179,15 @@ const SKILLS={
  medicina:{n:'Medicina',d:['Recupera el 10% de las bajas tras el combate','Recupera el 20% de las bajas','Recupera el 30% de las bajas'],k:'c'},
  necromancia:{n:'Nigromancia',d:['Levanta un 10% de los caídos como esqueletos','Levanta un 20% de los caídos','Levanta un 30% de los caídos'],k:'c'},
  inteligencia:{n:'Inteligencia',d:['+25% de maná máximo','+50% de maná máximo','+100% de maná máximo'],k:'g'},
- misticismo:{n:'Misticismo',d:['+2 maná por día','+4 maná por día','+6 maná por día'],k:'g'},
+ misticismo:{n:'Misticismo',d:['+2 maná por día','+3 maná por día','+4 maná por día'],k:'g'},
  sabiduria:{n:'Sabiduría',d:['Aprende hechizos de nivel 3','Aprende hechizos de nivel 4','Aprende todos los hechizos'],k:'g'},
  hechiceria:{n:'Hechicería',d:['+5% de daño de hechizos','+10% de daño de hechizos','+15% de daño de hechizos'],k:'g'},
  resistencia:{n:'Resistencia',d:['5% de resistir hechizos de daño','10% de resistir hechizos de daño','20% de resistir hechizos de daño'],k:'g'},
  ojo_aguila:{n:'Ojo de Águila',d:['20% de aprender hechizos enemigos','30% de aprender hechizos enemigos','40% de aprender hechizos enemigos'],k:'g'},
- fuego:{n:'Magia de Fuego',d:['Hechizos de fuego +20%','Hechizos de fuego +40%','Hechizos de fuego +60%'],k:'g'},
- agua:{n:'Magia de Agua',d:['Hechizos de agua +20%','Hechizos de agua +40%','Hechizos de agua +60%'],k:'g'},
- tierra:{n:'Magia de Tierra',d:['Hechizos de tierra +20%','Hechizos de tierra +40%','Hechizos de tierra +60%'],k:'g'},
- aire:{n:'Magia de Aire',d:['Hechizos de aire +20%','Hechizos de aire +40%','Hechizos de aire +60%'],k:'g'}
+ fuego:{n:'Magia de Fuego',d:['Hechizos de fuego a nivel básico y cuestan menos maná','Hechizos de fuego a nivel avanzado y menos maná','Hechizos de fuego a nivel experto y menos maná'],k:'g'},
+ agua:{n:'Magia de Agua',d:['Hechizos de agua a nivel básico y cuestan menos maná','Hechizos de agua a nivel avanzado y menos maná','Hechizos de agua a nivel experto y menos maná'],k:'g'},
+ tierra:{n:'Magia de Tierra',d:['Hechizos de tierra a nivel básico y cuestan menos maná','Hechizos de tierra a nivel avanzado y menos maná','Hechizos de tierra a nivel experto y menos maná'],k:'g'},
+ aire:{n:'Magia de Aire',d:['Hechizos de aire a nivel básico y cuestan menos maná','Hechizos de aire a nivel avanzado y menos maná','Hechizos de aire a nivel experto y menos maná'],k:'g'}
 };
 const SKILL_IDS=Object.keys(SKILLS);
 const SK_PREF=[['ataque','armadura','logistica','liderazgo','orientacion','tacticas','diplomacia','suerte','arqueria','finanzas','medicina','exploracion','aprendizaje'],['inteligencia','sabiduria','misticismo','hechiceria','fuego','aire','agua','tierra','resistencia','aprendizaje','ojo_aguila','logistica','liderazgo']];
@@ -188,7 +208,7 @@ const XP_LV=[0,1000,2000,3200,4600,6200,8000,10000,12200,14700,17500,20600,24320
 function xpForLevel(l){if(l<=XP_LV.length)return XP_LV[l-1];let v=XP_LV[XP_LV.length-1];for(let i=XP_LV.length;i<l;i++)v=Math.round(v*1.2);return v}
 
 // ---------- edificios de ciudad ----------
-const BNAME={hall1:'Ayuntamiento',hall2:'Concejo Municipal',hall3:'Capitolio',fort1:'Empalizada',fort2:'Ciudadela',fort3:'Castillo',
+const BNAME={hall1:'Cabildo',hall2:'Consistorio',hall3:'Alcaldía',fort1:'Empalizada',fort2:'Ciudadela',fort3:'Castillo',
  mage1:'Gremio de Magos I',mage2:'Gremio de Magos II',mage3:'Gremio de Magos III',mage4:'Gremio de Magos IV',tavern:'Taberna',market:'Mercado',shipyard:'Astillero',
  dw1:'Viviendas',dw2:'Tiro',dw3:'Cobijo',dw4:'Salón',dw5:'Santuario',dw6:'Palacio',dw7:'Trono'};
 const FBNAME=[ // nombres temáticos para viviendas por facción
@@ -200,19 +220,25 @@ const FBNAME=[ // nombres temáticos para viviendas por facción
  ['Muelle Pirata','Puesto de Arpones','Gruta de Sirenas','Cala de Cangrejos','Torre de Mareas','Abismo del Kraken','Trono del Leviatán'],
  ['Charca','Tolderías Lagarto','Nido Basilisco','Torre de Alas','Choza Chamán','Ciénaga Profunda','Sima Pútrida'],
  ['Campamento Goblin','Palizada Orca','Cubil de Lobos','Cueva de Ogros','Tienda Chamán','Torre Ciclópea','Cumbre del Trueno']];
+// ingresos de oro por día de la casa consistorial (Heroes 3: 500 / 1000 / 2000)
+const HALL_INC=[500,1000,2000];
+function townIncome(b){return b.hall3?HALL_INC[2]:b.hall2?HALL_INC[1]:HALL_INC[0]}
+// costes de construcción según las tablas del manual de Heroes 3 (viviendas: crecen de 500 a 15000 de oro; el nivel 7 pide 10 de recurso raro)
+const DW_COST=[null,{gold:500,ore:10},{gold:1000,wood:5,ore:5},{gold:1000,ore:5},{gold:2000,ore:5},{gold:3000,wood:5,ore:5},{gold:5000,wood:20},{gold:15000}];
+const UP_COST=[null,{gold:1000,ore:5},{gold:1000,wood:5,ore:5},{gold:1000},{gold:2000,ore:5},{gold:1000,wood:2,ore:2},{gold:3000,wood:10},{gold:2000}];
 function bCost(b,fi){
   const f=FDEF[fi],r=f.rare;let m;
   const dw=/^dw(\d)$/.exec(b),up=/^up(\d)$/.exec(b);
-  if(dw){const t=+dw[1];const c={gold:[0,600,1000,1500,2200,3000,4500,7500][t]};if(t>=2&&t<=3)c.wood=5+t;if(t>=3)c.ore=t<=4?5:0;if(t>=5)c[r]=4+t-5;if(t>=6)c.crystal=(c.crystal||0)+3;return c}
-  if(up){const t=+up[1];const c={gold:[0,500,800,1200,1800,2500,3500,6000][t]};if(t>=3)c.ore=4;if(t>=5)c[r]=3;return c}
-  m={hall1:{gold:2500},hall2:{gold:5000},hall3:{gold:10000},fort1:{gold:1500,wood:10,ore:10},fort2:{gold:2500,ore:10},fort3:{gold:5000,ore:20,wood:10},
-   mage1:{gold:2000,wood:5,ore:5},mage2:{gold:1500,wood:5,ore:5,mercury:4},mage3:{gold:1500,wood:5,ore:5,mercury:6,sulfur:4},mage4:{gold:2000,wood:5,ore:5,crystal:6,gems:6},
+  if(dw){const t=+dw[1],c=Object.assign({},DW_COST[t]);if(t===5)c[r]=3;if(t===7)c[r]=10;return c}
+  if(up){const t=+up[1],c=Object.assign({},UP_COST[t]);if(t===5)c[r]=3;if(t===7)c[r]=10;return c}
+  m={hall1:{gold:2500},hall2:{gold:2500},hall3:{gold:5000},fort1:{gold:5000,wood:20,ore:20},fort2:{gold:2500,ore:5},fort3:{gold:5000,wood:10,ore:10},
+   mage1:{gold:2000,wood:5,ore:5},mage2:{gold:1000,wood:5,ore:5,mercury:4,sulfur:4,crystal:4,gems:4},mage3:{gold:1000,wood:5,ore:5,mercury:6,sulfur:6,crystal:6,gems:6},mage4:{gold:1000,wood:5,ore:5,mercury:8,sulfur:8,crystal:8,gems:8},
    tavern:{gold:500,wood:5},market:{gold:500,wood:5,ore:5},shipyard:{gold:2000,wood:20}}[b];
   return m||{gold:999999};
 }
 function bReq(b,town){
   const has=x=>town.b[x];let m;
-  if(m=/^dw(\d)$/.exec(b)){const t=+m[1];if(t===1)return[];if(t<=3)return['dw1'];return['dw'+(t-2),...(t>=7?['mage1']:[])]}
+  if(m=/^dw(\d)$/.exec(b)){const t=+m[1];if(t===1)return[];if(t<=3)return['dw1'];return['dw'+(t-2),...(t===5||t>=7?['mage1']:[])]}
   if(m=/^up(\d)$/.exec(b)){return['dw'+m[1],...(+m[1]>=4?['fort1']:[])]}
   if(b==='hall2')return['hall1','tavern'];if(b==='hall3')return['hall2','fort2'];
   if(b==='fort2')return['fort1'];if(b==='fort3')return['fort2'];

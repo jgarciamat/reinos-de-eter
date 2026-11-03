@@ -58,7 +58,7 @@ function makeQuest(r,dg,arts){
   switch(t){
     case'res':{const common=r()<.55;q.res=common?(r()<.5?'wood':'ore'):RESKEYS[2+Math.floor(r()*4)];q.n=common?Math.round(14+dg*24):Math.round(8+dg*14);if(r()<.18){q.res='gold';q.n=Math.round(6000+dg*14000)}break}
     case'lvl':q.n=Math.round(5+dg*10+r()*2);break;
-    case'army':{const ids=ALL_BY_VAL.filter(id=>CR[id].tier<=5);q.cr=ids[Math.floor(r()*ids.length)];q.n=Math.max(3,Math.round((900+dg*3500)/CR[q.cr].val));break}
+    case'army':{const ids=GENALL.filter(id=>CR[id].tier<=5);q.cr=ids[Math.floor(r()*ids.length)];q.n=Math.max(3,Math.round((900+dg*3500)/GENCR[q.cr].val));break}
     case'towns':q.n=Math.round(3+dg*3);break;
     case'art':q.art=arts[Math.floor(r()*arts.length)].art;break;
   }
@@ -67,7 +67,7 @@ function makeQuest(r,dg,arts){
   else if(rw<.5)q.rw={t:'xp',n:Math.round(1500+2500*mag)};
   else if(rw<.7)q.rw={t:'art',lo:dg<.4?1:2,hi:dg<.4?2:4};
   else if(rw<.85)q.rw={t:'stat',k:['a','d','sp','kn'][Math.floor(r()*4)],n:dg>.6?2:1};
-  else{const ids=ALL_BY_VAL.filter(id=>CR[id].tier>=3&&CR[id].tier<=5);q.rw={t:'army',cr:ids[Math.floor(r()*ids.length)],n:Math.round(8+dg*10)}}
+  else{const ids=GENALL.filter(id=>CR[id].tier>=3&&CR[id].tier<=5);q.rw={t:'army',cr:ids[Math.floor(r()*ids.length)],n:Math.round(8+dg*10)}}
   return q;
 }
 function questText(q){

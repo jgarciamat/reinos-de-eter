@@ -39,7 +39,9 @@ function victoryText(v){
     case'survive':return`Aguanta hasta el día ${v.n} con alguna ciudad o héroe.`;
     default:return'Derrota a todos tus rivales.'}}
 // v1 = mapas antiguos (partidas guardadas), v2 = mitad de superficie y menos criaturas/recursos sueltos
-const MAP_SCALES={1:3.15,2:2.23},MGV_CUR=2;
+// v3: criaturas con el esquema de niveles de Heroes 3 (los mapas v1-v2 se regeneran con los valores anteriores para no mover los objetos)
+const MAP_SCALES={1:3.15,2:2.23,3:2.23},MGV_CUR=3;
+let GENCR=CR,GENALL=ALL_BY_VAL;
 function mapSpec(i,mv){mv=mv||MGV_CUR;
   const r=mulberry(9001+i*7919);
   const size=Math.round([144,144,150,156,162,168,174,180][Math.floor(r()*8)]*MAP_SCALES[mv]/2)*2;
@@ -68,11 +70,10 @@ function fbm(n,x,y,oct=4){let s=0,a=.5,f=1,t=0;for(let o=0;o<oct;o++){s+=a*n(x*f
 
 // ---------- rutas (A*) ----------
 const D8=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
-const PF_RED=[0,.25,.5,1];
 function tilePass(m,x,y,water){if(x<0||y<0||x>=m.w||y>=m.h)return false;const i=y*m.w+x;const t=m.terr[i];if(water?t!==WATER:IMP(t))return false;if(m.deco[i])return false;if(m.fp[i]&&m.fp[i]!==m.en[i])return false;return true}
 function stepCost(m,x,y,px,py,pf,water){
   const i=y*m.w+x,pi=py*m.w+px;let c=100;
-  if(!water){const tc=TERR[m.terr[i]].cost;c=100+(tc-100)*(1-PF_RED[pf||0]);if(m.road[i]&&m.road[pi])c=65}
+  if(!water){c=TERR[m.terr[i]].pf[pf||0];if(m.road[i]&&m.road[pi])c=65}
   return(x!==px&&y!==py)?c*1.414:c;
 }
 let _A={g:null,from:null,stamp:null,st:0,n:0,hF:new Float64Array(1<<16),hI:new Int32Array(1<<16)};
@@ -92,7 +93,7 @@ function findPath(m,sx,sy,tx,ty,opt={}){
     if(deco[ti])return null;if(fp[ti]&&fp[ti]!==en[ti])return null;
     if(water){if(t!==WATER&&IMP(t))return null}else{if(IMP(t)&&!(t===WATER&&ob&&ob.t==='boat'))return null}}
   SM[si]=st;G_[si]=0;FR[si]=-1;push(0,si);
-  const mc=opt.minCost||65,tcost=[];for(let t=0;t<TERR.length;t++)tcost[t]=100+(TERR[t].cost-100)*(1-PF_RED[pf]);
+  const mc=opt.minCost||65,tcost=[];for(let t=0;t<TERR.length;t++)tcost[t]=TERR[t].pf[pf];
   const pass=(x,y)=>{if(x<0||y<0||x>=w||y>=hgt)return false;const i=y*w+x;const t=terr[i];if(water?t!==WATER:(t===WATER||t===LAVA))return false;if(deco[i])return false;if(fp[i]&&fp[i]!==en[i])return false;return true};
   let expanded=0;const lim=opt.limit||90000;
   while(hn>0){
@@ -333,7 +334,7 @@ function genLevel(spec,opt={}){
   const sc=(W*H)/(150*150);
   for(let k=0;k<Math.round((V1?22:14)*sc);k++){const p=randPos(3,2,{l:startList,d:10});if(!p)continue;const dg=danger(p[0],p[1]);
     const maxT=dg<.25?3:dg<.55?5:7,tier=irnd(r,1,maxT),fi=Math.floor(r()*8);const cid=`f${fi}t${tier}`;
-    const o=addObj({t:'dwell',cr:cid,n:CR[cid].grow*2,x:p[0],y:p[1],owner:-1});guardOf(o,30+dg*dg*1500*spec.monsters*MM)}
+    const o=addObj({t:'dwell',cr:cid,n:GENCR[cid].grow*2,x:p[0],y:p[1],owner:-1});guardOf(o,30+dg*dg*1500*spec.monsters*MM)}
   const sites=['shrine','hut','well','stone','stable','mill','shrine','stone','shop','hut'];
   for(let k=0;k<Math.round((V1?84:60)*sc);k++){const p=randPos(1,1,{l:startList,d:6});if(!p)continue;const kk=r()<.38?pick(r,sites):pickNewSite(r);
     const o=addObj({t:'site',k:kk,x:p[0],y:p[1],used:{},spell:pick(r,SPELL_IDS),skill:pick(r,SKILL_IDS)});
@@ -449,6 +450,7 @@ function findDock(m,o){
   o.dock=best;
 }
 function genMap(spec,opt={}){
+  GENCR=spec.mv>=3?CR:CRL;GENALL=spec.mv>=3?ALL_BY_VAL:ALL_BY_VAL_L;
   const used=new Set();
   const m0=genLevel(spec,Object.assign({},opt,{under:false,used}));
   if(opt.surfaceOnly){for(const o of m0.objs)if(o.t==='town')findDock(m0,o);return m0}
@@ -459,20 +461,20 @@ function genMap(spec,opt={}){
 const levelOf=(m,y)=>m.lh&&y>=m.lh+2?1:0;
 function garrison(fi,power,r){
   const g=[];const units=FDEF[fi].units;let left=power;
-  for(let k=0;k<5&&left>5;k++){const t=Math.min(6,Math.max(0,Math.floor(Math.log(left/6)/Math.log(2.4)+r()*1.4)-1));const c=CR[units[Math.min(13,t+(r()<.4?7:0))]];
+  for(let k=0;k<5&&left>5;k++){const t=Math.min(6,Math.max(0,Math.floor(Math.log(left/6)/Math.log(2.4)+r()*1.4)-1));const c=GENCR[units[Math.min(13,t+(r()<.4?7:0))]];
     const n=Math.max(1,Math.round(left/(c.val*(k===0?1.6:3))));left-=n*c.val;g.push({id:c.id,n})}
   return g;
 }
 function makeMonster(x,y,power,r){
-  const lo=power/70,hi=power/2.2;const cand=ALL_BY_VAL.filter(id=>{const v=CR[id].val;return v>=lo&&v<=hi});
+  const lo=power/70,hi=power/2.2;const cand=GENALL.filter(id=>{const v=GENCR[id].val;return v>=lo&&v<=hi});
   if(!cand.length)return null;const cid=cand[Math.floor(Math.pow(r(),.7)*cand.length)];
-  const n=Math.max(1,Math.round(power*(0.75+r()*.5)/CR[cid].val));
+  const n=Math.max(1,Math.round(power*(0.75+r()*.5)/GENCR[cid].val));
   return{t:'mon',cr:cid,n,x,y};
 }
 function initTown(o,r,neutral){
   o.b={hall1:1,dw1:1,dw2:1};o.avail=[];for(let t=1;t<=7;t++)o.avail.push(0);
-  o.avail[0]=CR[FDEF[o.fi].units[0]].grow;o.avail[1]=CR[FDEF[o.fi].units[1]].grow;
-  o.spells=[];for(let lv=1;lv<=4;lv++){const pool=SPELL_IDS.filter(s=>SPELLS[s].lv===lv);const a=[];while(a.length<Math.min(2,pool.length)){const s=pool[Math.floor(r()*pool.length)];if(!a.includes(s))a.push(s)}o.spells.push(...a)}
+  o.avail[0]=GENCR[FDEF[o.fi].units[0]].grow;o.avail[1]=GENCR[FDEF[o.fi].units[1]].grow;
+  o.spells=[];for(let lv=1;lv<=4;lv++){const pool=SPELL_IDS.filter(s=>GUILD_LV[s]===lv);const a=[];while(a.length<Math.min(2,pool.length)){const s=pool[Math.floor(r()*pool.length)];if(!a.includes(s))a.push(s)}o.spells.push(...a)}
   o.builtToday=false;
   if(neutral){o.b.dw3=1;if(r()<.6)o.b.tavern=1}
 }

@@ -21,6 +21,7 @@ class Battle{
       arr.forEach((o,k)=>{const hsb=sd.hs||{};const cr0=CR[o.a.id];const cr=(hsb.hpB||hsb.spdB)?Object.assign({},cr0,{hp:cr0.hp+(hsb.hpB||0),spd:cr0.spd+(hsb.spdB||0)}):cr0;const y=pos[k],x=si===0?0:BW-1;this.obst.delete(hk(x,y));this.obst.delete(hk(x+(si?-1:1),y));
         const s={side:si,slot:o.slot,id:o.a.id,cr,n:o.a.n,startN:o.a.n,top:cr.hp,x,y,ret:true,defend:false,waited:false,buff:{},shots:cr.shots,idx:this.st.length,dead:false,killed:0,fresh:true};
         this.st.push(s);this.grid.set(hk(x,y),s)})});
+    this.am=[this.armyMorale(0),this.armyMorale(1)];
     if(opt.siege)this.initSiege(opt.siege);
     this.startRound();
   }
@@ -28,10 +29,11 @@ class Battle{
   alive(side,all){return this.st.filter(s=>!s.dead&&(all||!s.siege)&&(side===undefined||s.side===side))}
   at(x,y){return this.grid.get(hk(x,y))||null}
   hs(side){return this.sides[side].hs||{a:0,d:0,sp:0,kn:0,off:0,arch:0,armor:0,mana:0}}
-  spd(s){let v=s.cr.spd;if(this.round<=2)v+=this.hs(s.side).tact||0;if(s.buff.haste)v+=3;if(s.buff.slow)v=Math.max(1,v-Math.ceil(v*.4));return v}
+  bm(s,k,def){return(s.bm&&s.bm[k])||def}
+  spd(s){let v=s.cr.spd;if(this.round<=2)v+=this.hs(s.side).tact||0;if(s.buff.haste)v+=this.bm(s,'haste',3);if(s.buff.slow)v=Math.max(1,v-Math.ceil(v*this.bm(s,'slow',25)/100));return v}
   specB(s){const sp=this.hs(s.side).spec;return sp&&sp.id.replace('u','')===s.id.replace('u','')?sp.bonus:0}
   atkVal(s){return s.cr.atk+this.hs(s.side).a+this.specB(s)}
-  defVal(s){let d=s.cr.def+this.hs(s.side).d+this.specB(s);if(s.buff.stone)d+=4;if(s.defend)d=Math.ceil(d*1.2);return d}
+  defVal(s){let d=s.cr.def+this.hs(s.side).d+this.specB(s);if(s.buff.stone)d+=this.bm(s,'stone',3);if(s.defend)d=Math.ceil(d*1.2);return d}
   total(s){return s.dead?0:(s.n-1)*s.cr.hp+s.top}
   cur(){return this.queue[0]||null}
   // ---- rondas ----
@@ -41,11 +43,18 @@ class Battle{
     this.queue=this.alive(undefined,true).sort((a,b)=>this.spd(b)-this.spd(a)||a.side-b.side||a.idx-b.idx);this.waitQ=[];
     this.ev.push({t:'round',n:this.round});this.beginTurn();if(this.cur()&&this.cur().skip&&!this.over)this.nextTurn();
   }
-  morale(s){if(s.cr.arch==='golem'||s.cr.arch==='undead'||s.cr.arch==='ghost'||s.cr.arch==='lich'||s.cr.arch==='skel')return 0;return Math.max(-3,Math.min(3,this.hs(s.side).lead||0))}
+  // moral del ejército (reglas de Heroes 3): +1 si todas las criaturas son de un mismo castillo (salvo no-muertos), -1 si se mezclan no-muertos con vivos,
+  // -1 por cada castillo distinto por encima de dos. Solo cuenta si hay un héroe al mando.
+  armyMorale(side){
+    const sd=this.sides[side];if(!sd.hero)return 0;
+    const fs=new Set();let und=false,liv=false;
+    for(const a of sd.army){if(!a||a.n<=0)continue;const c=CR[a.id];fs.add(c.f);if(c.f===2)und=true;else liv=true}
+    let m=0;if(und&&liv)m--;if(fs.size===1&&!und)m++;if(fs.size>2)m-=fs.size-2;return m}
+  morale(s){if(s.cr.f===2||s.cr.arch==='golem'||s.cr.arch==='undead'||s.cr.arch==='ghost'||s.cr.arch==='lich'||s.cr.arch==='skel')return 0;return Math.max(-3,Math.min(3,(this.hs(s.side).lead||0)+((this.am&&this.am[s.side])||0)))}
   beginTurn(){const s=this.cur();if(!s)return;
     if(s.siege){this.siegeAct(s);s.skip=true;return}
     if(s.cr.regen&&s.top<s.cr.hp){s.top=s.cr.hp;this.ev.push({t:'text',s,txt:'Regenera'})}
-    const mo=this.morale(s);if(mo<0&&!s.bonus&&Math.random()<[0,1/12,1/6,1/4][-mo]){this.ev.push({t:'text',s,txt:'¡Moral baja!'});this.ev.push({t:'morale',s,bad:true});s.skip=true}}
+    const mo=this.morale(s);if(mo<0&&!s.bonus&&Math.random()<[0,1/24,1/12,1/8][-mo]){this.ev.push({t:'text',s,txt:'¡Moral baja!'});this.ev.push({t:'morale',s,bad:true});s.skip=true}}
   nextTurn(){
     if(this.checkEnd())return;
     const sc=this.queue[0];
@@ -83,13 +92,13 @@ class Battle{
     if(avg)base=N*(cr.mn+cr.mx)/2;
     else if(N<=10){for(let i=0;i<N;i++)base+=one()}else{let t=0;for(let i=0;i<10;i++)t+=one();base=Math.floor(t*N/10)}
     const atk=this.atkVal(a),df=this.defVal(d);let I=0,R=0;
-    if(atk>df)I+=Math.min(3,.05*(atk-df));else R=Math.min(.7,.025*(df-atk));
+    if(atk>df)I+=Math.min(3,.05*(atk-df));else R=Math.min(.7,.02*(df-atk));
     const h=this.hs(a.side);const lv=ranged?h.arch||0:h.off||0;
     I+=ranged?[0,.1,.25,.5][lv]:[0,.1,.2,.3][lv];
-    a.lucky=false;if(!avg&&h.luck>0&&Math.random()<[0,.0417,.0833,.125][Math.min(3,h.luck)]){I+=1;a.lucky=true}
-    let m=(1+I)*(1-R);
+    a.lucky=false;if(!avg&&h.luck>0&&Math.random()<[0,.0417,.0833,.125][Math.min(3,h.luck)])a.lucky=true;
+    let m=(1+I)*(1-R);if(a.lucky)m*=2; // la suerte duplica el daño final
     const hd=this.hs(d.side);if(hd.armor)m*=1-.05*hd.armor;
-    if(!ranged&&d.buff.shield)m*=.75;
+    if(!ranged&&d.buff.shield)m*=1-this.bm(d,'shield',25)/100;
     if(ranged&&this.wallBetween(a,d))m*=.5;
     if(ranged&&a.cr.shoot&&(this.enemiesAdj(a).length||hexDist(a.x,a.y,d.x,d.y)>=10))m*=.5;
     return Math.max(1,Math.floor(base*m));
@@ -132,15 +141,19 @@ class Battle{
     if(!this.queue.length){this.queue=this.waitQ.sort((a,b)=>this.spd(a)-this.spd(b)||b.side-a.side);this.waitQ=[]}this.beginTurn();if(this.cur()&&this.cur().skip&&!this.over)this.nextTurn();return true}
   // ---- magia ----
   heroMana(side){const h=this.sides[side].hero;return h?h.mana:0}
-  canCast(side,sp){const h=this.sides[side].hero;return !!h&&!this.cast[side]&&h.mana>=SPELLS[sp].cost&&(h.spells||[]).includes(sp)}
+  // nivel de efecto (0 básico, 1 avanzado, 2 experto) según el dominio de la escuela del hechizo
+  spLv(side,sp){const h=this.hs(side),l=(h.sch&&h.sch[SCHOOL[sp]])||0;return Math.max(0,l-1)}
+  // coste de maná: con algún dominio de la escuela se ahorra tanto maná como el nivel del hechizo
+  spellCost(side,sp){const h=this.hs(side),S=SPELLS[sp];return Math.max(1,S.cost-(((h.sch&&h.sch[SCHOOL[sp]])||0)>0?S.lv:0))}
+  canCast(side,sp){const h=this.sides[side].hero;return !!h&&!this.cast[side]&&h.mana>=this.spellCost(side,sp)&&(h.spells||[]).includes(sp)}
   spellPower(side,sp){
-    const h=this.hs(side),S=SPELLS[sp];let k=1+.05*(h.sorc||0);const sc=SCHOOL[sp];if(sc){k+=[0,.2,.4,.6][(h.sch&&h.sch[sc])||0]+((h.schA&&h.schA[sc])||0)/100}
+    const h=this.hs(side),S=SPELLS[sp];let k=1+.05*(h.sorc||0);const sc=SCHOOL[sp];if(sc)k+=((h.schA&&h.schA[sc])||0)/100;
     if(h.specSpell&&h.specSpell.id===sp)k+=h.specSpell.pct;
-    return(S.base+S.per*(h.sp||0))*k;
+    return((S.bon?S.bon[this.spLv(side,sp)]:S.base)+S.per*(h.sp||0))*k;
   }
   castSpell(side,sp,target,cx,cy){
     if(!this.canCast(side,sp))return false;const S=SPELLS[sp],h=this.sides[side].hero;
-    h.mana-=S.cost;this.cast[side]=true;const dmg=this.spellPower(side,sp);
+    h.mana-=this.spellCost(side,sp);this.cast[side]=true;const dmg=S.base?this.spellPower(side,sp):0,lv=this.spLv(side,sp);
     (this.casts=this.casts||[[],[]])[side].push(sp);
     this.ev.push({t:'spell',sp,side,target,x:target?target.x:cx,y:target?target.y:cy});
     const hurt=(u,amt)=>{if(!u||u.dead)return;const hr=this.hs(u.side).resi||0;if(hr&&Math.random()<hr/100){this.ev.push({t:'text',s:u,txt:'¡Resiste!'});return}amt=Math.floor(amt);const k=this.applyDmg(u,amt,null);this.ev.push({t:'hit',a:null,d:u,dmg:amt,kills:k,spell:true,dead:u.dead,na:u.n,ta:u.top,sp})};
@@ -153,7 +166,9 @@ class Battle{
       case'all':for(const u of this.alive())hurt(u,dmg);break;
       case'heal':{const max=target.startN*target.cr.hp,tot=Math.min(max,this.total(target)+dmg);target.n=Math.ceil(tot/target.cr.hp);target.top=tot-(target.n-1)*target.cr.hp;this.ev.push({t:'text',s:target,txt:'+'+Math.floor(dmg)});break}
       case'res':{const unit=target.cr.hp;const add=Math.floor(dmg/unit);const n=Math.min(target.startN-target.n,add);if(n>0)target.n+=n;this.ev.push({t:'text',s:target,txt:'+'+n});break}
-      case'buff':case'debuff':target.buff[S.buff]=S.dur;this.ev.push({t:'text',s:target,txt:S.n});break;
+      case'buff':case'debuff':{ // con dominio experto afecta a todas las criaturas del bando correspondiente
+        const dur=Math.max(S.dur,this.hs(side).sp||0);const grp=lv>=2?this.alive(S.k==='buff'?side:1-side):[target];
+        for(const u of grp){u.buff[S.buff]=dur;if(S.mag){u.bm=u.bm||{};u.bm[S.buff]=S.mag[lv]}this.ev.push({t:'text',s:u,txt:S.n})}break}
     }
     this.ev.push({t:'sync'});this.checkEnd();return true;
   }
@@ -216,7 +231,7 @@ class Battle{
     const h=this.sides[side].hero;if(!h||this.cast[side]||!h.spells)return;
     const foes=this.alive(1-side),fr=this.alive(side);if(!foes.length)return;
     let best=null,bv=0;
-    for(const sp of h.spells){const S=SPELLS[sp];if(h.mana<S.cost)continue;const dmg=S.base?this.spellPower(side,sp):0;
+    for(const sp of h.spells){const S=Object.assign({},SPELLS[sp],{cost:this.spellCost(side,sp)});if(h.mana<S.cost)continue;const dmg=S.base?this.spellPower(side,sp):0;
       if(S.k==='dmg'||S.k==='dmgslow'){for(const t of foes){const v=Math.min(dmg,this.total(t))/t.cr.hp*t.cr.val-S.cost*2;if(v>bv){bv=v;best={sp,t}}}}
       else if(S.k==='area'){for(const t of foes){let v=-S.cost*2;for(const[x,y]of [[t.x,t.y],...hexNb(t.x,t.y)]){const u=this.at(x,y);if(!u)continue;const w=Math.min(dmg,this.total(u))/u.cr.hp*u.cr.val;v+=u.side!==side?w:-w}if(v>bv){bv=v;best={sp,t}}}}
       else if(S.k==='chain'){for(const t of foes){const v=Math.min(dmg,this.total(t))/t.cr.hp*t.cr.val*1.8-S.cost*2;if(v>bv){bv=v;best={sp,t}}}}

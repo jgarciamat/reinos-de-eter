@@ -58,7 +58,8 @@ function hstat(h){
     sch,schA:{fuego:b.sf||0,agua:b.sw||0,tierra:b.se||0,aire:b.sa||0},manaR:b.mana||0,spdB:b.spd||0,hpB:b.hp||0,xpB:b.xp||0,fin:0};
 }
 const maxMana=h=>{const s=hstat(h);return Math.round(Math.max(1,s.kn)*10*[1,1.25,1.5,2][s.int])};
-const MP_BASE=[1300,1360,1430,1500,1560,1630,1700,1760,1830,1900,1960,2000];
+// puntos de movimiento por la velocidad de la criatura más lenta (tabla del manual de Heroes 3: 15 a 20 casillas)
+const MP_BASE=[1500,1500,1500,1500,1500,1600,1700,1700,1800,1900,1900,2000];
 function maxMP(h){const s=hstat(h);if(h.boat)return Math.round(1500*(1+.5*s.nav)+s.mpw+(typeof lighthouses==='function'&&lighthouses(h.pid)?500:0));let sl=99;for(const u of h.army)if(u&&u.n>0)sl=Math.min(sl,CR[u.id].spd+s.spdB);if(sl===99)sl=4;return Math.round(MP_BASE[Math.max(0,Math.min(11,sl))]*(1+.1*s.log)+s.mp);}
 const heroVis=h=>5+hstat(h).vis;
 function skillOffers(h){
@@ -69,7 +70,7 @@ function skillOffers(h){
 function gainXp(h,x){
   if(x<=0)return;const st=hstat(h);x=Math.round(x*(1+st.lear*.05+st.xpB/100));h.xp+=x;
   while(h.xp>=xpForLevel(h.lvl+1)){h.lvl++;
-    const w=h.cls?[15,15,35,35]:[35,35,15,15];let t=Math.random()*100,k=0;for(;k<3;k++){t-=w[k];if(t<=0)break}
+    const w=h.lvl>9?(h.cls?[20,20,30,30]:[30,30,20,20]):(h.cls?[10,10,40,40]:[40,40,10,10]); let t=Math.random()*100,k=0;for(;k<3;k++){t-=w[k];if(t<=0)break}
     [()=>h.a++,()=>h.d++,()=>h.sp++,()=>h.kn++][k]();
     const opts=skillOffers(h);
     const applySk=sk2=>{if(sk2&&(h.skills[sk2]||0)<3){h.skills[sk2]=(h.skills[sk2]||0)+1}};
@@ -133,7 +134,7 @@ function townUnit(t,tier){const u=FDEF[t.fi].units;return t.b['up'+tier]?u[tier-
 function incomeOf(p){
   const inc={gold:0,wood:0,ore:0,mercury:0,sulfur:0,crystal:0,gems:0};
   for(const o of objsWhere('own',o=>o.t==='town'||o.t==='mine')){if(o.dead||o.owner!==p.id)continue;
-    if(o.t==='town')inc.gold+=250+(o.b.hall2?500:0)+(o.b.hall3?1000:0);
+    if(o.t==='town')inc.gold+=townIncome(o.b);
     else if(o.t==='mine')inc[o.res]+=o.res==='gold'?1000:o.res==='wood'||o.res==='ore'?2:1}
   for(const hid of p.heroes){const h=G.heroes[hid],s=hstat(h);inc.gold+=s.gold;for(const r of SPEC_RES)inc[r]+=s.resB[r]||0}
   return inc;
@@ -305,7 +306,7 @@ function visit(h,o,cb){
   const p=G.players[h.pid],human=p.human,done=()=>{refreshFog(p);if(human)checkVictory();cb&&cb()};
   switch(o.t){
     case'res':p.res[o.res]+=o.n;notify(`${h.name} recoge ${o.n} ${RESN[o.res]}`,'good');removeObj(o);done();break;
-    case'chest':{const lvl=Math.max(1,h.lvl);const gold=1000+lvl*100,xp=500+lvl*150;removeObj(o);
+    case'chest':{const lvl=Math.max(1,h.lvl);const gold=1500,xp=1000;removeObj(o);
       const take=k=>{if(k==='gold'){p.res.gold+=gold;notify(`Cofre: ${gold} de oro`,'good')}else{gainXp(h,xp);notify(`Cofre: ${xp} de experiencia`,'good')}done()};
       if(human)G.hooks.askChest(h,{gold,xp},take);else take(h.lvl<8?'xp':'gold');break}
     case'art':{const r=giveArtifact(h,o.art);if(!r){notify('Mochila llena','bad');done();break}notify(`${h.name} encuentra: ${ART[o.art].n}`+(r==='pack'?' (a la mochila)':''),'good');removeObj(o);done();break}
@@ -384,7 +385,7 @@ function stepHero(h,cb){
 function moveTo(h,x,y){const m=G.map;if(G.hooks.heroStep)G.hooks.heroStep(h,h.x,h.y,x,y);if(G.hmap[mapIdx(h.x,h.y)]===h.id+1)G.hmap[mapIdx(h.x,h.y)]=0;h.x=x;h.y=y;G.hmap[mapIdx(x,y)]=h.id+1;const p=G.players[h.pid];if(p.fog)reveal(p,x,y,heroVis(h))}
 // ---------- turnos / días ----------
 function startDayFor(p){
-  for(const hid of p.heroes){const h=G.heroes[hid];h.mp=maxMP(h);h.sleep=false;const s=hstat(h);h.mana=Math.min(maxMana(h),h.mana+1+s.mys*2+s.manaR);
+  for(const hid of p.heroes){const h=G.heroes[hid];h.mp=maxMP(h);h.sleep=false;const s=hstat(h);h.mana=Math.min(maxMana(h),h.mana+1+[0,2,3,4][s.mys]+s.manaR);
     const t=objAtTownTile(h);if(t&&t.b.mage1)h.mana=Math.max(h.mana,maxMana(h))}
   for(const t of ownedTowns(p.id))t.builtToday=false;
 }
@@ -406,15 +407,18 @@ function checkVictory(){
   }
   if(why){G.over=true;G.vdone=true;G.vreason=why;G.hooks.gameOver(true,why)}
 }
-// ---- semanas especiales (como en Heroes 3): semana de una criatura o plaga ----
+// ---- semanas y meses especiales (como en Heroes 3) ----
+// Semana de una criatura: +5 de crecimiento en sus viviendas. Mes de una criatura (la 1ª semana de cada mes de 4 semanas): su crecimiento se DUPLICA.
+// Plaga: las viviendas pierden la mitad de sus criaturas.
 function rollWeek(week){
   if(week<=1)return{t:'normal',week};
+  const month=(week-1)%4===0;
   const r=mulberry((G.map.spec.seed|0)*131+week*7919);const x=r();
-  if(x<.1)return{t:'plague',week};
-  if(x<.72){const ids=ALL_BY_VAL.filter(id=>CR[id].tier<=6||r()<.3);return{t:'creature',cr:ids[Math.floor(r()*ids.length)],week}}
-  return{t:'normal',week};
+  if(x<.1)return{t:'plague',week,month};
+  if(x<.72){const ids=ALL_BY_VAL.filter(id=>CR[id].tier<=6||r()<.3);return{t:'creature',cr:ids[Math.floor(r()*ids.length)],week,month}}
+  return{t:'normal',week,month};
 }
-function weekLabel(w){return w.t==='creature'?`Semana de ${CR[w.cr].name}`:w.t==='plague'?'Semana de la Plaga':`Semana ${w.week}`}
+function weekLabel(w){return w.t==='creature'?`${w.month?'Mes':'Semana'} de ${CR[w.cr].name}`:w.t==='plague'?`${w.month?'Mes':'Semana'} de la Plaga`:`Semana ${w.week}`}
 // castillos del dueño de la morada que crían la misma criatura (o su mejora) con el edificio construido
 function dwellTiers(t,cr){const u=FDEF[t.fi].units,out=[];for(let k=1;k<=7;k++)if((u[k-1]===cr||u[k-1+7]===cr)&&t.b['dw'+k])out.push(k);return out}
 function dwellBonusInfo(o){let n=0;for(const t of ownedTowns(o.owner))if(dwellTiers(t,o.cr).length)n++;return n}
@@ -427,13 +431,13 @@ function newWeek(){
   for(const o of m.objs){if(o.dead)continue;
     if(o.t==='town'){const mul=1+(o.b.fort2?.5:0)+(o.b.fort3?.5:0);
       for(let t=1;t<=7;t++)if(o.b['dw'+t]){const id=FDEF[o.fi].units[t-1];let add=Math.round(CR[id].grow*mul);
-        if(cid&&(id===cid||FDEF[o.fi].units[t-1+7]===cid)){add=add*2+5;boosted++}
-        const ex=o.owner>=0?dwellExtra(o,t):0;if(ex){add+=(cid&&(FDEF[o.fi].units[t-1]===cid||FDEF[o.fi].units[t-1+7]===cid))?ex*2:ex}
+        if(cid&&(id===cid||FDEF[o.fi].units[t-1+7]===cid)){add=ev.month?add*2:add+5;boosted++}
+        const ex=o.owner>=0?dwellExtra(o,t):0;if(ex){add+=(cid&&ev.month&&(FDEF[o.fi].units[t-1]===cid||FDEF[o.fi].units[t-1+7]===cid))?ex*2:ex}
         o.avail[t-1]+=add;if(ev.t==='plague')o.avail[t-1]=Math.floor(o.avail[t-1]/2)}}
-    else if(o.t==='dwell'){let add=CR[o.cr].grow;if(cid&&o.cr===cid){add=add*2+5;boosted++}o.n+=add;if(ev.t==='plague')o.n=Math.floor(o.n/2)}
+    else if(o.t==='dwell'){let add=CR[o.cr].grow;if(cid&&o.cr===cid){add=ev.month?add*2:add+5;boosted++}o.n+=add;if(ev.t==='plague')o.n=Math.floor(o.n/2)}
     else if(o.t==='mon'){ // las manadas crecen cada semana; las de la criatura de la semana se duplican
       if(!o.n0)o.n0=o.n;let add=Math.max(1,Math.round(o.n*.05));if(o.n<o.n0*2.2)o.n+=add;
-      if(cid&&o.cr===cid){o.n=Math.round(o.n*2);o.fresh=G.day;boosted++}}}
+      if(cid&&o.cr===cid){o.n=Math.round(o.n*(ev.month?2:1.5));o.fresh=G.day;boosted++}}}
   recomputeZoc();
   if(cid){ // aparecen nuevas manadas de esa criatura por todo el mapa
     const want=Math.round(6+m.w/30),cr=CR[cid];let tries=0;const r=Math.random;
