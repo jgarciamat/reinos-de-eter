@@ -204,56 +204,56 @@ function drawTownList(t){
 }
 // Menú de construcción: lista por categorías con icono, coste, requisitos que faltan (en rojo) y botón Construir
 function bBrief(t,b){const L=buildTip(t,b,G.players[0],{ok:1},bCost(b,t.fi));return L.slice(1).filter(l=>!/^(Coste|✖)/.test(l)).join(' · ')}
+// cuadrícula de construcción al estilo Heroes 3: cada casilla es una "cadena" y la mejora ocupa el mismo hueco que su vivienda
+const BCHAINS=[['hall','Ayuntamiento',['hall1','hall2','hall3','hall4']],['fort','Defensa',['fort1','fort2','fort3']],['mage','Gremio de magos',['mage1','mage2','mage3','mage4']],['tavern','Taberna',['tavern']],['market','Mercado',['market']],['shipyard','Astillero',['shipyard']]];
+function townChains(t){const L=BCHAINS.filter(c=>c[0]!=='shipyard'||t.dock).map(c=>({k:c[0],g:'city',ch:c[2]}));for(let i=1;i<=7;i++)L.push({k:'dw'+i,g:'dw',ch:['dw'+i,'up'+i]});return L}
+function chainCur(t,c){return c.ch.find(b=>!t.b[b])||c.ch[c.ch.length-1]}
 function townHallModal(t,c0){
-  const p=G.players[0],P=UI.ph;let cat=c0||'all',only=false,top=0;
-  const ORD=['hall','fort','mage','serv','dw','up'];
+  const p=G.players[0],P=UI.ph,chains=townChains(t);let sel=null;
+  const pre=chains.find(c=>c.k===c0);if(pre)sel=pre.k;
   Dlg.show({w:1060,title:'Construcción',draw:m=>{
-    const x=110,y=34,w=1060,hh=652,RH=P?72:68,HH=28;
+    const x=110,y=34,w=1060,hh=652;
     panel(x,y,w,hh,{title:'Construcción · '+t.name});
-    // pestañas de categoría y filtro de construibles
-    const all=BUILD_ORDER.filter(b=>b!=='shipyard'||t.dock),sts={};all.forEach(b=>sts[b]=buildStatus(t,b,p));
-    const nOk=all.filter(b=>sts[b].ok).length,nReady=all.filter(b=>sts[b].ready).length;
-    BCATS.forEach((q,i)=>{const tx=x+16+i*116,on=cat===q[0],cnt=q[0]==='all'?0:all.filter(b=>bCat(b)===q[0]&&sts[b].ready).length;
-      button(tx,y+24,112,P?42:38,q[1],()=>{cat=q[0];top=0},{size:fz(13),col:on?'#8a3a1a':'#3a2e44',tip:q[0]==='all'?'Todos los edificios':'Solo: '+BCATN[q[0]]});
-      if(cnt)buildBadge(tx+104,y+27,cnt)});
-    button(x+w-196,y+24,180,P?42:38,(only?'☑ ':'☐ ')+`Construibles (${nReady})`,()=>{only=!only;top=0},{size:fz(13),col:only?'#2a6a3a':'#3a2e44',tip:'Mostrar solo lo que ya cumple los requisitos y tiene recursos'});
-    // aviso del día
-    if(t.builtToday)text('Hoy ya has construido aquí: solo se permite un edificio por día. Vuelve mañana.',x+w/2,y+74+(P?4:0)+9,{size:fz(13),bold:true,align:'center',color:'#ffb060'});
-    else text(`Un edificio por día. ${nOk} se pueden construir ahora${t.lastBuilt&&t.b[t.lastBuilt]?' · Último construido: '+bTitle(t.lastBuilt,t.fi):''}`,x+w/2,y+74+(P?4:0)+9,{size:fz(13),align:'center',color:'#c8b890'});
-    // elementos visibles (con cabeceras de grupo)
-    const items=[];let last=null;
-    all.filter(b=>(cat==='all'||bCat(b)===cat)&&(!only||sts[b].ready)).sort((a,b)=>ORD.indexOf(bCat(a))-ORD.indexOf(bCat(b))).forEach(b=>{const c0=bCat(b);if(cat==='all'&&c0!==last){items.push({hdr:c0});last=c0}items.push({b})});
-    const ly=y+(P?104:100),ley=y+hh-58,vh=ley-ly;
-    // cuántos caben desde 'top'
-    const fits=s0=>{let h=0,n=0;for(let i=s0;i<items.length;i++){const ih=items[i].hdr?HH:RH;if(h+ih>vh)break;h+=ih;n++}return n};
-    if(UI.wheel&&hovered(x,ly,w,vh))top+=UI.wheel*2;
-    // mt: mayor desplazamiento útil (hasta ver el final de la lista)
-    let mt=0;while(mt<items.length&&mt+fits(mt)<items.length)mt++;
-    top=clamp(top,0,mt);
-    const n=fits(top);let cy=ly;
-    if(!items.length)text(only?'Nada cumple ahora los requisitos. Quita el filtro para ver qué falta.':'Sin edificios en esta categoría.',x+w/2,ly+60,{size:fz(15),align:'center',color:'#c8b890',italic:true});
-    for(let i=top;i<top+n;i++){const it=items[i];
-      if(it.hdr){text(BCATN[it.hdr].toUpperCase(),x+22,cy+20,{size:fz(13),bold:true,color:'#e8c25a'});ctx.fillStyle='rgba(232,194,90,.4)';ctx.fillRect(x+22+measure(BCATN[it.hdr].toUpperCase(),fz(13),true)+10,cy+15,w-100-measure(BCATN[it.hdr].toUpperCase(),fz(13),true),1.4);cy+=HH;continue}
-      const b=it.b,st=sts[b],rw=w-70,rx=x+16,ry=cy+2,rh=RH-5;
-      const hovR=hit(rx,ry,rw,rh,st.built?()=>{Dlg.close();buildDialog(t,b)}:null,{tip:st.built?'Clic: usar este edificio':buildTip(t,b,p,{ok:st.ok},st.cost)});
-      rrect(ctx,rx,ry,rw,rh,8,lg(ctx,0,ry,0,ry+rh,[st.built?'#2e4a2a':st.ok?'#4e3c2a':'#2c2428','#18121a']),st.built?'#7ac060':st.ok?(hovR?'#fff0b0':'#e8c25a'):'#5a4a38',st.ok?2.2:1.4);
-      if(st.ok){ctx.save();ctx.globalAlpha=.12+.08*Math.sin(S.clock*4);rrect(ctx,rx,ry,rw,rh,8,'#ffe27a');ctx.restore()}
-      ctx.save();ctx.beginPath();ctx.rect(rx+4,ry+3,76,rh-6);ctx.clip();if(!st.built&&!st.ready)ctx.globalAlpha=.5;ctx.drawImage(buildingSprite(b,t.fi),rx+2,ry+rh-70,78,70);ctx.restore();
-      const nm=bTitle(b,t.fi);text(nm,rx+90,ry+22,{size:fz(16),bold:true,color:st.built?'#c8ffb0':st.ready?'#ffe9a0':'#d8c8b0'});
-      const br=bBrief(t,b);text(wrap(br,430,fz(12))[0]||'',rx+90,ry+40,{size:fz(12),color:'#b8a888'});
-      if(st.built){text('✔ Construido'+(t.lastBuilt===b?' (el último)':''),rx+90,ry+rh-8,{size:fz(13),bold:true,color:'#8ae070'})}
-      else{costChips(rx+90,ry+rh-8,st.cost,st.low,18,fz(13));
-        const rl=st.miss.filter(q=>!q.res);
-        rl.slice(0,2).forEach((q,k)=>text('✖ '+q.txt,rx+560,ry+22+k*18,{size:fz(12),bold:true,color:'#ff7a68'}));
-        const lw=st.miss.filter(q=>q.res);if(lw.length&&rl.length<2)text('✖ '+(lw.length>1?`Faltan recursos (${lw.length})`:lw[0].txt),rx+560,ry+22+rl.length*18,{size:fz(12),bold:true,color:'#ff7a68'});
-        if(!st.miss.length&&st.day)text('Disponible mañana',rx+560,ry+22,{size:fz(12),bold:true,color:'#ffb060'});
-        if(st.ok)text('¡Listo para construir!',rx+560,ry+22,{size:fz(12),bold:true,color:'#9aff9a'})}
-      if(!st.built)button(rx+rw-146,ry+(rh-(P?50:46))/2,138,P?50:46,'Construir',()=>{if(doBuild(t,b))Dlg.close()},{size:fz(15),primary:1,disabled:!st.ok,tip:st.ok?'Construir por '+costText(st.cost):st.day?'Ya has construido hoy en esta ciudad':st.miss.map(q=>q.txt)});
-      cy+=RH}
-    // indicador de desplazamiento y botones ▲▼
-    const sx=x+w-48;
-    if(mt>0){button(sx,ly,34,40,'▲',()=>{top=Math.max(0,top-1)},{size:15,disabled:top<=0});button(sx,ley-40,34,40,'▼',()=>{top=Math.min(mt,top+1)},{size:15,disabled:top>=mt});
-      const th=ley-ly-96,ty0=ly+48;rrect(ctx,sx+13,ty0,8,th,4,'rgba(0,0,0,.5)','#5a4a30',1);const kh=Math.max(24,th*n/Math.max(1,items.length));rrect(ctx,sx+12,ty0+(th-kh)*top/mt,10,kh,4,'#c8a24a')}
+    const nOk=chains.filter(c=>buildStatus(t,chainCur(t,c),p).ok).length;
+    if(!sel){const f=chains.find(c=>buildStatus(t,chainCur(t,c),p).ok);sel=(f||chains[0]).k}
+    if(t.builtToday)text('Hoy ya has construido aquí: solo se permite un edificio por día. Vuelve mañana.',x+w/2,y+58,{size:fz(14),bold:true,align:'center',color:'#ffb060'});
+    else text(`Un edificio por día · ${nOk} se pueden construir ahora`+(t.lastBuilt&&t.b[t.lastBuilt]?' · Último: '+bTitle(t.lastBuilt,t.fi):''),x+w/2,y+58,{size:fz(14),align:'center',color:'#c8b890'});
+    const gap=8,cw=Math.floor((w-32-gap*6)/7),ch=P?176:168;
+    const drawRow=(list,ry,label)=>{
+      text(label,x+18,ry-6,{size:fz(13),bold:true,color:'#e8c25a'});
+      list.forEach((c,i)=>{const cx=x+16+i*(cw+gap),b=chainCur(t,c),st=buildStatus(t,b,p),done=c.ch.filter(q=>t.b[q]).length,full=done===c.ch.length,isSel=sel===c.k;
+        const hov=hit(cx,ry,cw,ch,()=>{sel=c.k},{tip:buildTip(t,b,p,{ok:st.ok},st.cost)});
+        const edge=isSel?'#fff0b0':st.ok?'#e8c25a':full?'#7ac060':done?'#8aa868':'#5a4a38';
+        rrect(ctx,cx,ry,cw,ch,8,lg(ctx,0,ry,0,ry+ch,[full?'#2e4a2a':st.ok?'#4e3c2a':'#2c2428','#18121a']),edge,isSel?3:st.ok?2.2:1.4);
+        if(st.ok){ctx.save();ctx.globalAlpha=.12+.08*Math.sin(S.clock*4);rrect(ctx,cx,ry,cw,ch,8,'#ffe27a');ctx.restore()}
+        if(hov&&!isSel){ctx.save();ctx.globalAlpha=.1;rrect(ctx,cx,ry,cw,ch,8,'#fff');ctx.restore()}
+        ctx.save();if(!st.built&&!st.ready)ctx.globalAlpha=.5;ctx.drawImage(buildingSprite(b,t.fi),cx+(cw-104)/2,ry+4,104,94);ctx.restore();
+        const nm=bTitle(b,t.fi),ls=wrap(nm,cw-12,fz(13),true);ls.slice(0,2).forEach((l,k)=>text(l,cx+cw/2,ry+112+k*15,{size:fz(13),bold:true,align:'center',color:full?'#c8ffb0':st.ready?'#ffe9a0':'#d8c8b0'}));
+        if(c.ch.length>1){for(let d=0;d<c.ch.length;d++)ell(ctx,cx+cw/2+(d-(c.ch.length-1)/2)*11,ry+ch-26,3.6,3.6,t.b[c.ch[d]]?'#8ae070':'#4a3e34','#1a1018',1)}
+        const sy=ry+ch-9;
+        if(st.built)text('✔ Construido',cx+cw/2,sy,{size:fz(12),bold:true,align:'center',color:'#8ae070'});
+        else if(st.ok)text('¡Construir!',cx+cw/2,sy,{size:fz(12),bold:true,align:'center',color:'#9aff9a'});
+        else if(st.day&&st.ready)text('Mañana',cx+cw/2,sy,{size:fz(12),bold:true,align:'center',color:'#ffb060'});
+        else text(st.miss.some(q=>q.req)?'Requisitos':'Faltan recursos',cx+cw/2,sy,{size:fz(12),bold:true,align:'center',color:'#ff7a68'});
+        if(st.ok)buildBadge(cx+cw-10,ry+10,0)});
+    };
+    const ry1=y+90,ry2=ry1+ch+36;
+    drawRow(chains.filter(c=>c.g==='city'),ry1,'CIUDAD');
+    drawRow(chains.filter(c=>c.g==='dw'),ry2,'CRIATURAS (la mejora aparece en el mismo hueco de su vivienda)');
+    // ficha del elemento seleccionado
+    const sc=chains.find(c=>c.k===sel)||chains[0],b=chainCur(t,sc),st=buildStatus(t,b,p),dy=ry2+ch+14,dh=y+hh-dy-62;
+    rrect(ctx,x+16,dy,w-32,dh,8,'rgba(0,0,0,.35)','#7a6a48',1.4);
+    ctx.save();ctx.beginPath();ctx.rect(x+22,dy+4,86,dh-8);ctx.clip();ctx.drawImage(buildingSprite(b,t.fi),x+20,dy+dh-92,90,82);ctx.restore();
+    text(bTitle(b,t.fi),x+122,dy+24,{size:fz(17),bold:true,color:st.built?'#c8ffb0':'#ffe9a0'});
+    const br=bBrief(t,b);wrap(br,520,fz(13)).slice(0,2).forEach((l,k)=>text(l,x+122,dy+44+k*16,{size:fz(13),color:'#c8b890'}));
+    if(st.built)text('✔ Construido'+(t.lastBuilt===b?' (el último)':''),x+122,dy+dh-10,{size:fz(14),bold:true,color:'#8ae070'});
+    else{costChips(x+122,dy+dh-10,st.cost,st.low,20,fz(14));
+      st.miss.filter(q=>!q.res).slice(0,2).forEach((q,k)=>text('✖ '+q.txt,x+660,dy+24+k*18,{size:fz(13),bold:true,color:'#ff7a68'}));
+      const lw=st.miss.filter(q=>q.res);if(lw.length)text('✖ '+(lw.length>1?`Faltan recursos (${lw.length})`:lw[0].txt),x+660,dy+24+st.miss.filter(q=>!q.res).slice(0,2).length*18,{size:fz(13),bold:true,color:'#ff7a68'});
+      if(st.ready&&st.day)text('Disponible mañana',x+660,dy+24,{size:fz(13),bold:true,color:'#ffb060'})}
+    const bh=P?52:48;
+    if(st.built){if(/^(dw|tavern|market|shipyard)/.test(b))button(x+w-190,dy+(dh-bh)/2,160,bh,'Usar',()=>{Dlg.close();buildDialog(t,b)},{size:fz(15)})}
+    else button(x+w-190,dy+(dh-bh)/2,160,bh,'Construir',()=>{doBuild(t,b)},{size:fz(16),primary:1,disabled:!st.ok,tip:st.ok?'Construir por '+costText(st.cost):st.day?'Ya has construido hoy en esta ciudad':st.miss.map(q=>q.txt)});
     // pie: recursos, ingreso y cerrar
     let px=x+22;for(const r of RES){ctx.drawImage(resIcon(r,24),px,y+hh-46,24,24);text(String(p.res[r]),px+27,y+hh-28,{size:fz(13),bold:true});px+=P?88:84}
     text(`+${townIncome(t.b)} oro/día`,x+w-190,y+hh-26,{size:fz(14),bold:true,align:'right',color:'#ffe27a'});
