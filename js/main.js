@@ -27,8 +27,9 @@ function sfx(n){
 }
 // (sin música de fondo: solo efectos de sonido)
 // ---------- ganchos ----------
-G.hooks.visibleTo=(x,y)=>!!S.ai&&isVis(x,y);
-G.hooks.notify=(m,k,l)=>{if(S.ai&&!(l&&isVis(l.x,l.y))&&!/Pierdes|Tu |tu |tus /.test(m))return;toast(m,k)};
+const seenByMe=(x,y)=>{const m=G.map;return x>=0&&y>=0&&x<m.w&&y<m.h&&(isVis(x,y)||!!G.players[0].fog[y*m.w+x])}; // zona descubierta (visible o ya explorada)
+G.hooks.visibleTo=(x,y)=>!!S.ai&&seenByMe(x,y);
+G.hooks.notify=(m,k,l)=>{if(S.ai&&!(l&&seenByMe(l.x,l.y))&&!/Pierdes|Tu |tu |tus /.test(m))return;toast(m,k)};
 G.hooks.gameOver=(win,why)=>setTimeout(()=>{Dlg.show({title:win?'¡VICTORIA!':'DERROTA',w:560,text:win?(why||'Has eliminado a todos tus rivales. Los Reinos de Éter se inclinan ante ti.'):'Todos tus héroes y ciudades han caído. La sombra cubre el reino.',buttons:[{label:'Volver al menú',primary:1,fn:()=>{S.scr='menu'}},{label:win?'Seguir explorando':'Ver el mapa',fn:()=>{G.over=false}}]});sfx(win?'win':'lose')},800);
 // ---------- bucle ----------
 let last=performance.now();

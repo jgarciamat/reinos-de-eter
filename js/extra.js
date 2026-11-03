@@ -12,11 +12,11 @@ G.hooks.weekBanner=(ev,info)=>{
   Dlg.show({title:weekLabel(ev),w:560,text:txt,buttons:[{label:'Entendido',primary:1}]});
 };
 G.hooks.quickReport=(b,A,D,done)=>{
-  const res=b.result(),won=b.winner===0;
+  const me=A.human?0:1,res=b.result(),won=b.winner===me;
   const losses=(sd,si)=>{const out=[];sd.army.forEach((a,i)=>{if(!a||a.n<=0)return;const left=res[si][i]?res[si][i].n:0;if(left<a.n)out.push({id:a.id,n:a.n-left})});return out};
-  const mine=losses(A,0),foe=losses(D,1),rows=Math.max(1,Math.ceil(Math.max(mine.length,foe.length)/4));
+  const mine=me===0?losses(A,0):losses(D,1),foe=me===0?losses(D,1):losses(A,0),rows=Math.max(1,Math.ceil(Math.max(mine.length,foe.length)/4));
   let foot=`${b.round} rondas`;if(b.wall){const broken=[...b.wall.values()].filter(w=>w.hp<=0).length;foot=`Muralla de nivel ${b.siege.lvl}: ${broken} de ${b.wall.size} secciones destruidas · ${foot}`}
-  const me=A.human?0:1,xq=xpPreview(b,me);
+  const xq=xpPreview(b,me);
   const cs=(b.casts&&b.casts[0])||[];if(cs.length){const cnt={};cs.forEach(k=>cnt[k]=(cnt[k]||0)+1);foot+=' · Hechizos: '+Object.keys(cnt).map(k=>SPELLS[k].n+(cnt[k]>1?' ×'+cnt[k]:'')).join(', ')}
   Dlg.show({title:won?'¡Victoria! (combate rápido)':'Derrota (combate rápido)',w:620,text:'',extra:34+rows*68+26+(xq?26:0),buttons:[{label:'Aceptar',primary:1,fn:done}],
     body:(x,y,w)=>{
