@@ -53,7 +53,7 @@ function bCat(b){return /^hall/.test(b)?'hall':/^fort/.test(b)?'fort':/^mage/.te
 function townSpot(b,t){
   const P=UI.ph;let row=0,col=0,up=0;TOWN_LAYOUT.forEach((r,i)=>{const j=r.indexOf(b);if(j>=0){row=i;col=j}});
   // filas 0 y 1: fondo (izquierda/derecha del castillo); filas 2 y 3: cada vivienda con su mejora al lado
-  if(/^hall/.test(b)){const hw=P?160:150,hh=hw*112/124,hb=P?436:442;return{x:16,y:hb-hh,w:hw,h:hh,row:0,base:hb,cx:16+hw/2}} // Ayuntamiento: mitad del castillo
+  if(/^hall/.test(b)){const hw=P?200:190,hh=hw*112/124,hb=P?440:446;return{x:16,y:hb-hh,w:hw,h:hh,row:0,base:hb,cx:16+hw/2}} // Ayuntamiento: mitad del castillo
   const front=row>=2,w=front?(P?92:90):(P?92:90),h=w*112/124,base=front?(P?518:528):(P?436:442);
   const cx=front?640+(col-3)*172+(row===3?46:-46):(row===0?200+(col-4)*84:676)+(row===0?0:col*84)+w/2;
   return{x:cx-w/2,y:base-h,w,h,row:front?1:0,base,cx}}
