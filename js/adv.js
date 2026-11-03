@@ -437,7 +437,10 @@ function horsePath(){
 function hoverReach(){
   const hv=S.hov,h=selHero();if(!h||!h.alive)return null;
   const o=hv.o,gx=o?o.x+o.ex:hv.tx,gy=o?o.y+o.ey:hv.ty,key=h.id+':'+h.x+','+h.y+':'+gx+','+gy+':'+(h.boat?1:0);
-  if(S.hovKey!==key){S.hovKey=key;S.hovOk=(isExpl(hv.tx,hv.ty)||isVis(hv.tx,hv.ty))&&((gx===h.x&&gy===h.y)||!!planPath(h,gx,gy))}
+  if(S.hovKey!==key+':'+Math.round(h.mp)){S.hovKey=key+':'+Math.round(h.mp);S.hovFull=true;
+    const pth=(isExpl(hv.tx,hv.ty)||isVis(hv.tx,hv.ty))&&!(gx===h.x&&gy===h.y)?planPath(h,gx,gy):null;
+    S.hovOk=(isExpl(hv.tx,hv.ty)||isVis(hv.tx,hv.ty))&&((gx===h.x&&gy===h.y)||!!pth);
+    if(pth){let mp=h.mp;for(const q of pth){if(mp<q.c&&!(mp>=50)){S.hovFull=false;break}mp-=q.c}}}
   return S.hovOk;
 }
 function drawHoverCursor(c){
@@ -449,6 +452,19 @@ function drawHoverCursor(c){
     c.fillStyle='#3a2a08';c.beginPath();c.moveTo(-4,12);c.lineTo(-4,4);c.quadraticCurveTo(0,-2,4,4);c.lineTo(4,12);c.closePath();c.fill();c.restore();return}
   const ok=S.mov||S.ai?true:hoverReach();
   if(ok===null){c.strokeStyle='rgba(255,240,170,.85)';c.lineWidth=2;c.strokeRect(hv.tx*TILE+1,hv.ty*TILE+1,TILE-2,TILE-2);return}
-  if(ok){const k=TILE*.9/100,x=hv.tx*TILE+TILE*.05,y=hv.ty*TILE+TILE*.05;c.save();c.translate(x,y);c.scale(k,k);c.shadowColor='rgba(0,0,0,.5)';c.shadowBlur=4;c.fillStyle='rgba(255,226,110,.92)';c.fill(horsePath());c.shadowBlur=0;c.strokeStyle='#3a2a08';c.lineWidth=2.6;c.stroke(horsePath());c.restore();return}
+  if(ok){const eh=heroAt(hv.tx,hv.ty),fight=(hv.o&&((hv.o.t==='mon')||(hv.o.t==='town'&&hv.o.owner!==0)))||(eh&&eh.pid!==0&&isVis(hv.tx,hv.ty));
+    if(fight)drawSwords(c,hv.tx*TILE+TILE/2,hv.ty*TILE+TILE/2);
+    else{const k=TILE*.9/100,x=hv.tx*TILE+TILE*.05,y=hv.ty*TILE+TILE*.05;c.save();c.translate(x,y);c.scale(k,k);c.shadowColor='rgba(0,0,0,.5)';c.shadowBlur=4;c.fillStyle='rgba(255,226,110,.92)';c.fill(horsePath());c.shadowBlur=0;c.strokeStyle='#3a2a08';c.lineWidth=2.6;c.stroke(horsePath());c.restore()}
+    if(!S.mov&&!S.ai&&S.hovFull===false){const bx=hv.tx*TILE+TILE-9,by=hv.ty*TILE+TILE-9;c.save();c.translate(bx,by);c.fillStyle='#c83a30';c.strokeStyle='#fff';c.lineWidth=1.6;c.beginPath();c.arc(0,0,9,0,6.29);c.fill();c.stroke();c.lineWidth=2.6;c.lineCap='round';c.beginPath();c.moveTo(-4,-4);c.lineTo(4,4);c.moveTo(4,-4);c.lineTo(-4,4);c.stroke();c.restore()}
+    return}
   UI.cursor='none';const ax=UI.mx+S.cam.x,ay=UI.my+S.cam.y;c.save();c.translate(ax,ay);c.fillStyle='#ffe27a';c.strokeStyle='#3a2a08';c.lineWidth=1.8;c.beginPath();c.moveTo(0,0);c.lineTo(0,19);c.lineTo(5,14.5);c.lineTo(9,23);c.lineTo(12.5,21.5);c.lineTo(8.5,13);c.lineTo(15,13);c.closePath();c.fill();c.stroke();c.restore();
+}
+
+// espadas cruzadas: el clic inicia un combate
+function drawSwords(c,cx,cy){
+  c.save();c.translate(cx,cy);c.fillStyle='rgba(30,20,10,.65)';c.beginPath();c.arc(0,0,TILE*.46,0,6.29);c.fill();c.lineCap='round';c.lineJoin='round';
+  for(const d of[-1,1]){c.save();c.scale(d,1);c.rotate(.78);
+    c.fillStyle='#e8ecf4';c.strokeStyle='#2a2a38';c.lineWidth=1.4;c.beginPath();c.moveTo(0,-17);c.lineTo(3,-10);c.lineTo(3,6);c.lineTo(-3,6);c.lineTo(-3,-10);c.closePath();c.fill();c.stroke();
+    c.fillStyle='#ffe27a';c.beginPath();c.rect(-8,6,16,3.4);c.fill();c.stroke();c.fillStyle='#a8743c';c.beginPath();c.rect(-1.8,9.4,3.6,7);c.fill();c.stroke();c.restore()}
+  c.restore();
 }
