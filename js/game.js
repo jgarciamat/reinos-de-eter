@@ -141,6 +141,9 @@ function incomeOf(p){
 // lista filtrada y cacheada de objetos (se invalida si cambia el nº de objetos)
 function objsWhere(key,fn){const m=G.map,c=m._ow||(m._ow={}),e=c[key];if(e&&e.n===m.objs.length)return e.l;const l=m.objs.filter(fn);c[key]={n:m.objs.length,l};return l}
 function objsOfType(t){const m=G.map,c=m._ot||(m._ot={}),e=c[t];if(e&&e.n===m.objs.length)return e.l;const l=m.objs.filter(o=>o.t===t);c[t]={n:m.objs.length,l};return l}
+// cuantos más mercados tenga el jugador, mejor tasa de cambio: 80% con uno, +3% por cada mercado extra, tope 95%
+function marketCount(pid){return ownedTowns(pid).filter(t=>t.b.market).length}
+function marketEff(pid){const n=marketCount(pid);return n<1?.8:Math.min(.95,.8+.03*(n-1))}
 function ownedTowns(pid){return objsOfType('town').filter(o=>!o.dead&&o.owner===pid)}
 function ownedMines(pid){return objsOfType('mine').filter(o=>!o.dead&&o.owner===pid)}
 function canBuild(t,b,p){
@@ -449,10 +452,10 @@ function aiPickSkill(h,opts){const pref=SK_PREF[h.cls];return opts.slice().sort(
 function aiTrade(p){
   const towns=ownedTowns(p.id);if(!towns.some(t=>t.b.market))return;
   for(const r of RES){if(r==='gold')continue;const keep=r==='wood'||r==='ore'?30:15;
-    if(p.res[r]>keep+10){const sell=p.res[r]-keep;const gold=Math.floor(sell*RV[r]*.8);p.res[r]-=sell;p.res.gold+=gold}}
+    if(p.res[r]>keep+10){const sell=p.res[r]-keep;const gold=Math.floor(sell*RV[r]*marketEff(p.id));p.res[r]-=sell;p.res.gold+=gold}}
   // comprar recursos que bloquean la construcción más importante
   const t=towns[0];if(t&&p.res.gold>4000)for(const b of['dw4','dw5','dw6','dw7','mage1']){if(t.b[b]||!canBuild(t,b,p).ok&&bReq(b,t).some(x=>!t.b[x]))continue;const c=bCost(b,t.fi);
-    for(const r in c)if((p.res[r]||0)<c[r]){const need=c[r]-p.res[r],cost=Math.ceil(need*RV[r]/.8);if(p.res.gold>=cost+2000){p.res.gold-=cost;p.res[r]+=need}}break}
+    for(const r in c)if((p.res[r]||0)<c[r]){const need=c[r]-p.res[r],cost=Math.ceil(need*RV[r]/marketEff(p.id));if(p.res.gold>=cost+2000){p.res.gold-=cost;p.res[r]+=need}}break}
 }
 function aiUpgradeArmy(p,t,arr){for(let i=0;i<7;i++){const u=upgradeCostFor(t,arr,i);if(u&&canAfford(p,u.cost)&&p.res.gold>u.cost.gold+1500)doUpgrade(p,t,arr,i)}}
 function aiTowns(p){

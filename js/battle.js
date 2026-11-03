@@ -221,8 +221,10 @@ class Battle{
       else if(S.k==='area'){for(const t of foes){let v=-S.cost*2;for(const[x,y]of [[t.x,t.y],...hexNb(t.x,t.y)]){const u=this.at(x,y);if(!u)continue;const w=Math.min(dmg,this.total(u))/u.cr.hp*u.cr.val;v+=u.side!==side?w:-w}if(v>bv){bv=v;best={sp,t}}}}
       else if(S.k==='chain'){for(const t of foes){const v=Math.min(dmg,this.total(t))/t.cr.hp*t.cr.val*1.8-S.cost*2;if(v>bv){bv=v;best={sp,t}}}}
       else if(S.k==='all'){let v=-S.cost*2;for(const u of this.alive()){const w=Math.min(dmg,this.total(u))/u.cr.hp*u.cr.val;v+=u.side!==side?w:-w}if(v>bv){bv=v;best={sp,t:null}}}
-      else if(S.k==='buff'&&this.round<=2){const t=fr.sort((a,b)=>b.cr.val*b.n-a.cr.val*a.n)[0];if(t&&!t.buff[S.buff]){const v=t.cr.val*t.n*.4;if(v>bv&&v>S.cost){bv=v;best={sp,t}}}}
-      else if(S.k==='debuff'&&this.round<=2){const t=foes.sort((a,b)=>b.cr.val*b.n-a.cr.val*a.n)[0];if(t&&!t.buff[S.buff]){const v=t.cr.val*t.n*.35;if(v>bv&&v>S.cost){bv=v;best={sp,t}}}}
+      else if(S.k==='heal'){for(const t of fr){const miss=t.startN*t.cr.hp-this.total(t);if(miss<=0)continue;const v=Math.min(dmg,miss)/t.cr.hp*t.cr.val-S.cost*2;if(v>bv){bv=v;best={sp,t}}}}
+      else if(S.k==='res'){for(const t of fr){const lost=t.startN-t.n;if(lost<=0)continue;const v=Math.min(lost,Math.floor(dmg/t.cr.hp))*t.cr.val-S.cost*2;if(v>bv){bv=v;best={sp,t}}}}
+      else if(S.k==='buff'&&this.round<=3){const t=fr.sort((a,b)=>b.cr.val*b.n-a.cr.val*a.n)[0];if(t&&!t.buff[S.buff]){const v=t.cr.val*t.n*.4;if(v>bv&&v>S.cost){bv=v;best={sp,t}}}}
+      else if(S.k==='debuff'&&this.round<=3){const t=foes.sort((a,b)=>b.cr.val*b.n-a.cr.val*a.n)[0];if(t&&!t.buff[S.buff]){const v=t.cr.val*t.n*.35;if(v>bv&&v>S.cost){bv=v;best={sp,t}}}}
     }
     if(best)this.castSpell(side,best.sp,best.t,0,0);
   }

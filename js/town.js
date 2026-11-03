@@ -182,13 +182,13 @@ function guildModal(t,h){
 function marketModal(){
   const p=G.players[0];let give='gold',get='wood',q=1;
   Dlg.show({w:640,title:'Mercado',draw:m=>{const x=320,y=130,w=640,hh=460;panel(x,y,w,hh,{title:'Mercado'});
-    text('Intercambia recursos (se pierde un 20% en cada trato)',x+w/2,y+46,{size:13,align:'center',color:'#c8b890'});
+    text(`Intercambia recursos · ${marketCount(0)} mercado${marketCount(0)===1?'':'s'} → se pierde un ${Math.round((1-marketEff(0))*100)}% en cada trato`,x+w/2,y+46,{size:13,align:'center',color:'#c8b890'});text('Cada mercado extra abarata el comercio un 3% más (máximo 95% de eficiencia)',x+w/2,y+62,{size:11,align:'center',italic:true,color:'#9a8a70'});
     text('Entregas:',x+30,y+78,{size:14,bold:true,color:'#ffe9a0'});text('Recibes:',x+30,y+170,{size:14,bold:true,color:'#ffe9a0'});
     RES.forEach((r,i)=>{const bx=x+30+i*84;const s1=give===r,s2=get===r;
       rrect(ctx,bx,y+86,76,64,6,'rgba(40,30,44,.9)',s1?'#ffe27a':'#6a5a40',s1?3:1.3);ctx.drawImage(resIcon(r,36),bx+20,y+90,36,36);text(String(p.res[r]),bx+38,y+143,{size:13,bold:true,align:'center'});hit(bx,y+86,76,64,()=>{give=r;if(get===r)get=RES.find(z=>z!==r)},{tip:RESN[r]});
       rrect(ctx,bx,y+178,76,64,6,'rgba(40,30,44,.9)',s2?'#7ae0ff':'#6a5a40',s2?3:1.3);ctx.drawImage(resIcon(r,36),bx+20,y+182,36,36);text(RESN[r],bx+38,y+235,{size:12,align:'center'});hit(bx,y+178,76,64,()=>{get=r;if(give===r)give=RES.find(z=>z!==r)},{tip:RESN[r]})});
     // cálculo: q = unidades que se reciben
-    const rate=RV[give]/RV[get]*.8;const cost=Math.ceil(q/rate);const mxGet=Math.floor(p.res[give]*rate);
+    const eff=marketEff(0),rate=RV[give]/RV[get]*eff;const cost=Math.ceil(q/rate);const mxGet=Math.floor(p.res[give]*rate);
     text(`Quieres recibir:  ${q}  ${RESN[get]}`,x+w/2,y+292,{size:20,bold:true,align:'center'});text(`Costará:  ${cost}  ${RESN[give]}`,x+w/2,y+322,{size:17,align:'center',color:p.res[give]>=cost?'#ffe27a':'#e08070'});
     button(x+w/2-130,y+338,50,32,'−',()=>{q=Math.max(1,q-(q>20?10:1))},{size:18});button(x+w/2-70,y+338,50,32,'+',()=>{q=q+(q>=20?10:1)},{size:18});button(x+w/2-10,y+338,80,32,'Máx',()=>{q=Math.max(1,mxGet)},{size:13});
     button(x+w/2+80,y+338,60,32,'×10',()=>{q=q*10},{size:13});
