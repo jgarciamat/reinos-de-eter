@@ -213,8 +213,19 @@ function drawMinimap(x,y,sz){
   button(x+2,y+sz-24,90,22,'Objetivos',()=>openObjectives(),{size:11,tip:'Condición de victoria y misiones (tecla O)'});
   button(x+sz-92,y+sz-24,90,22,lvl?'▲ Superficie':'▼ Subsuelo',()=>switchLevel(),{size:11,tip:'Cambiar de nivel (la cámara pasa al otro mundo)'});
 }
+// ciudad seleccionada: aro, nombre y botones
+function drawTownSel(){
+  const t=S.selTown;if(!t||t.dead||t.owner!==0||S.scr!=='adv'||S.fx){return}
+  const x=t.x*TILE-S.cam.x,y=t.y*TILE-S.cam.y,w=t.w*TILE,hh=t.h*TILE;
+  if(x<VPW&&y<VPH){ctx.save();ctx.beginPath();ctx.rect(0,0,VPW,VPH);ctx.clip();ctx.strokeStyle=`rgba(255,226,122,${.65+.3*Math.sin(S.t*6)})`;ctx.lineWidth=3;ctx.setLineDash([10,6]);ctx.lineDashOffset=-S.t*20;ctx.strokeRect(x-6,y-6,w+12,hh+12);ctx.restore()}
+  const bx=VPW/2-250,by=VPH-62;rrect(ctx,bx,by,500,52,10,'rgba(16,10,22,.88)','#c8a24a',1.6);
+  text(t.name,bx+14,by+22,{size:15,bold:true,color:'#ffe9a0'});text(`${FDEF[t.fi].name} · guarnición ${t.gar.filter(s=>s&&s.n>0).length}/7`,bx+14,by+40,{size:12,color:'#d8c8a0'});
+  button(bx+260,by+8,110,36,'Entrar',()=>{S.selTown=null;const hh2=heroAt(t.x+t.ex,t.y+t.ey);openTown(t,hh2&&hh2.pid===0?hh2:null)},{primary:1,size:15});
+  const h=selHero();button(bx+378,by+8,114,36,'Mover héroe',()=>{if(!h)return;const path=planPath(h,t.x+t.ex,t.y+t.ey);if(!path){toast('No hay camino hasta allí','bad');return}S.selTown=null;h.path=path;S.path=path;S.target={x:t.x+t.ex,y:t.y+t.ey};startMove(h)},{size:13,disabled:!h||(h.x===t.x+t.ex&&h.y===t.y+t.ey),tip:'Enviar el héroe seleccionado a esta ciudad'});
+}
 // ---------- panel lateral ----------
 function drawSidePanel(dt){
+  drawTownSel();
   const c=ctx,px=VPW,pw=VW-VPW;const p=G.players[0];
   c.fillStyle=lg(c,px,0,px+pw,0,['#241a1a','#1a1220']);c.fillRect(px,0,pw,VH);c.strokeStyle='#c8a24a';c.lineWidth=3;c.beginPath();c.moveTo(px,0);c.lineTo(px,VH);c.stroke();
   drawMinimap(px+16,16,240);
@@ -234,7 +245,7 @@ function drawSidePanel(dt){
   text('CIUDADES',px+14,490,{size:12,bold:true,color:'#c8a24a'});
   const ts=ownedTowns(0);
   for(let i=0;i<8;i++){const x=px+14+(i%4)*64,y=498+Math.floor(i/4)*34;const t=ts[i];
-    if(t){const hov=hit(x,y,58,30,()=>{if(S.lastTown===t&&S.t-S.lastClick<.45)openTown(t,heroAt(t.x+t.ex,t.y+t.ey));else camTo(t.x+2,t.y+1);S.lastTown=t;S.lastClick=S.t},{tip:[t.name,FDEF[t.fi].name,'Doble clic: entrar']});
+    if(t){const hov=hit(x,y,58,30,()=>{if(S.selTown===t){S.selTown=null;const hh=heroAt(t.x+t.ex,t.y+t.ey);openTown(t,hh&&hh.pid===0?hh:null)}else{S.selTown=t;camTo(t.x+2,t.y+1)}},{tip:[t.name,FDEF[t.fi].name,'Clic: seleccionar · otro clic: entrar']});
       rrect(c,x,y,58,30,4,lg(c,0,y,0,y+30,[hov?'#5a4a30':'#3a2e22','#1a1410']),FDEF[t.fi].col[0],1.4);
       c.drawImage(townSprite(t.fi).c,x+2,y+2,54,26*1.2,);}
     else rrect(c,x,y,58,30,4,'rgba(0,0,0,.35)','#3a2e22',1)}
@@ -321,9 +332,11 @@ function advClick(c){
   // héroe propio bajo el ratón: seleccionar
   const eh=vis?heroAt(tx,ty):null;
   if(eh&&eh.pid===0){if(S.sel===eh.id&&S.lastClick&&S.t-S.lastClick<.5){const t=objAtTownTile(eh);if(t)openTown(t,eh);else openHeroScreen(eh)}else selectHero(eh,false);S.lastClick=S.t;return}
-  // ciudad propia sin héroe: entrar
-  if(o&&o.t==='town'&&o.owner===0){const hh=heroAt(o.x+o.ex,o.y+o.ey);if(!hh||hh.pid===0){if(!h||S.target&&S.target.x===o.x+o.ex&&S.target.y===o.y+o.ey){}
-      if(!h||(h.x===o.x+o.ex&&h.y===o.y+o.ey)||!planPathCheck(h,o.x+o.ex,o.y+o.ey)){openTown(o,hh);return}}}
+  // ciudad propia: un clic la selecciona, otro clic entra (con o sin héroe)
+  if(!(o&&o.t==='town'&&o.owner===0))S.selTown=null;
+  if(o&&o.t==='town'&&o.owner===0){const hh=heroAt(o.x+o.ex,o.y+o.ey);
+    if(S.selTown===o){S.selTown=null;openTown(o,hh&&hh.pid===0?hh:null);return}
+    S.selTown=o;S.path=null;S.target=null;if(hh&&hh.pid===0)selectHero(hh,false);if(G.hooks.sfx)G.hooks.sfx('click');return}
   if(!h)return;
   if(!expl){toast('Territorio inexplorado','bad');return}
   let gx=tx,gy=ty;if(o){gx=o.x+o.ex;gy=o.y+o.ey}

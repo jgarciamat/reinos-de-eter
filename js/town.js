@@ -24,6 +24,7 @@ function armyPanel(x,y,arr,label,o={}){
 }
 function townHalls(t){return t.b.hall3?3:t.b.hall2?2:1}
 function drawTown(dt){
+  if(!S.town){ctx.fillStyle='#120c14';ctx.fillRect(0,0,VW,VH);return}
   const c=ctx,{t,h}=S.town,p=G.players[0],F=FDEF[t.fi];const tf=S.townFx;if(tf)tf.t+=dt;
   c.fillStyle='#120c14';c.fillRect(0,0,VW,VH);
   // panorama
