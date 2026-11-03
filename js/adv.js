@@ -293,10 +293,23 @@ function drawTopBar(){
   let x=22;for(const r of RES){const v=p.res[r];hit(x-4,10,100,30,null,{tip:[RESN[r],`Tienes ${v}`,`Ingreso diario: +${inc[r]}`]});
     ctx.drawImage(resIcon(r,28),x,12,28,28);text(String(v),x+31,33,{size:17,bold:true,color:r==='gold'?'#ffe27a':'#fff'});x+=r==='gold'?124:104}
 }
+// ¿lo ha visitado ya el héroe seleccionado / el jugador? null si no es un lugar visitable
+function visitState(o){
+  if(o.dead||!['shrine','hut','stone','well','stable','site','mine','dwell','town'].includes(o.t))return null;
+  if(o.t==='site'&&o.k==='shop')return null;
+  if(o.t==='mine'||o.t==='dwell'||o.t==='town')return o.owner===0;
+  const h=selHero(),pl=G.players[0],wk=Math.floor((G.day-1)/7);
+  if(o.t==='well')return !!h&&h.visited.well===G.day;
+  if(o.t==='stable')return !!h&&h.visited[o.id]===G.day-G.day%7;
+  if(o.t==='site'){const d=typeof SITEDEF!=='undefined'&&SITEDEF[o.k];if(!d)return !!h&&!!h.visited[o.id];
+    if(d.once==='hero')return !!h&&!!h.visited[o.id];if(d.once==='day')return !!h&&h.visited['d'+o.id]===G.day;
+    if(d.once==='week')return !!o.used&&o.used[0]===wk;if(d.once==='player')return !!o.used&&!!o.used[0];if(o.k==='lighthouse')return o.owner===0;return null}
+  return !!h&&!!h.visited[o.id];
+}
 function drawStatus(){
   const c=ctx;let s='';const hv=S.hov;if(hv&&hv.tx!=null&&UI.mx<VPW&&UI.my>=0){const x=hv.tx,y=hv.ty;
     if(!isExpl(x,y)&&!isVis(x,y))s='Territorio inexplorado';else{const h=isVis(x,y)?heroAt(x,y):null;const o=hv.o;
-      if(h)s=`${h.name} (${G.players[h.pid].name}) · Nivel ${h.lvl}`;else if(o){s=objName(o);if(o.t==='mon'&&isVis(x,y))s+='  [clic para atacar]';else if((o.t==='mine')&&o.owner>=0)s+=`  (${G.players[o.owner].name})`;else if(o.t==='town')s+=` · ${FDEF[o.fi].name}${o.owner>=0?' ('+G.players[o.owner].name+')':' (neutral)'}`}
+      if(h)s=`${h.name} (${G.players[h.pid].name}) · Nivel ${h.lvl}`;else if(o){s=objName(o);const vs=visitState(o);if(vs!=null)s+=vs?'  (Visitado)':'  (No visitado)';if(o.t==='mon'&&isVis(x,y))s+='  [clic para atacar]';else if((o.t==='mine')&&o.owner>=0)s+=`  (${G.players[o.owner].name})`;else if(o.t==='town')s+=` · ${FDEF[o.fi].name}${o.owner>=0?' ('+G.players[o.owner].name+')':' (neutral)'}`}
       else s=TERR[G.map.terr[y*G.map.w+x]].n}}
   if(!s)return;const w=measure(s,15,true)+28;rrect(c,VPW/2-w/2,VPH-34,w,26,7,'rgba(16,12,24,.9)','#c8a24a',1.4);text(s,VPW/2,VPH-15,{size:15,bold:true,align:'center'});
 }
@@ -370,7 +383,7 @@ function advClick(c){
     let best=null;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const nx=eh.x+dx,ny=eh.y+dy;if(nx<0||ny<0||nx>=m.w||ny>=m.h||G.hmap[ny*m.w+nx])continue;const pth=planPath(h,nx,ny);if(pth&&(!best||pth.length<best.p.length))best={p:pth,x:nx,y:ny}}
     if(!best){toast('No hay camino hasta ese héroe','bad');S.path=null;S.target=null;return}
     S.path=best.p;S.target={x:best.x,y:best.y};S.exTarget=eh.id;h.path=null;return}
-  if(eh&&eh.pid===0){if(S.sel===eh.id&&S.lastClick&&S.t-S.lastClick<.5){const t=objAtTownTile(eh);if(t)openTown(t,eh);else openHeroScreen(eh)}else selectHero(eh,false);S.lastClick=S.t;return}
+  if(eh&&eh.pid===0){if(S.sel===eh.id){const t=objAtTownTile(eh);if(t)openTown(t,eh);else openHeroScreen(eh)}else selectHero(eh,false);S.lastClick=S.t;return}
   // ciudad propia: un clic la selecciona, otro clic entra (con o sin héroe)
   if(!(o&&o.t==='town'&&o.owner===0))S.selTown=null;
   if(o&&o.t==='town'&&o.owner===0){const hh=heroAt(o.x+o.ex,o.y+o.ey);
@@ -465,6 +478,9 @@ function drawHoverCursor(c){
   const hv=S.hov,sh=selHero(),oh=!S.mov&&!S.ai&&sh&&isVis(hv.tx,hv.ty)?heroAt(hv.tx,hv.ty):null;
   if(oh&&oh.pid===0&&oh!==sh){const cx=hv.tx*TILE+TILE/2,cy=hv.ty*TILE+TILE/2;c.save();c.translate(cx,cy);c.fillStyle='rgba(30,20,10,.65)';c.beginPath();c.arc(0,0,TILE*.46,0,6.29);c.fill();c.strokeStyle='#ffe27a';c.lineWidth=2.4;c.lineCap='round';c.lineJoin='round';
     const arrow=(y,d)=>{c.beginPath();c.moveTo(-14*d,y);c.lineTo(14*d,y);c.moveTo(14*d-7*d,y-6);c.lineTo(14*d,y);c.lineTo(14*d-7*d,y+6);c.stroke()};arrow(-7,1);arrow(7,-1);c.restore();return}
+  if(sh&&!S.mov&&!S.ai&&sh.x===hv.tx&&sh.y===hv.ty){const cx=hv.tx*TILE+TILE/2,cy=hv.ty*TILE+TILE/2;c.save();c.translate(cx,cy);c.fillStyle='rgba(30,20,10,.65)';c.beginPath();c.arc(0,0,TILE*.46,0,6.29);c.fill();c.lineJoin='round';c.lineWidth=1.6;c.strokeStyle='#2a2a38';
+    c.fillStyle='#d8dde8';c.beginPath();c.moveTo(-11,13);c.lineTo(-11,-3);c.quadraticCurveTo(-11,-15,0,-15);c.quadraticCurveTo(11,-15,11,-3);c.lineTo(11,13);c.lineTo(5,13);c.lineTo(5,3);c.lineTo(-5,3);c.lineTo(-5,13);c.closePath();c.fill();c.stroke();
+    c.fillStyle='#1c1c28';c.fillRect(-7,-6,14,4);c.fillRect(-1,-6,2,10);c.fillStyle='#e04a3a';c.beginPath();c.moveTo(0,-15);c.quadraticCurveTo(7,-23,13,-17);c.quadraticCurveTo(6,-17,2,-14);c.closePath();c.fill();c.stroke();c.restore();return}
   if(!sh&&!S.mov&&!S.ai&&hv.o&&hv.o.t==='town'&&hv.o.owner===0){const cx=hv.tx*TILE+TILE/2,cy=hv.ty*TILE+TILE/2;c.save();c.translate(cx,cy);c.fillStyle='rgba(30,20,10,.65)';c.beginPath();c.arc(0,0,TILE*.46,0,6.29);c.fill();
     c.fillStyle='#ffe27a';c.strokeStyle='#3a2a08';c.lineWidth=1.6;c.beginPath();c.moveTo(-14,12);c.lineTo(-14,-6);c.lineTo(-14,-10);c.lineTo(-10,-10);c.lineTo(-10,-6);c.lineTo(-5,-6);c.lineTo(-5,-13);c.lineTo(-1,-13);c.lineTo(-1,-9);c.lineTo(1,-9);c.lineTo(1,-13);c.lineTo(5,-13);c.lineTo(5,-6);c.lineTo(10,-6);c.lineTo(10,-10);c.lineTo(14,-10);c.lineTo(14,12);c.closePath();c.fill();c.stroke();
     c.fillStyle='#3a2a08';c.beginPath();c.moveTo(-4,12);c.lineTo(-4,4);c.quadraticCurveTo(0,-2,4,4);c.lineTo(4,12);c.closePath();c.fill();c.restore();return}

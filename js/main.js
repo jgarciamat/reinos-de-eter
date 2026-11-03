@@ -30,7 +30,8 @@ const SCALES={adv:[0,2,4,7,9,12,14,16],battle:[0,3,5,7,10,12,15,17],town:[0,2,4,
 setInterval(()=>{if(!AC||S.sound===false||AC.state!=='running')return;const sc=SCALES[S.scr==='battle'?'battle':S.scr==='town'?'town':'adv'];mus++;const root=S.scr==='battle'?110:S.scr==='town'?174:146;
   if(S.scr==='battle'||mus%2===0)tone(root*Math.pow(2,sc[Math.floor(Math.random()*sc.length)]/12),1.2,'triangle',S.scr==='battle'?.02:.014);if(mus%8===0)tone(root/2,2.4,'sine',.02)},S.scr==='battle'?300:520);
 // ---------- ganchos ----------
-G.hooks.notify=(m,k)=>{if(S.ai&&!/conquista|elimin|captura|derrotado/.test(m))return;if(S.ai&&/captura/.test(m)&&!/Tu|tu/.test(m)){}toast(m,k)};
+G.hooks.visibleTo=(x,y)=>!!S.ai&&isVis(x,y);
+G.hooks.notify=(m,k,l)=>{if(S.ai&&!(l&&isVis(l.x,l.y))&&!/Pierdes|Tu |tu |tus /.test(m))return;toast(m,k)};
 G.hooks.gameOver=(win,why)=>setTimeout(()=>{Dlg.show({title:win?'¡VICTORIA!':'DERROTA',w:560,text:win?(why||'Has eliminado a todos tus rivales. Los Reinos de Éter se inclinan ante ti.'):'Todos tus héroes y ciudades han caído. La sombra cubre el reino.',buttons:[{label:'Volver al menú',primary:1,fn:()=>{S.scr='menu'}},{label:win?'Seguir explorando':'Ver el mapa',fn:()=>{G.over=false}}]});sfx(win?'win':'lose')},800);
 // ---------- bucle ----------
 let last=performance.now();

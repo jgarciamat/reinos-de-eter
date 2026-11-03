@@ -10,7 +10,7 @@ const RV={gold:1,wood:250,ore:250,mercury:500,sulfur:500,crystal:500,gems:500};
 const SIZE_LAB=[[4,'Unos pocos'],[9,'Varios'],[19,'Un grupo'],[49,'Muchos'],[99,'Una horda'],[249,'Una multitud'],[499,'Una legión'],[1e9,'Innumerables']];
 const sizeLabel=n=>{for(const[m,l]of SIZE_LAB)if(n<=m)return l};
 const sizeRange=n=>{const R=[[1,4],[5,9],[10,19],[20,49],[50,99],[100,249],[250,499],[500,999]];for(const[a,b]of R)if(n<=b)return`${a}-${b}`;return'500+'};
-const notify=(m,k)=>G.hooks.notify(m,k);
+const notify=(m,k,l)=>G.hooks.notify(m,k,l);
 const isHuman=pid=>pid>=0&&G.players[pid]&&G.players[pid].human;
 const mapIdx=(x,y)=>y*G.map.w+x;
 const padArmy=a=>{const r=[];for(let i=0;i<7;i++)r.push(a&&a[i]&&a[i].n>0?{id:a[i].id,n:a[i].n}:null);return r};
@@ -245,7 +245,7 @@ function fightMonster(h,mo,cb){
 }
 function retreatHero(h){const p=G.players[h.pid];removeHero(h);h.army=padArmy([]);p.pool.unshift({hero:h});notify(`${h.name} se retira del combate`,'bad');checkDefeat(h.pid)}
 function surrenderCost(army){let g=0;for(const s of army)if(s&&s.n>0)g+=Math.floor(CR[s.id].cost.gold*s.n/2);return g}
-function heroDefeated(h){const pid=h.pid;if(G.usedH)delete G.usedH[heroKey(h.fi,h.port)];notify(`${h.name} ha sido derrotado`,'bad');removeHero(h);checkDefeat(pid)}
+function heroDefeated(h){const pid=h.pid;if(G.usedH)delete G.usedH[heroKey(h.fi,h.port)];notify(`${h.name} ha sido derrotado`,'bad',{x:h.x,y:h.y});removeHero(h);checkDefeat(pid)}
 function fightHero(h,e,cb){
   const t=objAtTownTile(e);
   let defArmy=e.army,defSrc=null;
@@ -269,7 +269,7 @@ function fightTown(h,t,cb){
     applyArmy(A,res[0],h.army);
     defSrc.forEach((o,k)=>{const r=res[1][k];const arr=o.src==='h'?gh.army:t.gar;arr[o.i]=r?{id:r.id,n:r.n}:null});
     if(w===0){gainXp(h,xp[0]+500);postBattle(h,b,0);const old=t.owner;const eh=gh&&gh.pid===old?gh:null;if(eh){removeHero(eh)}
-      t.owner=h.pid;t.builtToday=true;t.gar=padArmy([]);notify(`${G.players[h.pid].name} conquista ${t.name}`,'good');checkDefeat(old);checkVictory();cb(true)}
+      t.owner=h.pid;t.builtToday=true;t.gar=padArmy([]);notify(old===0&&h.pid!==0?`Pierdes ${t.name}: ${G.players[h.pid].name} lo conquista`:`${G.players[h.pid].name} conquista ${t.name}`,old===0&&h.pid!==0?'bad':'good',{x:t.x,y:t.y});checkDefeat(old);checkVictory();cb(true)}
     else{if(gh&&gh.pid===t.owner)gainXp(gh,xp[1]);if(b.fled===0)retreatHero(h);else heroDefeated(h);cb(false)}
   });
 }
@@ -292,9 +292,9 @@ function visit(h,o,cb){
     case'boat':{h.boat=true;h.mp=0;h.path=null;removeObj(o);notify(`${h.name} sube al barco: los pasos se agotan hasta mañana`,'good');if(G.hooks.sfx)G.hooks.sfx('boat');done();break}
     case'gate':case'mono':{if(o.dir==='out'){notify('Esta salida es solo de salida','bad');done();break}const dest=o.pair!=null?G.map.objs[o.pair]:null;
       if(!dest||dest.dead||!teleportHero(h,dest)){notify('El portal está bloqueado','bad');done();break}notify(o.t==='gate'?'Cruzas la puerta entre mundos':'El monolito te transporta','good');done();break}
-    case'mine':{if(o.owner!==h.pid){o.owner=h.pid;const rate=o.res==='gold'?1000:(o.res==='wood'||o.res==='ore')?2:1,rn=RESN[o.res].toLowerCase();notify(h.pid===0?`Conquistada mina de ${rn}: +${rate} de ${rn} al día`:`${p.name} captura una mina de ${rn}`,'good')}done();break}
+    case'mine':{if(o.owner!==h.pid){o.owner=h.pid;const rate=o.res==='gold'?1000:(o.res==='wood'||o.res==='ore')?2:1,rn=RESN[o.res].toLowerCase();notify(h.pid===0?`Conquistada mina de ${rn}: +${rate} de ${rn} al día`:`${p.name} captura una mina de ${rn}`,'good',{x:o.x,y:o.y})}done();break}
     case'dwell':{if(o.owner!==h.pid){o.owner=h.pid;const bn=dwellBonusInfo(o);
-        notify(human?`Conquistada morada de ${CR[o.cr].name}: +${CR[o.cr].grow} por semana`+(bn?` · suma +${CR[o.cr].grow} semanales en ${bn} castillo${bn>1?'s':''} con ese edificio`:''):`${p.name} conquista una morada de ${CR[o.cr].name}`,'good')}
+        notify(human?`Conquistada morada de ${CR[o.cr].name}: +${CR[o.cr].grow} por semana`+(bn?` · suma +${CR[o.cr].grow} semanales en ${bn} castillo${bn>1?'s':''} con ese edificio`:''):`${p.name} conquista una morada de ${CR[o.cr].name}`,'good',{x:o.x,y:o.y})}
       if(human)G.hooks.dwell(o,h,done);else{aiBuyDwell(p,h,o);done()}break}
     case'town':{
       if(o.owner===h.pid){learnTownSpells(o,h);const mg=o.b.mage1;if(mg)h.mana=Math.max(h.mana,maxMana(h));
@@ -445,7 +445,7 @@ function heroLoop(p,h,guard,cb){
 }
 function runPath(h,done){
   const next=()=>{let sync=true,got=null;
-    const handle=s=>{if(s==='moved')return next();done(s)};
+    const handle=s=>{if(s==='moved'){if(!G.sync&&!G.headless&&h.alive&&G.hooks.visibleTo&&G.hooks.visibleTo(h.x,h.y))return setTimeout(next,150);return next()}done(s)};
     stepHero(h,s=>{if(sync)got=s;else handle(s)});sync=false;if(got!==null)handle(got)};
   next();
 }
