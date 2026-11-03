@@ -7,7 +7,10 @@ const TILE=48,SC=IS_TOUCH?1.5:2;
 const FONT='"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif';
 function mkc(w,h,s=SC){const c=document.createElement('canvas');c.width=Math.ceil(w*s);c.height=Math.ceil(h*s);const x=c.getContext('2d');x.scale(s,s);c.lw=w;c.lh=h;c.ctx=x;return c}
 const _shc={};
-function shade(hex,k){const key=hex+k;if(_shc[key])return _shc[key];let h=hex.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16),t=k<0?0:255,p=Math.abs(k),f=q=>Math.round(q+(t-q)*p);return _shc[key]=`rgb(${f(n>>16&255)},${f(n>>8&255)},${f(n&255)})`}
+function shade(col,k){const key=col+k;if(_shc[key])return _shc[key];let r,g,b;
+  if(col.charCodeAt(0)===35){let h=col.slice(1);if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];const n=parseInt(h,16);r=n>>16&255;g=n>>8&255;b=n&255}
+  else{const m=col.match(/[\d.]+/g);r=+m[0];g=+m[1];b=+m[2]}
+  const t=k<0?0:255,p=Math.abs(k),f=q=>Math.round(q+(t-q)*p);return _shc[key]=`rgb(${f(r)},${f(g)},${f(b)})`}
 function lg(c,x0,y0,x1,y1,stops){const g=c.createLinearGradient(x0,y0,x1,y1);stops.forEach((s,i)=>g.addColorStop(i/(stops.length-1),s));return g}
 function rg(c,x,y,r0,r1,stops){const g=c.createRadialGradient(x,y,r0,x,y,r1);stops.forEach((s,i)=>g.addColorStop(i/(stops.length-1),s));return g}
 const vg=(c,y0,y1,col,k=.28)=>lg(c,0,y0,0,y1,[shade(col,k),col,shade(col,-k*1.1)]);
@@ -22,7 +25,7 @@ const hash2=(x,y,s=0)=>{let h=(x*374761393+y*668265263+s*982451653)|0;h=Math.imu
 const TBASE={[GRASS]:'#5a9e3a',[DIRT]:'#8f6e46',[SAND]:'#dcc07c',[SNOW]:'#e6eef6',[SWAMP]:'#4a6a3c',[ROUGH]:'#807868',[ASH]:'#4a3b39',[WATER]:'#2b6cb5',[LAVA]:'#d2480c',[SUBT]:'#3c3446'};
 const TPRIO={[WATER]:0,[SAND]:1,[SWAMP]:2,[GRASS]:3,[DIRT]:4,[ASH]:5,[ROUGH]:6,[SNOW]:7,[SUBT]:4.5,[LAVA]:0};
 const Gfx={tiles:{},edges:{},shoreL:[],shoreW:[],road:[],cache:{},ready:false};
-function drawTerrainTile(t,v,frame=0){
+function drawTerrainTileOld(t,v,frame=0){
   if(t===LAVA||t===SUBT)return drawNewTile(t,v,frame);
   const c=mkc(TILE,TILE),x=c.ctx,r=mulberry(t*977+v*131+17);const base=shade(TBASE[t],(r()-.5)*.03);
   x.fillStyle=base;x.fillRect(0,0,TILE,TILE);

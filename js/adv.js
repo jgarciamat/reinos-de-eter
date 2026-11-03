@@ -151,7 +151,7 @@ function advDraw(dt){
   }
   c.save();c.beginPath();c.rect(0,0,VPW,VPH);c.clip();
   if(!S.fx&&!S.noFog)drawFog(c,cx,cy,x0,y0,x1,y1);
-  c.fillStyle=rg(c,VPW/2,VPH/2,VPH*.45,VPW*.75,['rgba(0,0,0,0)','rgba(8,4,16,.42)']);c.fillRect(0,0,VPW,VPH);c.restore();
+  try{postFX(c,0,0,VPW,VPH,{mood:S.lvl?'cave':'day',bloom:.16})}catch(e){c.fillStyle=rg(c,VPW/2,VPH/2,VPH*.45,VPW*.75,['rgba(0,0,0,0)','rgba(8,4,16,.42)']);c.fillRect(0,0,VPW,VPH)}c.restore();
 }
 const NZ=noise2(4242);
 let _fogC=null,_fogB=null;

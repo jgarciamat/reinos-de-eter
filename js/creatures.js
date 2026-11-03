@@ -239,6 +239,7 @@ function drawCreatureRaw(cr){
   }
   // iluminación: luz arriba-izquierda y sombra abajo
   x.save();x.globalCompositeOperation='source-atop';x.fillStyle=lg(x,0,0,70,96,['rgba(255,252,230,.26)','rgba(255,255,255,0)','rgba(14,4,40,.3)']);x.fillRect(0,0,96,96);x.fillStyle=rg(x,30,24,2,48,['rgba(255,255,255,.14)','rgba(255,255,255,0)']);x.fillRect(0,0,96,96);x.restore();
+  try{polishSprite(c,{rim:'#fff3c8',bounce:(P&&P[2])||'#6aa0ff',grain:.2,mat:matOf(cr)})}catch(e){console.warn('polish',e)}
   if(cr.up){// destello dorado de criatura mejorada
     x.save();x.globalCompositeOperation='lighter';x.fillStyle=rg(x,48,48,6,52,['rgba(255,230,140,.16)','rgba(255,230,140,0)']);x.fillRect(0,0,96,96);x.restore();
     x.fillStyle='#ffe27a';poly(x,[[82,6],[84,12],[90,14],[84,16],[82,22],[80,16],[74,14],[80,12]],'#ffe27a',OUT,.8)}
