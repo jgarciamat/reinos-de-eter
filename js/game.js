@@ -591,7 +591,7 @@ function aiHeroAct(p,h,cb){
 }
 // ---------- guardado ----------
 function saveState(){
-  const m=G.map;return JSON.stringify({idx:m.spec.i,opt:G.opt,day:G.day,cur:G.cur,
+  const m=G.map;return JSON.stringify({idx:m.spec.i,mv:m.spec.mv||1,opt:G.opt,day:G.day,cur:G.cur,
     players:G.players.map(p=>({...p,fog:null})),fog:G.players[0].fog?packFog(G.players[0].fog):null,
     heroes:G.heroes,gid:G.gid,qdone:G.qdone,vdone:G.vdone,usedH:G.usedH,week:G.week,objs:diffObjs(m)});
 }
@@ -601,7 +601,7 @@ function diffObjs(m){const out=[];m.objs.forEach((o,i)=>{if(i<(m.snap?m.snap.len
 function packFog(f){let s='';const out=[];for(let i=0;i<f.length;i+=8){let b=0;for(let k=0;k<8;k++)if(f[i+k])b|=1<<k;out.push(b)}for(let i=0;i<out.length;i+=4096)s+=String.fromCharCode.apply(null,out.slice(i,i+4096));return btoa(s)}
 function unpackFog(s,n){const raw=atob(s),f=new Uint8Array(n);for(let i=0;i<raw.length;i++){const b=raw.charCodeAt(i);for(let k=0;k<8;k++)if(b&(1<<k))f[i*8+k]=1}return f}
 function loadState(str){
-  const d=JSON.parse(str);const spec=mapSpec(d.idx);const map=genMap(spec,{fac0:d.opt.fac});G.map=map;snapMap(map);G.opt=d.opt;G.day=d.day;G.cur=d.cur;G.over=false;G.busy=false;
+  const d=JSON.parse(str);const spec=mapSpec(d.idx,d.mv||1);const map=genMap(spec,{fac0:d.opt.fac});G.map=map;snapMap(map);G.opt=d.opt;G.day=d.day;G.cur=d.cur;G.over=false;G.busy=false;
   // sustituir objetos dinámicos
   for(const o of d.objs){if(o.id>=map.objs.length){if(o.dead)map.objs.push({t:'void',dead:1,id:o.id,x:0,y:0,w:1,h:1,ex:0,ey:0});else addMapObj(o);continue}
     if(o.dead){const real=map.objs[o.id];if(real&&!real.dead)removeObj(real)}else Object.assign(map.objs[o.id],o)}

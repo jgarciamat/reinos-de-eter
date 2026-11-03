@@ -38,10 +38,11 @@ function victoryText(v){
     case'quests':return`Completa ${v.n} misiones de los videntes.`;
     case'survive':return`Aguanta hasta el día ${v.n} con alguna ciudad o héroe.`;
     default:return'Derrota a todos tus rivales.'}}
-const MAP_SCALE=3.15; // ~10 veces más superficie que antes
-function mapSpec(i){
+// v1 = mapas antiguos (partidas guardadas), v2 = mitad de superficie y menos criaturas/recursos sueltos
+const MAP_SCALES={1:3.15,2:2.23},MGV_CUR=2;
+function mapSpec(i,mv){mv=mv||MGV_CUR;
   const r=mulberry(9001+i*7919);
-  const size=Math.round([144,144,150,156,162,168,174,180][Math.floor(r()*8)]*MAP_SCALE/2)*2;
+  const size=Math.round([144,144,150,156,162,168,174,180][Math.floor(r()*8)]*MAP_SCALES[mv]/2)*2;
   const biome=SPEC_BIOME[i],name=SPEC_NAME[i],B=BIOMES[biome];
   const wl=B.wl+(r()-.5)*.06;
   const sea=!!B.sea||(!B.liquid&&r()<.3);
@@ -52,7 +53,7 @@ function mapSpec(i){
   if(vt.t==='quests')victory.n=3+level*2;
   if(vt.t==='survive')victory.n=[90,110,140,170,200][level-1];
   const forest=.55+r()*.7,monsters=(.7+r()*.7)*LV.mon,rich=(.8+r()*.5)*LV.rich;
-  return{i,seed:1000003*(i+1)+17,name,size,players:8,biome,wl,forest,monsters,rich,sea,diff:1,level,lvn:LV.n,mineK:LV.mines,startK:LV.start,aiK:LV.ai,startTowns,victory,
+  return{i,mv,seed:1000003*(i+1)+17,name,size,players:8,biome,wl,forest,monsters,rich,sea,diff:1,level,lvn:LV.n,mineK:LV.mines,startK:LV.start,aiK:LV.ai,startTowns,victory,
     desc:`${B.n} · ${size}×${size} · 2 niveles · ${startTowns} castillo${startTowns>1?'s':''} inicial${startTowns>1?'es':''}${sea?' · mar':''}${B.liquid===LAVA?' · lava':''}`};
 }
 // ---------- ruido ----------
@@ -321,25 +322,25 @@ function genLevel(spec,opt={}){
     const one=k===nPair;const col=k%8,key=`${under?1:0}.${k}`;
     addObj({t:'mono',col,dir:one?'in':'two',key,x:p1[0],y:p1[1]});addObj({t:'mono',col,dir:one?'out':'two',key,x:p2[0],y:p2[1]});monoList.push({x:p1[0],y:p1[1]},{x:p2[0],y:p2[1]})}
   // ciudades neutrales
-  const nNeutral=Math.round((W*H)/(150*150)*(under?6:11)); // muchos castillos abandonados por conquistar
+  const V1=spec.mv===1;const nNeutral=Math.round((W*H)/(150*150)*(V1?(under?6:11):(under?5:9))); // muchos castillos abandonados por conquistar
   for(let k=0;k<nNeutral;k++){const p=randPos(4,3,{l:m.objs.filter(o=>o.t==='town'),d:24});if(!p)continue;
     const fi=fiFor(p[0]+2,p[1]+1,Math.floor(r()*8));const o=placeTown(p[0],p[1],fi,-1);const dg=danger(p[0],p[1]);
     o.gar=garrison(o.fi,40+dg*dg*2200*spec.monsters*MM,r)}
   const guardOf=(o,pw)=>{const ex=o.x+o.ex,ey=o.y+o.ey;const cands=[[0,1],[1,1],[-1,1],[1,0],[-1,0],[0,2]];
     for(const[dx,dy]of cands){const x=ex+dx,y=ey+dy;if(x>=2&&y>=2&&x<W-2&&y<H-2&&!IMP(m.terr[y*W+x])&&!m.fp[y*W+x]){const mo=makeMonster(x,y,pw,r);if(mo){addObj(mo);return}}}};
   const mineTarget={gold:Math.max(4,Math.round(spec.players*2.2)),wood:Math.round(spec.players*1.2),ore:Math.round(spec.players*1.2),mercury:Math.round(spec.players*.9),sulfur:Math.round(spec.players*.9),crystal:Math.round(spec.players*.9),gems:Math.round(spec.players*.9)};
-  for(const res in mineTarget)for(let k=0;k<mineTarget[res]*(W/150)**2*(under?.8:1)*(spec.mineK||1);k++){const p=randPos(3,2,{l:startList,d:under?10:13});if(!p)continue;const o=addObj({t:'mine',res,x:p[0],y:p[1],owner:-1});guardOf(o,60+danger(p[0],p[1])**2*2500*spec.monsters*MM)}
+  for(const res in mineTarget)for(let k=0;k<mineTarget[res]*(W/150)**2*(under?.8:1)*(spec.mineK||1)*(V1?1:.5);k++){const p=randPos(3,2,{l:startList,d:under?10:13});if(!p)continue;const o=addObj({t:'mine',res,x:p[0],y:p[1],owner:-1});guardOf(o,60+danger(p[0],p[1])**2*2500*spec.monsters*MM)}
   const sc=(W*H)/(150*150);
-  for(let k=0;k<Math.round(22*sc);k++){const p=randPos(3,2,{l:startList,d:10});if(!p)continue;const dg=danger(p[0],p[1]);
+  for(let k=0;k<Math.round((V1?22:14)*sc);k++){const p=randPos(3,2,{l:startList,d:10});if(!p)continue;const dg=danger(p[0],p[1]);
     const maxT=dg<.25?3:dg<.55?5:7,tier=irnd(r,1,maxT),fi=Math.floor(r()*8);const cid=`f${fi}t${tier}`;
     const o=addObj({t:'dwell',cr:cid,n:CR[cid].grow*2,x:p[0],y:p[1],owner:-1});guardOf(o,30+dg*dg*1500*spec.monsters*MM)}
   const sites=['shrine','hut','well','stone','stable','mill','shrine','stone','shop','hut'];
-  for(let k=0;k<Math.round(84*sc);k++){const p=randPos(1,1,{l:startList,d:6});if(!p)continue;const kk=r()<.38?pick(r,sites):pickNewSite(r);
+  for(let k=0;k<Math.round((V1?84:60)*sc);k++){const p=randPos(1,1,{l:startList,d:6});if(!p)continue;const kk=r()<.38?pick(r,sites):pickNewSite(r);
     const o=addObj({t:'site',k:kk,x:p[0],y:p[1],used:{},spell:pick(r,SPELL_IDS),skill:pick(r,SKILL_IDS)});
     if(kk==='shop'){const dg=danger(p[0],p[1]);const pool=ART_WORLD().filter(a=>!used.has(a)&&ART[a].v<=2+(dg>.5?1:0)&&!ART[a].set);o.stock=[];for(let q=0;q<4&&pool.length;q++){const a=pool.splice(Math.floor(r()*pool.length),1)[0];o.stock.push(a)}}
     const sd=SITEDEF[kk];if(sd&&sd.guard)guardOf(o,(1800+danger(p[0],p[1])**2*5200)*sd.guard*spec.monsters*MM);else if(r()<.5)guardOf(o,40+danger(p[0],p[1])**2*900*spec.monsters*MM)}
   const takeArt=(lvl)=>{let pool=ART_WORLD().filter(a=>!used.has(a)&&ART[a].v<=lvl+1&&ART[a].v>=Math.max(1,lvl-1)&&(!ART[a].set||lvl>=3));if(!pool.length)pool=ART_WORLD().filter(a=>!used.has(a));if(!pool.length)return null;const a=pool[Math.floor(r()*pool.length)];used.add(a);return a};
-  for(let k=0;k<Math.round(34*sc*(under?1.3:1));k++){const p=randPos(1,1,{l:startList,d:12});if(!p)continue;const dg=danger(p[0],p[1]);
+  for(let k=0;k<Math.round((V1?34:28)*sc*(under?1.3:1));k++){const p=randPos(1,1,{l:startList,d:12});if(!p)continue;const dg=danger(p[0],p[1]);
     const lvl=(dg<.35?1:dg<.65?2:3)+(under?1:0);const a=takeArt(Math.min(4,lvl));if(!a)break;
     const o=addObj({t:'art',art:a,x:p[0],y:p[1]});guardOf(o,100+dg*dg*3500*spec.monsters*MM)}
   // linajes: las 4 piezas (arma, escudo, yelmo, anillo) de varios linajes, muy custodiadas
@@ -359,11 +360,11 @@ function genLevel(spec,opt={}){
       const q=makeQuest(r,dg,artObjs);
       if(q.t==='kill'){const kp=randPos(1,1,{l:startList,d:14});if(!kp)continue;const mo=makeMonster(kp[0],kp[1],(900+dg*dg*4500)*spec.monsters*MM,r);if(!mo)continue;mo.qk=1;q.mon=addObj(mo).id}
       addObj({t:'site',k:'seer',x:p[0],y:p[1],used:{},q})}}
-  for(let k=0;k<Math.round(120*sc*spec.rich);k++){const p=randPos(1,1,null,60);if(!p)continue;const dg=danger(p[0],p[1]);
+  for(let k=0;k<Math.round((V1?120:45)*sc*spec.rich);k++){const p=randPos(1,1,null,60);if(!p)continue;const dg=danger(p[0],p[1]);
     addObj({t:'chest',x:p[0],y:p[1]});if(r()<.6)guardOf(m.objs[m.objs.length-1],20+dg*dg*1200*spec.monsters*MM)}
-  for(let k=0;k<Math.round(430*sc*spec.rich);k++){const p=randPos(1,1,null,60);if(!p)continue;
+  for(let k=0;k<Math.round((V1?430:110)*sc*spec.rich);k++){const p=randPos(1,1,null,60);if(!p)continue;
     const rs=r()<.28?'gold':pick(r,RES.slice(1));const g=rs==='gold';addObj({t:'res',res:rs,n:g?irnd(r,3,10)*100:(rs==='wood'||rs==='ore')?irnd(r,4,12):irnd(r,2,6),x:p[0],y:p[1]})}
-  for(let k=0;k<Math.round(520*sc*spec.monsters*(under?1.15:1));k++){const x=3+Math.floor(r()*(W-6)),y=3+Math.floor(r()*(H-6));if(!free(x,y)||mnd(x,y,startList)<10)continue;
+  for(let k=0;k<Math.round((V1?520:60)*sc*spec.monsters*(under?1.15:1));k++){const x=3+Math.floor(r()*(W-6)),y=3+Math.floor(r()*(H-6));if(!free(x,y)||mnd(x,y,startList)<10)continue;
     const dg=danger(x,y);const mo=makeMonster(x,y,25+dg*dg*3200*spec.monsters*MM*(0.5+r()),r);if(mo)addObj(mo)}
   // barcos y tesoros marinos
   if(keepIslands){
@@ -371,8 +372,8 @@ function genLevel(spec,opt={}){
       let land=0,wat=0;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const t=m.terr[i+dy*W+dx];if(t===WATER)wat++;else if(!IMP(t))land++}if(land>=1&&wat>=2)coast.push({x,y})}
     for(const s of startList){const c=coast.filter(c=>Math.hypot(c.x-s.x,c.y-s.y)<34&&!m.fp[c.y*W+c.x]).sort((a,b)=>Math.hypot(a.x-s.x,a.y-s.y)-Math.hypot(b.x-s.x,b.y-s.y))[0];if(c)addObj({t:'boat',x:c.x,y:c.y,isle:1})}
     if(coast.length)for(let k=0;k<Math.round(W/12);k++){const c=coast[Math.floor(r()*coast.length)];if(c&&!m.fp[c.y*W+c.x])addObj({t:'boat',x:c.x,y:c.y,isle:1})}
-    for(let k=0;k<Math.round(40*sc);k++){const x=4+Math.floor(r()*(W-8)),y=4+Math.floor(r()*(H-8));const i=y*W+x;if(m.terr[i]!==WATER||m.fp[i]||m.en[i])continue;addObj({t:'site',k:pick(r,['buoy','mermaids','wreck']),x,y,isle:1,used:{}})}
-    for(let k=0;k<Math.round(70*sc);k++){const x=4+Math.floor(r()*(W-8)),y=4+Math.floor(r()*(H-8));const i=y*W+x;if(m.terr[i]!==WATER||m.fp[i])continue;let ok=true;for(let j=-1;j<=1&&ok;j++)for(let q=-1;q<=1;q++)if(m.terr[i+j*W+q]!==WATER||m.fp[i+j*W+q])ok=false;if(!ok)continue;
+    for(let k=0;k<Math.round((V1?40:30)*sc);k++){const x=4+Math.floor(r()*(W-8)),y=4+Math.floor(r()*(H-8));const i=y*W+x;if(m.terr[i]!==WATER||m.fp[i]||m.en[i])continue;addObj({t:'site',k:pick(r,['buoy','mermaids','wreck']),x,y,isle:1,used:{}})}
+    for(let k=0;k<Math.round((V1?70:40)*sc);k++){const x=4+Math.floor(r()*(W-8)),y=4+Math.floor(r()*(H-8));const i=y*W+x;if(m.terr[i]!==WATER||m.fp[i])continue;let ok=true;for(let j=-1;j<=1&&ok;j++)for(let q=-1;q<=1;q++)if(m.terr[i+j*W+q]!==WATER||m.fp[i+j*W+q])ok=false;if(!ok)continue;
       if(r()<.2)addObj({t:'chest',x,y,isle:1});else{const rs=r()<.3?'gold':pick(r,RES.slice(1));addObj({t:'res',res:rs,n:rs==='gold'?irnd(r,4,12)*100:irnd(r,3,8),x,y,isle:1})}}
   }
   // decoración / obstáculos: cordilleras (crestas con gargantas), bosquetes (arboleda agrupada) y árboles sueltos muy escasos
