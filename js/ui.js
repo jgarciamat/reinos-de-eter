@@ -3,12 +3,15 @@
 //  Marco de interfaz (modo inmediato sobre canvas), diálogos y efectos
 // =====================================================================
 const VW=1280,VH=720;
-const UI={hits:[],mx:-1,my:-1,down:false,clicks:[],rclicks:[],wheel:0,nohit:false,tt:null,toasts:[],modals:[],t:0,keys:{},cursor:'default',shake:0,fade:{a:0,to:0,col:'#000',cb:null,spd:2}};
+const UI={hits:[],mx:-1,my:-1,down:false,clicks:[],rclicks:[],wheel:0,nohit:false,tt:null,toasts:[],modals:[],t:0,q:1,avg:16,nAd:0,lastAd:-9,keys:{},cursor:'default',shake:0,fade:{a:0,to:0,col:'#000',cb:null,spd:2}};
 let cv,ctx;
 function setupCanvas(){
   cv=document.getElementById('c');ctx=cv.getContext('2d');
-  const fit=()=>{const dpr=Math.min(IS_TOUCH?1.5:2,window.devicePixelRatio||1);const s=Math.min(innerWidth/VW,innerHeight/VH);cv.style.width=VW*s+'px';cv.style.height=VH*s+'px';cv.width=Math.round(VW*s*dpr);cv.height=Math.round(VH*s*dpr);UI.scale=s*dpr};
-  addEventListener('resize',fit);fit();
+  const fit=()=>{const dpr=Math.min(IS_TOUCH?1.25:1.5,window.devicePixelRatio||1)*UI.q;const s=Math.min(innerWidth/VW,innerHeight/VH);cv.style.width=VW*s+'px';cv.style.height=VH*s+'px';cv.width=Math.round(VW*s*dpr);cv.height=Math.round(VH*s*dpr);UI.scale=s*dpr};
+  UI.fit=fit;addEventListener('resize',fit);fit();
+  // resolución dinámica: si los fotogramas tardan, baja la resolución interna del lienzo (nunca la vuelve a subir)
+  UI.adapt=ms=>{if(document.hidden||S.loading)return;UI.avg=UI.avg*.93+Math.min(ms,100)*.07;UI.nAd++;
+    if(UI.nAd>90&&UI.avg>26&&UI.q>.6&&UI.t-UI.lastAd>2){UI.q=Math.max(.6,UI.q*.82);UI.lastAd=UI.t;UI.avg=16;fit()}};
   const pos=e=>{const r=cv.getBoundingClientRect();UI.mx=(e.clientX-r.left)/r.width*VW;UI.my=(e.clientY-r.top)/r.height*VH};
   cv.addEventListener('mousemove',e=>{pos(e);if(UI.onDrag)UI.onDrag(e)});
   cv.addEventListener('mousedown',e=>{pos(e);if(e.button===0){UI.down=true;UI.clicks.push({x:UI.mx,y:UI.my,type:'down'})}else if(e.button===2){UI.rclicks.push({x:UI.mx,y:UI.my})}else if(e.button===1){UI.mid=true}});

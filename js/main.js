@@ -35,7 +35,7 @@ G.hooks.gameOver=(win,why)=>setTimeout(()=>{Dlg.show({title:win?'¡VICTORIA!':'D
 // ---------- bucle ----------
 let last=performance.now();
 function frame(now){
-  const dt=Math.max(0,Math.min(.05,(now-last)/1000));last=now;UI.t+=dt;
+  const raw=now-last,dt=Math.max(0,Math.min(.05,raw/1000));last=now;if(UI.adapt&&raw>0)UI.adapt(raw);UI.t+=dt;
   try{
     ctx.setTransform(UI.scale,0,0,UI.scale,0,0);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality=IS_TOUCH?'low':'high';processClicks();UI.hits=[];UI.tt=null;UI.cursor='default';UI.hover=null;UI.nohit=UI.modals.length>0;
     updateFade(dt);
