@@ -72,7 +72,7 @@ function gainXp(h,x){
     const w=h.cls?[15,15,35,35]:[35,35,15,15];let t=Math.random()*100,k=0;for(;k<3;k++){t-=w[k];if(t<=0)break}
     [()=>h.a++,()=>h.d++,()=>h.sp++,()=>h.kn++][k]();
     const opts=skillOffers(h);
-    const applySk=sk2=>{if(sk2){h.skills[sk2]=(h.skills[sk2]||0)+1}};
+    const applySk=sk2=>{if(sk2&&(h.skills[sk2]||0)<3){h.skills[sk2]=(h.skills[sk2]||0)+1}};
     if(opts.length){if(isHuman(h.pid)&&opts.length>1)G.hooks.levelUp(h,opts,applySk);else applySk(aiPickSkill(h,opts))}
     notify(`${h.name} sube a nivel ${h.lvl}`,'good');
   }
@@ -206,7 +206,9 @@ function postBattle(h,b,side){
   const pc=[0,.1,.2,.3][s.med];
   if(pc>0)for(let i=0;i<7;i++){const orig=b.sides[side].army[i];if(!orig)continue;const slot=h.army[i];const lost=orig.n-(slot?slot.n:0);if(lost>0){const back=Math.floor(lost*pc);if(back>0){if(slot)slot.n+=back;else h.army[i]={id:orig.id,n:back}}}}
 }
-function stealArts(h,e){let n=0;for(const k of EQKEYS)if(e.eq[k]){const id=e.eq[k];e.eq[k]=null;if(giveArtifact(h,id))n++}for(const id of e.pack.splice(0)){if(giveArtifact(h,id))n++}if(n)notify(`${h.name} se queda con ${n} artefactos`,'good')}
+function stealArts(h,e){let n=0;for(const k of EQKEYS)if(e.eq[k]){const id=e.eq[k];e.eq[k]=null;if(id[0]==='#')continue;
+  if(ART[id].fusion){for(const pc of LIN[ART[id].fusion].pieces)if(giveArtifact(h,pc))n++;continue}
+  if(giveArtifact(h,id))n++}for(const id of e.pack.splice(0)){if(giveArtifact(h,id))n++}if(n)notify(`${h.name} se queda con ${n} artefactos`,'good')}
 function engage(h,mo,cb){
   const s=hstat(h);const lv=s.dipLv,bonus=s.dipA/100;
   if(lv>0||bonus>0){const hp=armyPower(h.army),mp=sizeVal(mo),ratio=hp/Math.max(1,mp);
@@ -227,7 +229,7 @@ function fightMonster(h,mo,cb){
 }
 function retreatHero(h){const p=G.players[h.pid];removeHero(h);h.army=padArmy([]);p.pool.unshift({hero:h});notify(`${h.name} se retira del combate`,'bad');checkDefeat(h.pid)}
 function surrenderCost(army){let g=0;for(const s of army)if(s&&s.n>0)g+=Math.floor(CR[s.id].cost.gold*s.n/2);return g}
-function heroDefeated(h){const pid=h.pid;notify(`${h.name} ha sido derrotado`,'bad');removeHero(h);checkDefeat(pid)}
+function heroDefeated(h){const pid=h.pid;if(G.usedH)delete G.usedH[heroKey(h.fi,h.port)];notify(`${h.name} ha sido derrotado`,'bad');removeHero(h);checkDefeat(pid)}
 function fightHero(h,e,cb){
   const t=objAtTownTile(e);
   let defArmy=e.army,defSrc=null;
@@ -331,7 +333,7 @@ function stepHero(h,cb){
   if(eh&&eh!==h){if(eh.pid===h.pid){h.path=null;cb('stop');return}
     h.mp-=Math.min(h.mp,cost);h.path=null;
     // ¿héroe dentro de ciudad?
-    fightHero(h,eh,won=>{if(won&&h.alive){moveTo(h,nx.x,nx.y)}cb(h.alive?'stop':'dead')});return}
+    fightHero(h,eh,won=>{if(won&&h.alive){moveTo(h,nx.x,nx.y);if(obj&&obj.t==='town'&&obj.owner!==h.pid){visit(h,obj,()=>cb(h.alive?'arrived':'dead'));return}}cb(h.alive?'stop':'dead')});return}
   if(obj&&obj.t==='mon'){h.mp-=Math.min(h.mp,cost);h.path=null;engage(h,obj,won=>{cb(won&&h.alive?'stop':'dead')});return}
   const px0=h.x,py0=h.y;moveTo(h,nx.x,nx.y);h.mp=Math.max(0,h.mp-cost);st.shift();
   if(h.boat&&m.terr[nx.y*m.w+nx.x]!==WATER){h.boat=false;addMapObj({t:'boat',x:px0,y:py0,isle:1});h.mp=0;h.path=null;st.length=0;notify(`${h.name} desembarca: los pasos se agotan hasta mañana`)}
@@ -450,14 +452,15 @@ function aiTowns(p){
   const order=['tavern','dw1','dw2','dw3','hall2','dw4','mage1','dw5','up1','up2','up3','dw6','hall3','up4','up5','dw7','market','fort1','fort2','up6','up7','fort3','mage2','mage3'];
   towns.sort((a,b)=>Object.keys(b.b).length-Object.keys(a.b).length);
   for(const t of towns){
-    if(!t.builtToday){const ord=G.day>10?['hall2',...order]:order;for(const b of ord){const cb=canBuild(t,b,p);if(cb.ok&&(b!=='hall3'||p.res.gold>12000)){build(t,b,p);break}}}
+    const saving=p.heroes.length===0&&t.b.tavern&&!heroAt(t.x+t.ex,t.y+t.ey);
+    if(!t.builtToday&&!saving){const ord=G.day>10?['hall2',...order]:order;for(const b of ord){const cb=canBuild(t,b,p);if(cb.ok&&(b!=='hall3'||p.res.gold>12000)){build(t,b,p);break}}}
     const hero=heroAt(t.x+t.ex,t.y+t.ey);const mine=hero&&hero.pid===p.id?hero:null;
-    for(let tier=7;tier>=1;tier--){if(!t.b['dw'+tier])continue;const id=townUnit(t,tier);const n=maxRecruit(p,id,t.avail[tier-1]);if(n>0)recruit(t,tier,n,p,mine)}
+    if(!saving)for(let tier=7;tier>=1;tier--){if(!t.b['dw'+tier])continue;const id=townUnit(t,tier);const n=maxRecruit(p,id,t.avail[tier-1]);if(n>0)recruit(t,tier,n,p,mine)}
     if(G.map.spec.sea&&t.dock&&G.day>5){
       if(!t.b.shipyard&&p.res.gold>9000&&canBuild(t,'shipyard',p).ok&&!t.builtToday&&ownedTowns(p.id).filter(q=>q.b.shipyard).length<2)build(t,'shipyard',p);
       if(t.b.shipyard&&p.res.gold>6000&&p.res.wood>=10&&(p.boats||0)<3&&!G.map.objs.some(o=>!o.dead&&o.t==='boat'&&Math.hypot(o.x-t.dock.x,o.y-t.dock.y)<6)){if(buyBoat(t,p)===null)p.boats=(p.boats||0)+1}}
     aiUpgradeArmy(p,t,t.gar);if(mine){aiUpgradeArmy(p,t,mine.army);mergeArmy(mine.army,t.gar);sortArmy(mine.army)}
-    if(p.heroes.length<Math.min(2+Math.floor(G.day/9),6)&&t.b.tavern&&!heroAt(t.x+t.ex,t.y+t.ey)&&p.res.gold>=HIRE_COST+700){const h=hireHero(p,t,Math.max(0,p.pool.findIndex(o=>o.fi===p.fac)));if(h){mergeArmy(h.army,t.gar);sortArmy(h.army)}}
+    if(p.heroes.length<Math.min(2+Math.floor(G.day/7),8)&&t.b.tavern&&!heroAt(t.x+t.ex,t.y+t.ey)&&p.res.gold>=HIRE_COST+(p.heroes.length?700:0)){const h=hireHero(p,t,Math.max(0,p.pool.findIndex(o=>o.fi===p.fac)));if(h){mergeArmy(h.army,t.gar);sortArmy(h.army)}}
   }
 }
 function threatsTo(p,t){let power=0,who=[];for(const q of G.players){if(q.id===p.id||!q.alive)continue;for(const hid of q.heroes){const e=G.heroes[hid];if(Math.hypot(e.x-(t.x+2),e.y-(t.y+1))<=16){power+=armyPower(e.army);who.push(e)}}}return{power,who}}

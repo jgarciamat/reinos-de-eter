@@ -48,7 +48,7 @@ function mapSpec(i){
   const lr=r(),level=lr<.14?1:lr<.38?2:lr<.68?3:lr<.9?4:5,LV=MAPLV[level];
   const startTowns=r()<.4?2:1;
   const vt=VICT[Math.floor(r()*VICT.length)];const victory={t:vt.t};
-  if(vt.t==='gold')victory.n=[40000,60000,90000,130000,180000][level-1];
+  if(vt.t==='gold')victory.n=[70000,100000,150000,220000,320000][level-1];
   if(vt.t==='quests')victory.n=3+level*2;
   if(vt.t==='survive')victory.n=[90,110,140,170,200][level-1];
   const forest=.55+r()*.7,monsters=(.7+r()*.7)*LV.mon,rich=(.8+r()*.5)*LV.rich;
@@ -442,7 +442,7 @@ function genMap(spec,opt={}){
   if(opt.surfaceOnly){for(const o of m0.objs)if(o.t==='town')findDock(m0,o);return m0}
   const spec2=Object.assign({},spec,{seed:spec.seed+31337});
   const m1=genLevel(spec2,{under:true,gates:m0.gates,used,liquid:spec.seed%2?LAVA:WATER});
-  return mergeLevels(m0,m1);
+  const mm=mergeLevels(m0,m1);mm.used=used;return mm;
 }
 const levelOf=(m,y)=>m.lh&&y>=m.lh+2?1:0;
 function garrison(fi,power,r){

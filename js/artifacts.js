@@ -79,9 +79,9 @@ function artBonus(h){
 function setProgress(h){const eq=equippedList(h),out=[];for(const sid in ARTSET){const S=ARTSET[sid];const n=S.pieces.filter(p=>eq.includes(p)).length;if(n)out.push({id:sid,n,tot:S.pieces.length,name:S.n})}return out}
 function freeSlotFor(h,id){const keys=SLOTKEYS[ART[id].slot];return keys.find(k=>!h.eq[k])||null}
 function giveArtifact(h,id){const k=freeSlotFor(h,id);if(k){h.eq[k]=id;return 'eq'}if(h.pack.length<14){h.pack.push(id);return 'pack'}return null}
-function equipFromPack(h,i,key){const id=h.pack[i];if(!id)return false;const keys=SLOTKEYS[ART[id].slot];if(!keys.includes(key))return false;const old=h.eq[key];h.eq[key]=id;h.pack.splice(i,1);if(old)h.pack.push(old);return true}
+function equipFromPack(h,i,key){const id=h.pack[i];if(!id)return false;const keys=SLOTKEYS[ART[id].slot];if(!keys.includes(key))return false;const old=h.eq[key];if(old&&(old.charCodeAt(0)===35||ART[old].fusion))return false;h.eq[key]=id;h.pack.splice(i,1);if(old)h.pack.push(old);return true}
 function unequip(h,key){const id=h.eq[key];if(!id)return false;if(id.charCodeAt(0)===35||ART[id].fusion)return unfuse(h,id.charCodeAt(0)===35?id.slice(1):id)===null;if(h.pack.length>=14)return false;h.pack.push(id);h.eq[key]=null;return true}
-function autoEquipBest(h){for(let i=h.pack.length-1;i>=0;i--){const id=h.pack[i];const keys=SLOTKEYS[ART[id].slot];const free=keys.find(k=>!h.eq[k]);if(free){h.eq[free]=id;h.pack.splice(i,1)}else{
+function autoEquipBest(h){for(let i=h.pack.length-1;i>=0;i--){const id=h.pack[i];const keys=SLOTKEYS[ART[id].slot];if(!keys.length)continue;const free=keys.find(k=>!h.eq[k]);if(free){h.eq[free]=id;h.pack.splice(i,1)}else{
   // reemplazar si el nuevo es de mayor nivel
   const worst=keys.map(k=>[k,h.eq[k].charCodeAt(0)===35||ART[h.eq[k]].fusion?99:ART[h.eq[k]].v]).sort((a,b)=>a[1]-b[1])[0];if(ART[id].v>worst[1]){const old=h.eq[worst[0]];h.eq[worst[0]]=id;h.pack.splice(i,1);h.pack.push(old)}}}}
 function artText(id){const a=ART[id];const l=Object.keys(a.b).map(k=>`${BNAMES[k]||k} ${a.b[k]>0&&k!=='pf'?'+':''}${k==='pf'?'':a.b[k]}`);return l.join(' · ')}

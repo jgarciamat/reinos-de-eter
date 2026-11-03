@@ -9,7 +9,8 @@ const lowerOf=(h,a,b)=>h[a]<=h[b]?a:b;
 const STATN={a:'Ataque',d:'Defensa',sp:'Poder',kn:'Conocimiento'};
 const statUp=(h,k,n)=>{h[k]+=n;return`${h.name} gana +${n} de ${STATN[k]}`};
 function rewardArt(h,lo,hi){
-  const used=G.map.used||new Set();const pool=ART_WORLD().filter(a=>!used.has(a)&&ART[a].v>=lo&&ART[a].v<=hi&&!ART[a].set);if(!pool.length)return null;
+  const used=G.map.used||(G.map.used=new Set());for(const hh of G.heroes){for(const k of EQKEYS){const e=hh.eq[k];if(e)used.add(e[0]==='#'?e.slice(1):e)}for(const e of hh.pack)used.add(e)}for(const oo of G.map.objs)if(!oo.dead&&oo.t==='art')used.add(oo.art);
+  const pool=ART_WORLD().filter(a=>!used.has(a)&&ART[a].v>=lo&&ART[a].v<=hi&&!ART[a].set);if(!pool.length)return null;
   const id=pool[Math.floor(Math.random()*pool.length)];used.add(id);const r=giveArtifact(h,id);return r?id:null;
 }
 const randRes=()=>RESKEYS[Math.floor(Math.random()*RESKEYS.length)];
@@ -85,7 +86,7 @@ function rewardText(w){
 function questDone(h,p,q){
   switch(q.t){
     case'res':return p.res[q.res]>=q.n;case'lvl':return h.lvl>=q.n;
-    case'army':return h.army.reduce((a,s)=>a+(s&&s.id===q.cr?s.n:0),0)>=q.n;
+    case'army':return h.army.reduce((a,s)=>a+(s&&s.id===q.cr?s.n:0),0)>=q.n&&h.army.reduce((a,s)=>a+(s&&s.n>0?s.n:0),0)>q.n;
     case'kill':{const mo=G.map.objs[q.mon];return!mo||!!mo.dead}
     case'towns':return ownedTowns(p.id).length>=q.n;
     case'art':return hasPiece(h,q.art);
