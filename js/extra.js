@@ -6,7 +6,7 @@ try{G.quick=localStorage.getItem('reinos_quick')==='1'}catch(e){}
 function toggleQuick(){G.quick=!G.quick;try{localStorage.setItem('reinos_quick',G.quick?'1':'0')}catch(e){}}
 G.hooks.weekBanner=(ev,info)=>{
   let txt;
-  if(ev.t==='creature')txt=`¡${weekLabel(ev)}!\n\nLa producción de ${CR[ev.cr].name} se duplica (+5) en todas las ciudades y moradas.\nHan aparecido ${info.spawned} nuevas manadas por el mapa (marcadas con un aro verde) y las que ya había se han duplicado.`;
+  if(ev.t==='creature')txt=`¡${weekLabel(ev)}!\n\nLa producción de ${CR[ev.cr].name} aumenta ${ev.month?'al doble (×2)':'en +5 por semana'} en todas las ciudades y moradas.\nHan aparecido ${info.spawned} nuevas manadas por el mapa (marcadas con un aro verde) y las que ya había se han duplicado.`;
   else if(ev.t==='plague')txt='¡Semana de la Plaga!\n\nLa población de criaturas disponible en ciudades y moradas se reduce a la mitad.';
   else txt=`Comienza la semana ${ev.week}.\n\nLas criaturas de ciudades y moradas crecen y las manadas errantes aumentan poco a poco.`;
   Dlg.show({title:weekLabel(ev),w:560,text:txt,buttons:[{label:'Entendido',primary:1}]});

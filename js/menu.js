@@ -84,7 +84,7 @@ function drawSelect(dt){
   const ox=880;
   text('Tu facción',ox,100,{size:14,bold:true,color:'#c8a24a'});
   for(let i=0;i<8;i++){const x=ox+(i%4)*86,y=108+Math.floor(i/4)*62;const sel=SEL.fac===i;const hov=hit(x,y,80,56,()=>{SEL.fac=i;pickMap(SEL.idx)},{tip:[FDEF[i].name,FDEF[i].desc]});
-    rrect(c,x,y,80,56,6,lg(c,0,y,0,y+56,[hov?'#5a4a3a':'#3a2e30','#1a1418']),sel?'#ffe27a':FDEF[i].col[0],sel?3:1.4);c.drawImage(townSprite(i).c,x+4,y+2,72,50);text(FDEF[i].short,x+40,y+54,{size:11,bold:true,align:'center',shadow:true,color:sel?'#ffe9a0':'#fff'})}
+    rrect(c,x,y,80,56,6,lg(c,0,y,0,y+56,[hov?'#5a4a3a':'#3a2e30','#1a1418']),sel?'#ffe27a':FDEF[i].col[0],sel?3:1.4);fitImg(c,townSprite(i).c,x+4,y+2,72,50);text(FDEF[i].short,x+40,y+54,{size:11,bold:true,align:'center',shadow:true,color:sel?'#ffe9a0':'#fff'})}
   text(FDEF[SEL.fac].name,ox,246,{size:15,bold:true,color:FDEF[SEL.fac].col[0]});paragraph(FDEF[SEL.fac].desc,ox,264,360,{size:13,color:'#d8c8a0'});
   text('Tu color',ox,320,{size:14,bold:true,color:'#c8a24a'});
   for(let i=0;i<8;i++){const x=ox+i*46,y=328;const sel=SEL.color===i;hit(x,y,40,36,()=>{SEL.color=i},{tip:PNAME[i]});rrect(c,x,y,40,36,6,lg(c,0,y,0,y+36,[shade(PCOL[i],.3),PCOL[i],shade(PCOL[i],-.4)]),sel?'#fff':'#1a1220',sel?3.4:1.5);if(sel){c.fillStyle='#fff';c.font='bold 20px '+FONT;c.textAlign='center';c.fillText('✔',x+20,y+26)}}

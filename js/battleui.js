@@ -238,7 +238,7 @@ function openSpellMenu(){
     ctx.fillStyle='rgba(60,30,10,.5)';ctx.fillRect(x+w/2-4,y+30,8,hh-96);
     const ph=(hh-110)/per;
     for(let pg=0;pg<2;pg++){const list=sp.slice((page*2+pg)*per,(page*2+pg+1)*per),px=pg?x+w/2+16:x+30;
-      list.forEach((s,i)=>{const S2=SPELLS[s],cy=y+38+i*ph,ok=hr.mana>=S2.cost,pw=w/2-46,col=(SPK[S2.k]||SPK.all)[0];
+      list.forEach((s,i)=>{const S2=Object.assign({},SPELLS[s],{cost:b.spellCost(side,s)}),cy=y+38+i*ph,ok=hr.mana>=S2.cost,pw=w/2-46,col=(SPK[S2.k]||SPK.all)[0];
         const hov=hit(px,cy,pw,ph-6,ok?()=>{Dlg.close();if(S2.k==='all'){b.castSpell(side,s,null,0,0);BU.pull()}else{BU.mode='spell';BU.spell=s}}:null,{tip:[S2.n,S2.d,`Daño/efecto: ${S2.base?S2.base+S2.per*b.hs(side).sp:'—'}`]});
         rrect(ctx,px,cy,pw,ph-6,6,hov&&ok?'rgba(255,240,190,.55)':'rgba(255,248,224,.25)',ok?'#8a6a3a':'#a89a80',1.2);
         ell(ctx,px+28,cy+(ph-6)/2,20,20,rg(ctx,px+24,cy+(ph-6)/2-4,2,22,[ok?col:'#8a8070','#2a1a30']),'#2a1a10',1.5);text((SPK[S2.k]||SPK.all)[1],px+28,cy+(ph-6)/2+7,{size:20,bold:true,align:'center',color:'#fff',shadow:false});

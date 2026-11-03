@@ -265,7 +265,7 @@ function drawSidePanel(dt){
     const t=ts[S.tOff+r],tx=px+150;
     if(t){const cur=S.selTown===t,hh=heroAt(t.x+t.ex,t.y+t.ey);const hov=hit(tx,y,124,RH-4,()=>{if(S.selTown===t){S.selTown=null;openTown(t,hh&&hh.pid===0?hh:null)}else{S.selTown=t;S.sel=null;S.path=null;S.target=null;S.exTarget=null;camTo(t.x+2,t.y+1)}},{tip:[t.name,FDEF[t.fi].name,'Clic: seleccionar (suelta al héroe) · otro clic: entrar']});
       rrect(c,tx,y,124,RH-4,5,lg(c,0,y,0,y+RH,[hov?'#5a4a30':'#3a2e22','#1a1410']),cur?'#ffe27a':FDEF[t.fi].col[0],cur?2.4:1.3);
-      c.drawImage(townSprite(t.fi).c,tx+3,y+2,54,28*1.2);
+      fitImg(c,townSprite(t.fi).c,tx+3,y+2,54,34);
       text(t.name.length>13?t.name.slice(0,12)+'…':t.name,tx+4,y+39,{size:10,bold:true,color:'#e8dcc0'});
       if(hh&&hh.pid===0){c.drawImage(portrait(hh.fi,hh.port,hh.cls),tx+84,y+3,34,34);c.strokeStyle='#c8a24a';c.lineWidth=1;c.strokeRect(tx+84,y+3,34,34)}}
     else rrect(c,tx,y,124,RH-4,5,'rgba(0,0,0,.3)','#3a2e22',1)}
@@ -315,7 +315,7 @@ function drawSidePanelPhone(dt){
     const t=ts[S.tOff+r],tx=px+118;
     if(t){const cur=S.selTown===t,eh=heroAt(t.x+t.ex,t.y+t.ey);const hov=hit(tx,y,108,hh,()=>{if(S.selTown===t){S.selTown=null;openTown(t,eh&&eh.pid===0?eh:null)}else{S.selTown=t;S.sel=null;S.path=null;S.target=null;S.exTarget=null;camTo(t.x+2,t.y+1)}});
       rrect(c,tx,y,108,hh,5,lg(c,0,y,0,y+RH,[hov?'#5a4a30':'#3a2e22','#1a1410']),cur?'#ffe27a':FDEF[t.fi].col[0],cur?2.6:1.3);
-      c.drawImage(townSprite(t.fi).c,tx+3,y+1,58,32);
+      fitImg(c,townSprite(t.fi).c,tx+3,y+1,58,32);
       text(t.name.length>13?t.name.slice(0,12)+'…':t.name,tx+4,y+hh-4,{size:10,bold:true,color:'#e8dcc0'});
       if(eh&&eh.pid===0){c.drawImage(portrait(eh.fi,eh.port,eh.cls),tx+68,y+3,34,34);c.strokeStyle='#c8a24a';c.lineWidth=1;c.strokeRect(tx+68,y+3,34,34)}}
     else rrect(c,tx,y,108,hh,5,'rgba(0,0,0,.3)','#3a2e22',1)}

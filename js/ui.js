@@ -42,6 +42,8 @@ function setupCanvas(){
   addEventListener('keydown',e=>{UI.keys[e.code]=true;UI.keyq=UI.keyq||[];UI.keyq.push(e);if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(e.code))e.preventDefault()});
   addEventListener('keyup',e=>{UI.keys[e.code]=false});
 }
+// dibuja una imagen conservando su proporción dentro de la caja
+function fitImg(c,img,x,y,w,h){const iw=img.lw||img.width,ih=img.lh||img.height,k=Math.min(w/iw,h/ih);c.drawImage(img,x+(w-iw*k)/2,y+(h-ih*k)/2,iw*k,ih*k)}
 const inRect=(px,py,x,y,w,h)=>px>=x&&py>=y&&px<x+w&&py<y+h;
 function hit(x,y,w,h,fn,opt={}){if(UI.nohit)return false;UI.hits.push({x,y,w,h,fn,opt});const hov=inRect(UI.mx,UI.my,x,y,w,h);if(hov){UI.hover=UI.hits[UI.hits.length-1];if(opt.tip)UI.tt=opt.tip;if(fn||opt.cursor)UI.cursor=opt.cursor||'pointer'}return hov}
 function hovered(x,y,w,h){return !UI.nohit&&inRect(UI.mx,UI.my,x,y,w,h)}

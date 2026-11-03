@@ -114,7 +114,7 @@ function drawTownBottom(t,h,p,F){
     const ix=bx+bw2*2+22,iw=1276-ix;panel(ix,y0,iw,bh,{plain:1,r:8,noshadow:1});
     text(F.name,ix+iw/2,y0+24,{size:15,bold:true,align:'center',color:'#ffe9a0'});
     text(`Ayuntamiento nivel ${townHalls(t)}`,ix+14,y0+48,{size:12,color:'#d8c8a0'});
-    const inc=250+(t.b.hall2?500:0)+(t.b.hall3?1000:0);text(`Ingreso: +${inc} oro/día`,ix+14,y0+68,{size:13,bold:true,color:'#ffe27a'});
+    const inc=townIncome(t.b);text(`Ingreso: +${inc} oro/día`,ix+14,y0+68,{size:13,bold:true,color:'#ffe27a'});
     const nb=BUILD_ORDER.filter(b=>t.b[b]).length;text(`Edificios: ${nb}/${BUILD_ORDER.filter(b=>b!=='shipyard'||t.dock).length}`,ix+14,y0+88,{size:12,color:'#d8c8a0'});
     if(h){const st=hstat(h);text(`${h.name} · Nv ${h.lvl}`,ix+14,y0+110,{size:12,bold:true,color:'#ffe9a0'});text(`Ata ${st.a} · Def ${st.d} · Pod ${st.sp} · Con ${st.kn}`,ix+14,y0+127,{size:12,color:'#bfe8ff'})}
     button(ix+10,y0+bh-48,iw-20,38,'Salir de la ciudad',()=>closeTown(),{size:15})}
@@ -124,7 +124,7 @@ function drawTownBottom(t,h,p,F){
       ['Más…',()=>townMore(t,h,p),{}],['Salir',()=>closeTown(),{}]];
     B.forEach((q,i)=>button(bx+6+(i%2)*(bw+6),y0+6+Math.floor(i/2)*(bh2+4),bw,bh2,q[0],q[1],Object.assign({size:19},q[2])))}
 }
-function townSummary(t){const inc=250+(t.b.hall2?500:0)+(t.b.hall3?1000:0);Dlg.show({title:t.name,w:480,text:`${FDEF[t.fi].name}\nIngreso: +${inc} de oro al día\nEdificios construidos: ${BUILD_ORDER.filter(b=>t.b[b]).length}`,buttons:[{label:'Cerrar',primary:1}]})}
+function townSummary(t){const inc=townIncome(t.b);Dlg.show({title:t.name,w:480,text:`${FDEF[t.fi].name}\nIngreso: +${inc} de oro al día\nEdificios construidos: ${BUILD_ORDER.filter(b=>t.b[b]).length}`,buttons:[{label:'Cerrar',primary:1}]})}
 // móvil: acciones menos frecuentes en un diálogo con botones grandes
 function townMore(t,h,p){
   Dlg.show({w:640,title:'Más acciones',draw:m=>{const x=320,y=150,w=640,hh=420;panel(x,y,w,hh,{title:'Acciones de la ciudad'});
@@ -140,7 +140,7 @@ function drawTownList(t){
   ts.forEach((q,i)=>{const x=12+i*(w+4),y=52,cur=q===t;
     const hov=hit(x,y,w,hh,()=>{if(!cur){const hh2=heroAt(q.x+q.ex,q.y+q.ey);S.town={t:q,h:hh2&&hh2.pid===q.owner?hh2:null};S.pick=null;S.townFx={t:0};sfx('click')}},{tip:[q.name,FDEF[q.fi].name,cur?'Estás aquí':'Clic: ir a este castillo']});
     rrect(c,x,y,w,hh,4,lg(c,0,y,0,y+hh,[hov?'#5a4a30':'#3a2e22','#1a1410']),cur?'#ffe27a':FDEF[q.fi].col[0],cur?2.6:1.4);
-    c.drawImage(townSprite(q.fi).c,x+2,y+2,w-4,(w-4)*.5)});
+    fitImg(c,townSprite(q.fi).c,x+2,y+2,w-4,(w-4)*.5)});
 }
 // Ayuntamiento: lista completa de edificios para construir (verde = construido)
 function townHallModal(t){
@@ -149,7 +149,7 @@ function townHallModal(t){
     const cw=P?140:134,ch=P?124:116,cols=7,w=cols*(cw+6)+26,list=BUILD_ORDER.filter(b=>b!=='shipyard'||t.dock),rows=Math.ceil(list.length/cols),hh=70+rows*(ch+6)+60,x=(1280-w)/2,y=Math.max(6,(720-hh)/2);
     panel(x,y,w,hh,{title:'Ayuntamiento · '+t.name});
     text('Clic en un edificio para ver su coste y construirlo. Verde: ya construido.',x+w/2,y+40,{size:fz(13),align:'center',color:'#c8b890'});
-    const inc=250+(t.b.hall2?500:0)+(t.b.hall3?1000:0);
+    const inc=townIncome(t.b);
     list.forEach((b,i)=>{const bx=x+16+(i%cols)*(cw+6),by=y+54+Math.floor(i/cols)*(ch+6);
       const built=!!t.b[b],cb=canBuild(t,b,p),cost=bCost(b,t.fi);
       const hov=hit(bx,by,cw,ch,()=>buildDialog(t,b),{tip:buildTip(t,b,p,cb,cost)});
@@ -167,7 +167,7 @@ function townHallModal(t){
 function buildTip(t,b,p,cb,cost){const L=[bTitle(b,t.fi)];let m;
   if(m=/^dw(\d)$/.exec(b)){const cr=CR[FDEF[t.fi].units[+m[1]-1]];const ex=dwellExtra(t,+m[1]);L.push(`Cría: ${cr.name} (${cr.grow}${ex?' +'+ex+' de moradas conquistadas':''}/semana)`,`Atq ${cr.atk} · Def ${cr.def} · Vida ${cr.hp} · Daño ${cr.mn}-${cr.mx}`)}
   else if(m=/^up(\d)$/.exec(b)){const cr=CR[FDEF[t.fi].units[+m[1]-1+7]];L.push(`Mejora a: ${cr.name}`,`Atq ${cr.atk} · Def ${cr.def} · Vida ${cr.hp}`)}
-  else L.push({shipyard:'Permite comprar barcos (1000 de oro y 10 de madera) para navegar',hall1:'Ingreso base de 250 oro/día',hall2:'+500 de oro al día',hall3:'+1000 de oro al día',fort1:'Defensa de la ciudad',fort2:'+50% de crecimiento semanal',fort3:'+100% de crecimiento semanal',tavern:'Permite contratar héroes',market:'Permite comerciar recursos',mage1:'Hechizos de nivel 1',mage2:'Hechizos de nivel 2',mage3:'Hechizos de nivel 3',mage4:'Hechizos de nivel 4'}[b]||'');
+  else L.push({shipyard:'Permite comprar barcos (1000 de oro y 10 de madera) para navegar',hall1:`Ingreso de ${HALL_INC[0]} oro/día`,hall2:`Ingreso de ${HALL_INC[1]} oro/día`,hall3:`Ingreso de ${HALL_INC[2]} oro/día`,fort1:'Defensa de la ciudad',fort2:'+50% de crecimiento semanal',fort3:'+100% de crecimiento semanal',tavern:'Permite contratar héroes',market:'Permite comerciar recursos',mage1:'Hechizos de nivel 1',mage2:'Hechizos de nivel 2',mage3:'Hechizos de nivel 3',mage4:'Hechizos de nivel 4'}[b]||'');
   if(!t.b[b]){L.push('Coste: '+costText(cost));if(!cb.ok)L.push('✖ '+cb.why)}return L}
 function buildDialog(t,b){
   const p=G.players[0],cb=canBuild(t,b,p),cost=bCost(b,t.fi);
