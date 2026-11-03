@@ -109,7 +109,7 @@ function buildFxTick(s,bl){if(Math.random()<.55)FX.add({x:s.x+8+Math.random()*(s
 function chainSpot(k,t){
   const P=UI.ph,back={hall:[111,P?200:190],fort:[330,150],mage:[880,120],tavern:[1000,112],market:[1118,122],shipyard:[1225,110]};
   if(back[k]){const[cx,w]=back[k],h=w*112/124,base=P?440:446;return{x:cx-w/2,y:base-h,w,h,row:0,base,cx}}
-  const i=+k.slice(2)-1,w=P?116:112,h=w*112/124,base=P?520:530,cx=100+i*180;
+  const i=+k.slice(2)-1,w=P?140:132,h=w*112/124,base=P?524:534,cx=100+i*180;
   return{x:cx-w/2,y:base-h,w,h,row:1,base,cx}}
 function chainShown(t,c){let b=null;for(const q of c.ch)if(t.b[q])b=q;return b||c.ch[0]}
 function drawTownBuildings(t,p){
