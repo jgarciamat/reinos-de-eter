@@ -37,7 +37,7 @@ let last=performance.now();
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;UI.t+=dt;
   try{
-    ctx.setTransform(UI.scale,0,0,UI.scale,0,0);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';processClicks();UI.hits=[];UI.tt=null;UI.cursor='default';UI.hover=null;UI.nohit=UI.modals.length>0;
+    ctx.setTransform(UI.scale,0,0,UI.scale,0,0);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality=IS_TOUCH?'low':'high';processClicks();UI.hits=[];UI.tt=null;UI.cursor='default';UI.hover=null;UI.nohit=UI.modals.length>0;
     updateFade(dt);
     switch(S.scr){
       case'menu':drawMenu(dt);break;

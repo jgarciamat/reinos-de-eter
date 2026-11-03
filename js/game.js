@@ -105,7 +105,11 @@ function newGame(idx,opt){
   G.players.forEach(p=>refreshFog(p));
   return G;
 }
-function recomputeZoc(){const m=G.map,z=new Uint8Array(m.w*m.h);for(const o of m.objs){if(o.dead||o.t!=='mon')continue;for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){const x=o.x+i,y=o.y+j;if(x>=0&&y>=0&&x<m.w&&y<m.h)z[y*m.w+x]++}}m.zoc=z}
+function recomputeZoc(){const m=G.map,z=new Uint8Array(m.w*m.h),dm=new Float32Array(m.w*m.h);for(const o of objsOfType('mon')){if(o.dead)continue;const sv=sizeVal(o);for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){const x=o.x+i,y=o.y+j;if(x>=0&&y>=0&&x<m.w&&y<m.h){const k=y*m.w+x;z[k]++;if(sv>dm[k])dm[k]=sv}}}m.zoc=z;m.dmax=dm}
+// recalcula el valor máximo de manada que cubre cada casilla alrededor de o (tras quitarla o cambiar su tamaño)
+function dmaxAround(o){const m=G.map;if(!m.dmax)return;for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){const x=o.x+i,y=o.y+j;if(x<0||y<0||x>=m.w||y>=m.h)continue;let best=0;
+  for(let b=-1;b<=1;b++)for(let a=-1;a<=1;a++){const xx=x+a,yy=y+b;if(xx<0||yy<0||xx>=m.w||yy>=m.h)continue;const v=m.en[yy*m.w+xx];if(!v)continue;const q=m.objs[v-1];if(q.t==='mon'&&!q.dead){const sv=sizeVal(q);if(sv>best)best=sv}}
+  m.dmax[y*m.w+x]=best}}
 function poolKeep(p){return(p.pool||[]).filter(o=>o.hero)}
 function refreshPool(p){ // cada semana cambian los campeones de la taberna
   for(const o of p.pool||[])if(!o.hero&&G.usedH)delete G.usedH[heroKey(o.fi,o.ni)];
@@ -114,7 +118,7 @@ function fillPool(p){let g=0;while(p.pool.filter(o=>!o.hero).length<3&&g++<9)p.p
 function placeHero(h,pid,x,y){h.pid=pid;h.x=x;h.y=y;h.alive=true;h.path=null;G.hmap[mapIdx(x,y)]=h.id+1;if(!G.players[pid].heroes.includes(h.id))G.players[pid].heroes.push(h.id);if(G.players[pid].fog)reveal(G.players[pid],x,y,heroVis(h))}
 function removeHero(h){if(h.x>=0&&G.hmap[mapIdx(h.x,h.y)]===h.id+1)G.hmap[mapIdx(h.x,h.y)]=0;const p=G.players[h.pid];if(p)p.heroes=p.heroes.filter(i=>i!==h.id);h.alive=false;h.x=-1;h.y=-1}
 const heroAt=(x,y)=>{const v=G.hmap[mapIdx(x,y)];return v?G.heroes[v-1]:null};
-function removeObj(o){o.dead=1;const m=G.map;for(let j=0;j<o.h;j++)for(let i=0;i<o.w;i++){const k=(o.y+j)*m.w+o.x+i;if(m.fp[k]===o.id+1)m.fp[k]=0;if(m.en[k]===o.id+1)m.en[k]=0}if(o.t==='mon')recomputeZoc()}
+function removeObj(o){const wasDead=o.dead;o.dead=1;const m=G.map;for(let j=0;j<o.h;j++)for(let i=0;i<o.w;i++){const k=(o.y+j)*m.w+o.x+i;if(m.fp[k]===o.id+1)m.fp[k]=0;if(m.en[k]===o.id+1)m.en[k]=0}if(o.t==='mon'&&m.zoc&&!wasDead){for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++){const x=o.x+i,y=o.y+j;if(x>=0&&y>=0&&x<m.w&&y<m.h)m.zoc[y*m.w+x]--}dmaxAround(o)}}
 const objAt=(x,y)=>{const v=G.map.en[mapIdx(x,y)];return v?G.map.objs[v-1]:null};
 
 // ---------- niebla ----------
@@ -122,20 +126,23 @@ function reveal(p,x,y,r){const f=p.fog;if(!f)return;const m=G.map,r2=r*r;for(let
 function refreshFog(p){if(!p.fog)return;for(const hid of p.heroes){const h=G.heroes[hid];reveal(p,h.x,h.y,heroVis(h))}
   for(const o of G.map.objs){if(o.dead)continue;if(o.t==='town'&&o.owner===p.id)reveal(p,o.x+2,o.y+1,8);else if((o.t==='mine')&&o.owner===p.id)reveal(p,o.x+1,o.y+1,4)}}
 function visSources(p){const s=[];for(const hid of p.heroes){const h=G.heroes[hid];s.push([h.x,h.y,heroVis(h)])}
-  for(const o of G.map.objs){if(o.dead)continue;if(o.t==='town'&&o.owner===p.id)s.push([o.x+2,o.y+1,8]);else if(o.t==='mine'&&o.owner===p.id)s.push([o.x+1,o.y+1,4])}return s}
+  for(const o of objsWhere('own',o=>o.t==='town'||o.t==='mine')){if(o.dead)continue;if(o.t==='town'&&o.owner===p.id)s.push([o.x+2,o.y+1,8]);else if(o.t==='mine'&&o.owner===p.id)s.push([o.x+1,o.y+1,4])}return s}
 
 // ---------- economía ----------
 function townUnit(t,tier){const u=FDEF[t.fi].units;return t.b['up'+tier]?u[tier-1+7]:u[tier-1]}
 function incomeOf(p){
   const inc={gold:0,wood:0,ore:0,mercury:0,sulfur:0,crystal:0,gems:0};
-  for(const o of G.map.objs){if(o.dead||o.owner!==p.id)continue;
+  for(const o of objsWhere('own',o=>o.t==='town'||o.t==='mine')){if(o.dead||o.owner!==p.id)continue;
     if(o.t==='town')inc.gold+=250+(o.b.hall2?500:0)+(o.b.hall3?1000:0);
     else if(o.t==='mine')inc[o.res]+=o.res==='gold'?1000:o.res==='wood'||o.res==='ore'?2:1}
   for(const hid of p.heroes){const h=G.heroes[hid],s=hstat(h);inc.gold+=s.gold;for(const r of SPEC_RES)inc[r]+=s.resB[r]||0}
   return inc;
 }
-function ownedTowns(pid){return G.map.objs.filter(o=>!o.dead&&o.t==='town'&&o.owner===pid)}
-function ownedMines(pid){return G.map.objs.filter(o=>!o.dead&&o.t==='mine'&&o.owner===pid)}
+// lista filtrada y cacheada de objetos (se invalida si cambia el nº de objetos)
+function objsWhere(key,fn){const m=G.map,c=m._ow||(m._ow={}),e=c[key];if(e&&e.n===m.objs.length)return e.l;const l=m.objs.filter(fn);c[key]={n:m.objs.length,l};return l}
+function objsOfType(t){const m=G.map,c=m._ot||(m._ot={}),e=c[t];if(e&&e.n===m.objs.length)return e.l;const l=m.objs.filter(o=>o.t===t);c[t]={n:m.objs.length,l};return l}
+function ownedTowns(pid){return objsOfType('town').filter(o=>!o.dead&&o.owner===pid)}
+function ownedMines(pid){return objsOfType('mine').filter(o=>!o.dead&&o.owner===pid)}
 function canBuild(t,b,p){
   if(t.b[b])return{ok:false,why:'Ya construido'};if(t.builtToday)return{ok:false,why:'Solo una construcción por día'};
   for(const r of bReq(b,t))if(!t.b[r])return{ok:false,why:'Requiere: '+bTitle(r,t.fi)};
@@ -224,7 +231,7 @@ function fightMonster(h,mo,cb){
   runBattle(A,D,{type:'mon',mon:mo},(w,b,res,xp)=>{
     applyArmy(A,res[0],h.army);
     if(w===0){gainXp(h,xp[0]);postBattle(h,b,0);removeObj(mo);cb(true)}
-    else{const left=res[1][0];if(left)mo.n=left.n;if(b.fled===0)retreatHero(h);else heroDefeated(h);cb(false)}
+    else{const left=res[1][0];if(left){mo.n=left.n;dmaxAround(mo)}if(b.fled===0)retreatHero(h);else heroDefeated(h);cb(false)}
   });
 }
 function retreatHero(h){const p=G.players[h.pid];removeHero(h);h.army=padArmy([]);p.pool.unshift({hero:h});notify(`${h.name} se retira del combate`,'bad');checkDefeat(h.pid)}
@@ -389,6 +396,7 @@ function newWeek(){
     else if(o.t==='mon'){ // las manadas crecen cada semana; las de la criatura de la semana se duplican
       if(!o.n0)o.n0=o.n;let add=Math.max(1,Math.round(o.n*.05));if(o.n<o.n0*2.2)o.n+=add;
       if(cid&&o.cr===cid){o.n=Math.round(o.n*2);o.fresh=G.day;boosted++}}}
+  recomputeZoc();
   if(cid){ // aparecen nuevas manadas de esa criatura por todo el mapa
     const want=Math.round(6+m.w/30),cr=CR[cid];let tries=0;const r=Math.random;
     while(spawned<want&&tries++<want*60){const lv=Math.random()<.5?0:1;const lh=m.lh||m.h;
@@ -479,9 +487,18 @@ function aiFindBoat(p,h,comp,hc){
     let ok=false;for(const[dx,dy]of D8){const x=o.x+dx,y=o.y+dy;if(x>=0&&y>=0&&x<m.w&&y<m.h&&comp[y*m.w+x]===hc){ok=true;break}}if(ok){bd=d;best=o}}
   if(!best)return null;return planPath(h,best.x,best.y);
 }
+// objetos no-barco por nivel (caché por longitud de m.objs)
+function objsByLevel(m){const c=m._ol;if(c&&c.n===m.objs.length)return c.l;const l=[[],[]];for(const o of m.objs)if(o.t!=='boat')l[levelOf(m,o.y)].push(o);m._ol={n:m.objs.length,l};return l}
+// los K mejores por v (desc), estable: igual que sort() y tomar los K primeros
+function topK(a,K){if(a.length<=K)return a.sort((x,y)=>y.v-x.v);const t=[];
+  for(let i=0;i<a.length;i++){const c=a[i];if(t.length===K&&c.v<=t[K-1].v)continue;let j=t.length;while(j>0&&t[j-1].v<c.v)j--;t.splice(j,0,c);if(t.length>K)t.pop()}return t}
+const AI_RADIUS=70;
+function objGrid(m){const c=m._gr;if(c&&c.n===m.objs.length)return c.l;const cs=16,gw=Math.ceil(m.w/cs),lh=m.lh||m.h;const l=[0,1].map(lv=>{const y0=lv?lh+2:0,gh=Math.ceil(lh/cs);return{cs,gw,gh,y0,towns:[],cells:Array.from({length:gw*gh},()=>[])}});
+  for(const o of m.objs){if(o.t==='boat')continue;const lv=levelOf(m,o.y),g=l[lv];if(o.t==='town'){g.towns.push(o);continue}const cx=Math.min(g.gw-1,Math.max(0,(o.x+o.ex)/cs|0)),cy=Math.min(g.gh-1,Math.max(0,(o.y+o.ey-g.y0)/cs|0));g.cells[cy*g.gw+cx].push(o)}
+  m._gr={n:m.objs.length,l};return l}
 function aiHeroAct(p,h,cb){
   const m=G.map,power=armyPower(h.army),dif=G.opt.diff==null?1:G.opt.diff,aggr=[.9,.8,.7,.6][dif];
-  const lowArmy=power<250+G.day*30;const danger=dangerMask(h,power);const cands=[];
+  const lowArmy=power<250+G.day*30;const dm=m.dmax,isD=i=>dm[i]>0&&dm[i]*1.15>=power;let cands=[];const hl=levelOf(m,h.y),lvObjs=objsByLevel(m)[hl];
   const myTowns=ownedTowns(p.id);const comp=mapComps(m),hc=comp[h.y*m.w+h.x],sea=!!m.spec.sea;
   // 1. defensa de ciudades amenazadas
   const inTown=objAtTownTile(h);
@@ -491,10 +508,10 @@ function aiHeroAct(p,h,cb){
           const e=th.who.sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0];
           if(Math.hypot(e.x-h.x,e.y-h.y)<=8&&evalFight(h,e.army,e,2).win>=.7)cands.push({o:{x:e.x,y:e.y,ex:0,ey:0},v:1e6,hero:e});else{h.mp=0;return cb(false)}}
         else cands.push({o:{x:t.x+t.ex,y:t.y+t.ey,ex:0,ey:0},v:5e5/(1+d)})}}}
-  for(const o of m.objs){
-    if(o.dead||o.t==='boat')continue;if(levelOf(m,o.y)!==levelOf(m,h.y))continue;const d=Math.hypot(o.x+o.ex-h.x,o.y+o.ey-h.y);if(d>140&&h.mp<1400)continue;let val=0;
+  const scanObj=o=>{
+    if(o.dead)return;const ddx=o.x+o.ex-h.x,ddy=o.y+o.ey-h.y,d2=ddx*ddx+ddy*ddy;if(d2>19600&&h.mp<1400)return;const d=Math.sqrt(d2);let val=0;
     {const ex=o.x+o.ex,ey=o.y+o.ey,ec=comp[ey*m.w+ex];
-      if(h.boat){if(ec<0){if(ec!==hc)continue}else if(!waterNear(m,comp,ex,ey,hc))continue}else if(ec!==hc)continue}
+      if(h.boat){if(ec<0){if(ec!==hc)return}else if(!waterNear(m,comp,ex,ey,hc))return}else if(ec!==hc)return}
     switch(o.t){
       case'res':val=(o.res==='gold'?o.n:o.n*220);break;
       case'chest':val=900;break;
@@ -507,10 +524,15 @@ function aiHeroAct(p,h,cb){
       case'gate':case'mono':if(o.dir!=='out'&&o.pair!=null&&G.day>4&&(o.id*7+G.day)%9===0)val=800;break;
       case'site':{if(SITEDEF[o.k]){val=siteAIValue(h,o,p);break}if(o.k==='shop'){if(p.res.gold>8000)val=900;break}if(o.k==='well'){if(h.mana<maxMana(h)*.5&&h.visited.well!==G.day)val=600}else if(!h.visited[o.id])val=o.k==='stone'?1200:o.k==='stable'?200:o.k==='mill'?800:700;break}
     }
-    if(val>0)cands.push({o,v:val/(8+d)});
-  }
+    if(val>0)cands.push({o,v:val/(8+d)});};
+  // índice espacial: ciudades siempre (son pocas y valen mucho); el resto, solo las celdas cercanas
+  const R=h.mp<1400?140:AI_RADIUS;const sp=objGrid(m)[hl];
+  for(const o of sp.towns)scanObj(o);
+  {const cs=sp.cs,gw=sp.gw,c0=Math.max(0,Math.floor((h.x-R)/cs)),c1=Math.min(gw-1,Math.floor((h.x+R)/cs)),r0=Math.max(0,Math.floor((h.y-R-sp.y0)/cs)),r1=Math.min(sp.gh-1,Math.floor((h.y+R-sp.y0)/cs));
+   for(let cy=r0;cy<=r1;cy++)for(let cx=c0;cx<=c1;cx++){const cell=sp.cells[cy*gw+cx];for(let q=0;q<cell.length;q++)scanObj(cell[q])}}
+  if(!cands.length)for(const o of lvObjs)if(o.t!=='town')scanObj(o); // nada cerca: búsqueda global
   for(const q of G.players)if(q.id!==p.id&&q.alive)for(const hid of q.heroes){const e=G.heroes[hid];const d=Math.hypot(e.x-h.x,e.y-h.y);if(d<45&&power>armyPower(e.army)*1.2)cands.push({o:{x:e.x,y:e.y,ex:0,ey:0},v:4000/(8+d),hero:e})}
-  cands.sort((a,b)=>b.v-a.v);
+  cands=topK(cands,10);
   if(sea&&!h.boat&&h.mp>=1000){ // ¿hay tesoros en otras tierras? entonces conviene subir a un barco
     let far=false;for(const o of m.objs){if(o.dead||o.t==='boat'||levelOf(m,o.y)!==levelOf(m,h.y))continue;if(!['res','chest','art','mine','dwell','site','town'].includes(o.t))continue;
       const ec=comp[(o.y+o.ey)*m.w+o.x+o.ex];if(ec>0&&ec!==hc&&(o.t!=='town'||o.owner<0)){far=true;break}}
@@ -523,7 +545,7 @@ function aiHeroAct(p,h,cb){
   for(const c of cands){
     if(tries>=6)break;
     const tx=c.o.x+c.o.ex,ty=c.o.y+c.o.ey;
-    const path=planPath(h,tx,ty,(x,y)=>!danger[y*m.w+x]||(Math.abs(x-tx)<=1&&Math.abs(y-ty)<=1));if(!path){tries++;continue}
+    const path=planPath(h,tx,ty,(x,y)=>!isD(y*m.w+x)||(Math.abs(x-tx)<=1&&Math.abs(y-ty)<=1));if(!path){tries++;continue}
     // comprobar el combate con una simulación
     const ob=c.o.t==='mon'?c.o:c.o.t==='town'&&c.o.owner!==p.id?c.o:null;
     if(c.hero||ob){tries++;let enemyArmy,enemyHero=null;
@@ -543,9 +565,9 @@ function aiHeroAct(p,h,cb){
       if(far&&(!cands.length||Math.random()<.5)){const bp=aiFindBoat(p,h,comp,hc);if(bp){h.path=bp;runPath(h,finish);return}}}
   }
   // sin objetivos útiles: explorar hacia un punto lejano seguro, o volver a casa
-  if(lowArmy&&myTowns.length&&!inTown){const t=myTowns[0];const path=planPath(h,t.x+t.ex,t.y+t.ey,(x,y)=>!danger[y*m.w+x]);if(path){h.path=path;runPath(h,finish);return}}
+  if(lowArmy&&myTowns.length&&!inTown){const t=myTowns[0];const path=planPath(h,t.x+t.ex,t.y+t.ey,(x,y)=>!isD(y*m.w+x));if(path){h.path=path;runPath(h,finish);return}}
   const rx=Math.floor(Math.random()*(m.w-8)+4),ry=Math.floor(Math.random()*(m.h-8)+4);
-  const path=planPath(h,rx,ry,(x,y)=>!danger[y*m.w+x]);
+  const path=planPath(h,rx,ry,(x,y)=>!isD(y*m.w+x));
   if(path){h.path=path.slice(0,40);runPath(h,finish);return}
   cb(false);
 }

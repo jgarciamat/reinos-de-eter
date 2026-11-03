@@ -3,7 +3,8 @@
 //  Gráficos procedurales: terrenos, decorados, objetos del mapa, héroes
 // =====================================================================
 const IS_TOUCH=('ontouchstart' in window)||(navigator.maxTouchPoints||0)>1; // móvil: menos memoria de canvas
-const TILE=48,SC=IS_TOUCH?1.5:2;
+const IS_PHONE=IS_TOUCH&&Math.min(screen.width,screen.height)<600;
+const TILE=48,SC=IS_PHONE?1:IS_TOUCH?1.5:2;
 const FONT='"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif';
 function mkc(w,h,s=SC){const c=document.createElement('canvas');c.width=Math.ceil(w*s);c.height=Math.ceil(h*s);const x=c.getContext('2d');x.scale(s,s);c.lw=w;c.lh=h;c.ctx=x;return c}
 const _shc={};

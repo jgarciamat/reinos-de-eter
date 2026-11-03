@@ -80,8 +80,8 @@ function drawAmbient(c,t){
     if(k==='snow'){c.fillStyle='rgba(255,255,255,.85)';c.fillRect(p.x,p.y,2.2,2.2)}
     else if(k==='ember'){c.globalCompositeOperation='lighter';c.fillStyle=`rgba(255,${120+Math.sin(p.l*8+p.ph)*60|0},40,${.5+.3*Math.sin(p.l*6)})`;c.fillRect(p.x,p.y,2.4,2.4);c.globalCompositeOperation='source-over'}
     else if(k==='dust'){c.fillStyle='rgba(230,215,170,.22)';c.fillRect(p.x,p.y,6,1.2)}
-    else if(k==='spore'){c.globalCompositeOperation='lighter';c.fillStyle=rg(c,p.x,p.y,0,6,[`rgba(${p.ph>3?'200,120,255':'120,230,255'},${.55+.35*Math.sin(p.l*3+p.ph)})`,'rgba(0,0,0,0)']);c.fillRect(p.x-6,p.y-6,12,12);c.globalCompositeOperation='source-over'}
-    else if(k==='fly'){c.globalCompositeOperation='lighter';const a=.3+.6*Math.max(0,Math.sin(p.l*2.2+p.ph));c.fillStyle=rg(c,p.x,p.y,0,7,[`rgba(220,255,120,${a})`,'rgba(0,0,0,0)']);c.fillRect(p.x-7,p.y-7,14,14);c.globalCompositeOperation='source-over'}
+    else if(k==='spore'){c.globalCompositeOperation='lighter';c.globalAlpha=.55+.35*Math.sin(p.l*3+p.ph);c.drawImage(glowSprite(p.ph>3?'rgba(200,120,255,1)':'rgba(120,230,255,1)',32),p.x-6,p.y-6,12,12);c.globalAlpha=1;c.globalCompositeOperation='source-over'}
+    else if(k==='fly'){c.globalCompositeOperation='lighter';c.globalAlpha=.3+.6*Math.max(0,Math.sin(p.l*2.2+p.ph));c.drawImage(glowSprite('rgba(220,255,120,1)',32),p.x-7,p.y-7,14,14);c.globalAlpha=1;c.globalCompositeOperation='source-over'}
     else{c.fillStyle=p.ph>3?'rgba(255,240,140,.7)':'rgba(255,255,255,.65)';c.fillRect(p.x,p.y+Math.sin(p.l*4+p.ph)*2,1.8,1.8)}}
 }
 let _DK=null;
@@ -98,8 +98,12 @@ function advDraw(dt){
   const wf=Math.floor(t*2.5)%6;
   const terrAt=(x,y)=>x<0||y<0||x>=m.w||y>=m.h?-1:m.terr[y*m.w+x];
   const TLw=(x1-x0+1)*TILE,TLh=(y1-y0+1)*TILE;
-  if(!S.TL||S.TL.lw!==TLw||S.TL.lh!==TLh){S.TL=document.createElement('canvas');S.TL.width=TLw*2;S.TL.height=TLh*2;S.TL.lw=TLw;S.TL.lh=TLh}
-  const tc=S.TL.getContext('2d');tc.setTransform(2,0,0,2,0,0);tc.translate(-x0*TILE,-y0*TILE);tc.imageSmoothingEnabled=true;
+  const TLS=UI.scale>1.5?2:UI.scale>1?1.5:1; // píxeles de canvas por píxel lógico realmente necesarios
+  if(!S.TL||S.TL.lw!==TLw||S.TL.lh!==TLh||S.TLS!==TLS){S.TL=document.createElement('canvas');S.TL.width=Math.ceil(TLw*TLS);S.TL.height=Math.ceil(TLh*TLS);S.TL.lw=TLw;S.TL.lh=TLh;S.TLS=TLS;S.TLkey=null}
+  const tlKey=x0+','+y0+','+(S.TLliq?wf:0)+','+(S.noTint?1:0);
+  if(S.TLkey!==tlKey){ // (re)pintar el terreno solo si la ventana de casillas o la fase del agua cambian
+  const tc=S.TL.getContext('2d');tc.setTransform(TLS,0,0,TLS,0,0);tc.translate(-x0*TILE,-y0*TILE);tc.imageSmoothingEnabled=true;
+  const tlLights=[];let liq=false;
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
     const i=y*m.w+x,tr=m.terr[i],hv=Math.floor(hash2(x,y,3)*6);const px=x*TILE,py=y*TILE;
     tc.drawImage((tr===WATER||tr===LAVA)?Gfx.tiles[tr][(wf+hv)%6]:Gfx.tiles[tr][hv],px,py,TILE,TILE);
@@ -109,7 +113,8 @@ function advDraw(dt){
       if(lq){if(!nq)tc.drawImage((tr===WATER?Gfx.shoreW:Gfx.lavaW)[s],px,py,TILE,TILE)}
       else if(nq){tc.drawImage((n===WATER?Gfx.shoreL:Gfx.lavaL)[s],px,py,TILE,TILE)}
       else if(TPRIO[n]>TPRIO[tr]&&Gfx.edges[n])tc.drawImage(Gfx.edges[n][s],px,py,TILE,TILE)}
-    if(tr===LAVA){lights.push({x:px+TILE/2,y:py+TILE/2,r:56,col:'rgba(255,140,50,.38)'})}
+    if(tr===LAVA){tlLights.push({x:px+TILE/2,y:py+TILE/2,r:56,col:'rgba(255,140,50,.38)'})}
+    if(tr===WATER||tr===LAVA)liq=true;
   }
   // decoración del suelo (matas, flores, huesos...)
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const i=y*m.w+x;const tr=m.terr[i];if(m.deco[i]||m.fp[i]||m.road[i]||tr===WATER||tr===LAVA)continue;decalAt(tc,x,y,tr)}
@@ -117,6 +122,8 @@ function advDraw(dt){
   if(!S.noTint)for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const n=NZ(x/10,y/10)*.7+NZ(x/5+40,y/5)*.3;if(m.terr[y*m.w+x]===WATER||m.terr[y*m.w+x]===LAVA)continue;tc.fillStyle=n>.5?`rgba(255,255,220,${(n-.5)*.16})`:`rgba(0,0,30,${(.5-n)*.2})`;tc.fillRect(x*TILE,y*TILE,TILE,TILE)}
   for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){if(!m.road[y*m.w+x])continue;tc.drawImage(Gfx.road[8],x*TILE,y*TILE,TILE,TILE);
     Gfx.roadDirs.forEach((d,k)=>{const nx=x+d[0],ny=y+d[1];if(nx>=0&&ny>=0&&nx<m.w&&ny<m.h&&m.road[ny*m.w+nx])tc.drawImage(Gfx.road[k],x*TILE,y*TILE,TILE,TILE)})}
+  S.TLkey=tlKey;S.TLliq=liq;S.TLlights=tlLights}
+  for(const l of S.TLlights)lights.push(l);
   c.drawImage(S.TL,x0*TILE,y0*TILE,TLw,TLh);
   // elementos ordenados por y
   const L=[];
@@ -154,18 +161,22 @@ function advDraw(dt){
   try{postFX(c,0,0,VPW,VPH,{mood:S.lvl?'cave':'day',bloom:.16})}catch(e){c.fillStyle=rg(c,VPW/2,VPH/2,VPH*.45,VPW*.75,['rgba(0,0,0,0)','rgba(8,4,16,.42)']);c.fillRect(0,0,VPW,VPH)}c.restore();
 }
 const NZ=noise2(4242);
-let _fogC=null,_fogB=null;
+let _fogC=null,_fogB=null,_fogM=null,_fogMk='',_fogDirty=true;
 function drawFog(c,cx,cy,x0,y0,x1,y1){
-  const w=x1-x0+1,h=y1-y0+1;if(!_fogC||_fogC.width!==w||_fogC.height!==h){_fogC=document.createElement('canvas');_fogC.width=w;_fogC.height=h}
-  const fx=_fogC.getContext('2d'),img=fx.createImageData(w,h),m=G.map,fog=G.players[0].fog;
+  const w=x1-x0+1,h=y1-y0+1;if(!_fogC||_fogC.width!==w||_fogC.height!==h){_fogC=document.createElement('canvas');_fogC.width=w;_fogC.height=h;_fogDirty=true}
+  const m=G.map,fog=G.players[0].fog;
+  const msk=new Uint8Array(w*h);
   for(let j=0;j<h;j++)for(let i=0;i<w;i++){const x=x0+i,y=y0+j;let a=0;
-    if(x>=m.w||y>=m.h)a=255;else if(isVis(x,y))a=0;else if(fog[y*m.w+x])a=110;else a=255;
-    const k=(j*w+i)*4;img.data[k]=6;img.data[k+1]=4;img.data[k+2]=16;img.data[k+3]=a}
-  fx.putImageData(img,0,0);
+    if(x>=m.w||y>=m.h)a=255;else if(isVis(x,y))a=0;else if(fog[y*m.w+x])a=110;else a=255;msk[j*w+i]=a}
+  let same=_fogM&&_fogM.length===msk.length&&_fogMk===x0+','+y0+','+w;if(same)for(let q=0;q<msk.length;q++)if(msk[q]!==_fogM[q]){same=false;break}
+  if(!same){_fogM=msk;_fogMk=x0+','+y0+','+w;_fogDirty=true}
+  if(_fogDirty){const fx=_fogC.getContext('2d'),img=fx.createImageData(w,h);
+    for(let q=0;q<msk.length;q++){const k=q*4;img.data[k]=6;img.data[k+1]=4;img.data[k+2]=16;img.data[k+3]=msk[q]}
+    fx.putImageData(img,0,0)}
   c.save();c.beginPath();c.rect(0,0,VPW,VPH);c.clip();c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
   // se amplía con suavizado -> bordes difuminados
-  if(!_fogB||_fogB.width!==w*12||_fogB.height!==h*12){_fogB=document.createElement('canvas');_fogB.width=w*12;_fogB.height=h*12}
-  const bx=_fogB.getContext('2d');bx.clearRect(0,0,_fogB.width,_fogB.height);bx.imageSmoothingEnabled=true;bx.filter='blur(7px)';bx.drawImage(_fogC,-6,-6,_fogB.width+12,_fogB.height+12);bx.filter='none';
+  if(!_fogB||_fogB.width!==w*12||_fogB.height!==h*12){_fogB=document.createElement('canvas');_fogB.width=w*12;_fogB.height=h*12;_fogDirty=true}
+  if(_fogDirty){const bx=_fogB.getContext('2d');bx.clearRect(0,0,_fogB.width,_fogB.height);bx.imageSmoothingEnabled=true;bx.filter='blur(7px)';bx.drawImage(_fogC,-6,-6,_fogB.width+12,_fogB.height+12);bx.filter='none';_fogDirty=false}
   c.drawImage(_fogB,x0*TILE-cx,y0*TILE-cy,w*TILE,h*TILE);c.restore();
 }
 function drawHeroOnMap(h,hx,hy,t){
@@ -201,7 +212,7 @@ function drawMinimap(x,y,sz){
   panel(x-6,y-6,sz+12,sz+12,{plain:1,r:6,noshadow:1});
   c.save();c.beginPath();c.rect(x,y,sz,sz);c.clip();c.imageSmoothingEnabled=true;c.drawImage(S.mini,0,y0,m.w,m.lh,x,y,sz,sz);
   const fog=G.players[0].fog;
-  for(const o of m.objs){if(o.dead||levelOf(m,o.y)!==lvl||!(o.t==='town'||(o.t==='mine'&&o.owner>=0)||o.t==='gate'))continue;const ex=o.x+o.ex,ey=o.y+o.ey;if(!fog[ey*m.w+ex]&&o.owner!==0)continue;
+  for(const o of objsWhere('mm',o=>o.t==='town'||o.t==='mine'||o.t==='gate')){if(o.dead||levelOf(m,o.y)!==lvl||!(o.t==='town'||(o.t==='mine'&&o.owner>=0)||o.t==='gate'))continue;const ex=o.x+o.ex,ey=o.y+o.ey;if(!fog[ey*m.w+ex]&&o.owner!==0)continue;
     const col=o.t==='gate'?'#ffd890':o.owner>=0?G.players[o.owner].col:'#bbb';c.fillStyle='#000';const s=o.t==='town'?5:3;const px=x+(o.x+o.w/2)*sc,py=y+(o.y-y0+o.h/2)*sc;c.fillRect(px-s/2-1,py-s/2-1,s+2,s+2);c.fillStyle=col;c.fillRect(px-s/2,py-s/2,s,s)}
   c.drawImage(S.miniFog,0,y0,m.w,m.lh,x,y,sz,sz);
   for(const h of G.heroes){if(!h.alive||h.x<0||levelOf(m,h.y)!==lvl)continue;if(h.pid!==0&&!isVis(h.x,h.y))continue;c.fillStyle='#000';c.fillRect(x+h.x*sc-3,y+(h.y-y0)*sc-3,6,6);c.fillStyle=G.players[h.pid].col;c.fillRect(x+h.x*sc-2,y+(h.y-y0)*sc-2,4,4)}

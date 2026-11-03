@@ -122,6 +122,7 @@ const MATOF={golem:'stone',tree:'stone',dragon:'scale',serp:'scale',naga:'scale'
 const matOf=cr=>MATOF[cr.arch]||'skin';
 // c = canvas de mkc con el sprite ya pintado. Modifica c en sitio.
 function polishSprite(c,o={}){
+  const _tmp=[];const mkc=(a,b)=>{const q=window.mkc(a,b);_tmp.push(q);return q};
   const w=c.lw,h=c.lh,x=c.ctx;
   const src=mkc(w,h),sx=src.ctx;sx.drawImage(c,0,0,w,h);                       // copia del sprite original
   // máscara 'sólida': descarta sombras suaves y destellos (alfa < 55%) para que contorno/luces sigan solo el cuerpo
@@ -145,6 +146,7 @@ function polishSprite(c,o={}){
   // 6) oclusión ambiental en el tercio inferior y gradiente tonal global (3 tonos: luz / media / sombra)
   {const t=mkc(w,h),g=t.ctx;g.drawImage(msk,0,0,w,h);g.globalCompositeOperation='source-in';
     g.fillStyle=lg(g,0,h*.55,0,h*.97,['rgba(14,6,30,0)','rgba(14,6,30,.34)']);g.fillRect(0,0,w,h);x.drawImage(t,0,0,w,h)}
+  for(const q of _tmp){q.width=q.height=0}
   return c;
 }
 
@@ -161,7 +163,8 @@ const PFX={ov:{},bl:null,bl2:null};
 const MOODS={day:{hi:'rgba(255,214,150,.15)',lo:'rgba(80,70,140,.20)',vig:.44},cave:{hi:'rgba(150,200,255,.10)',lo:'rgba(60,20,110,.40)',vig:.62},
              battle:{hi:'rgba(255,205,140,.18)',lo:'rgba(60,40,110,.30)',vig:.52},town:{hi:'rgba(255,225,170,.18)',lo:'rgba(60,40,90,.24)',vig:.40}};
 function postOverlay(w,h,mood){
-  const key=mood+w+'x'+h;if(PFX.ov[key])return PFX.ov[key];const M=MOODS[mood]||MOODS.day,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
+  const key=mood+w+'x'+h;if(PFX.ov[key])return PFX.ov[key];
+  for(const k in PFX.ov)if(k.startsWith(mood)&&k!==key){const o=PFX.ov[k];for(const q in o)if(o[q]&&o[q].width!==undefined)o[q].width=o[q].height=0;delete PFX.ov[k]}const M=MOODS[mood]||MOODS.day,c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');
   // gradación: luz cálida desde arriba-izquierda (soft-light) y sombras frías/violetas hacia abajo-derecha (multiply)
   g.globalCompositeOperation='source-over';g.fillStyle='rgba(0,0,0,0)';
   const hi=g.createLinearGradient(0,0,w,h);hi.addColorStop(0,M.hi);hi.addColorStop(.6,'rgba(0,0,0,0)');

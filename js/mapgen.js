@@ -57,7 +57,9 @@ function mapSpec(i){
 }
 // ---------- ruido ----------
 function noise2(seed){
-  const h=(x,y)=>{let n=(x*374761393+y*668265263+seed*982451653)|0;n=Math.imul(n^(n>>>13),1274126177);return((n^(n>>>16))>>>0)/4294967296};
+  const h0=(x,y)=>{let n=(x*374761393+y*668265263+seed*982451653)|0;n=Math.imul(n^(n>>>13),1274126177);return((n^(n>>>16))>>>0)/4294967296};
+  const D=320,cache=new Float64Array(D*D).fill(-1); // valores de la retícula memoizados (mismo valor exacto que h0)
+  const h=(x,y)=>{if(x>=0&&y>=0&&x<D&&y<D){const k=y*D+x;let v=cache[k];if(v<0)v=cache[k]=h0(x,y);return v}return h0(x,y)};
   return(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
     const a=h(xi,yi),b=h(xi+1,yi),c=h(xi,yi+1),d=h(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v};
 }
@@ -72,35 +74,44 @@ function stepCost(m,x,y,px,py,pf,water){
   if(!water){const tc=TERR[m.terr[i]].cost;c=100+(tc-100)*(1-PF_RED[pf||0]);if(m.road[i]&&m.road[pi])c=65}
   return(x!==px&&y!==py)?c*1.414:c;
 }
-let _A={g:null,from:null,stamp:null,st:0,n:0};
+let _A={g:null,from:null,stamp:null,st:0,n:0,hF:new Float64Array(1<<16),hI:new Int32Array(1<<16)};
+const _DX=[1,-1,0,0,1,1,-1,-1],_DY=[0,0,1,-1,1,-1,1,-1];
 function findPath(m,sx,sy,tx,ty,opt={}){
-  const w=m.w,n=m.w*m.h,water=!!opt.boat,pf=opt.pf||0;
+  const w=m.w,hgt=m.h,n=w*hgt,water=!!opt.boat,pf=opt.pf||0;
   if(_A.n!==n){_A.g=new Float32Array(n);_A.from=new Int32Array(n);_A.stamp=new Uint32Array(n);_A.st=0;_A.n=n}
   const A=_A;A.st++;const st=A.st;const ti=ty*w+tx,si=sy*w+sx;const ok=opt.ok||null;
-  const heap=[];const push=(f,i)=>{heap.push([f,i]);let k=heap.length-1;while(k>0){const p=(k-1)>>1;if(heap[p][0]<=heap[k][0])break;[heap[p],heap[k]]=[heap[k],heap[p]];k=p}};
-  const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let k=0;for(;;){let l=2*k+1,r=l+1,s=k;if(l<heap.length&&heap[l][0]<heap[s][0])s=l;if(r<heap.length&&heap[r][0]<heap[s][0])s=r;if(s===k)break;[heap[s],heap[k]]=[heap[k],heap[s]];k=s}}return top};
-  // el destino debe ser válido
-  {const t=m.terr[ti],ob=m.en[ti]?m.objs[m.en[ti]-1]:null;
-    if(m.deco[ti])return null;if(m.fp[ti]&&m.fp[ti]!==m.en[ti])return null;
+  const terr=m.terr,deco=m.deco,fp=m.fp,en=m.en,road=m.road,zoc=m.zoc,G_=A.g,FR=A.from,SM=A.stamp;
+  // montón binario con arrays tipados (mismo orden de desempate que la versión con arrays de pares)
+  let hF=A.hF,hI=A.hI,hn=0;
+  const push=(f,i)=>{if(hn===hF.length){const nf=new Float64Array(hn*2),ni=new Int32Array(hn*2);nf.set(hF);ni.set(hI);A.hF=hF=nf;A.hI=hI=ni}
+    let k=hn++;while(k>0){const p=(k-1)>>1;if(hF[p]<=f)break;hF[k]=hF[p];hI[k]=hI[p];k=p}hF[k]=f;hI[k]=i};
+  let popI=0;
+  const pop=()=>{popI=hI[0];const lf=hF[--hn],li=hI[hn];if(hn){let k=0;for(;;){let l=2*k+1,r=l+1,s=-1,sf=lf;if(l<hn&&hF[l]<sf){s=l;sf=hF[l]}if(r<hn&&hF[r]<sf){s=r;sf=hF[r]}if(s<0)break;hF[k]=hF[s];hI[k]=hI[s];k=s}hF[k]=lf;hI[k]=li}};
+  {const t=terr[ti],ob=en[ti]?m.objs[en[ti]-1]:null;
+    if(deco[ti])return null;if(fp[ti]&&fp[ti]!==en[ti])return null;
     if(water){if(t!==WATER&&IMP(t))return null}else{if(IMP(t)&&!(t===WATER&&ob&&ob.t==='boat'))return null}}
-  A.stamp[si]=st;A.g[si]=0;A.from[si]=-1;push(0,si);
-  const hf=(x,y)=>Math.max(Math.abs(x-tx),Math.abs(y-ty))*(opt.minCost||65);
+  SM[si]=st;G_[si]=0;FR[si]=-1;push(0,si);
+  const mc=opt.minCost||65,tcost=[];for(let t=0;t<TERR.length;t++)tcost[t]=100+(TERR[t].cost-100)*(1-PF_RED[pf]);
+  const pass=(x,y)=>{if(x<0||y<0||x>=w||y>=hgt)return false;const i=y*w+x;const t=terr[i];if(water?t!==WATER:(t===WATER||t===LAVA))return false;if(deco[i])return false;if(fp[i]&&fp[i]!==en[i])return false;return true};
   let expanded=0;const lim=opt.limit||90000;
-  while(heap.length){
-    const[,ci]=pop();const cx=ci%w,cy=(ci/w)|0;
+  while(hn>0){
+    pop();const ci=popI;const cx=ci%w,cy=(ci/w)|0;
     if(ci===ti)break;
     if(++expanded>lim)return null;
-    for(const[dx,dy]of D8){
-      const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=w||ny>=m.h)continue;
-      const ni=ny*w+nx;const isT=ni===ti;
-      if(!isT){if(!tilePass(m,nx,ny,water))continue;if(m.en[ni])continue;if(ok&&!ok(nx,ny))continue}
-      if(dx&&dy&&!tilePass(m,cx+dx,cy,water)&&!tilePass(m,cx,cy+dy,water))continue;
-      const g=A.g[ci]+stepCost(m,nx,ny,cx,cy,pf,water&&m.terr[ni]===WATER)+(m.zoc&&m.zoc[ni]?250:0);
-      if(A.stamp[ni]!==st||g<A.g[ni]){A.stamp[ni]=st;A.g[ni]=g;A.from[ni]=ci;push(g+hf(nx,ny),ni)}
+    const gc=G_[ci];
+    for(let d=0;d<8;d++){
+      const dx=_DX[d],dy=_DY[d],nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=w||ny>=hgt)continue;
+      const ni=ny*w+nx;
+      if(ni!==ti){if(!pass(nx,ny))continue;if(en[ni])continue;if(ok&&!ok(nx,ny))continue}
+      if(dx&&dy&&!pass(cx+dx,cy)&&!pass(cx,cy+dy))continue;
+      let c=100;if(!(water&&terr[ni]===WATER)){c=tcost[terr[ni]];if(road[ni]&&road[ci])c=65}
+      if(dx&&dy)c*=1.414;
+      const g=gc+c+(zoc&&zoc[ni]?250:0);
+      if(SM[ni]!==st||g<G_[ni]){SM[ni]=st;G_[ni]=g;FR[ni]=ci;const ddx=nx>tx?nx-tx:tx-nx,ddy=ny>ty?ny-ty:ty-ny;push(g+(ddx>ddy?ddx:ddy)*mc,ni)}
     }
   }
-  if(A.stamp[ti]!==st)return null;
-  const path=[];let c=ti;while(c!==si){const px=A.from[c]%w,py=(A.from[c]/w)|0,x=c%w,y=(c/w)|0;path.push({x,y,c:Math.round(stepCost(m,x,y,px,py,pf,water&&m.terr[c]===WATER))});c=A.from[c]}
+  if(SM[ti]!==st)return null;
+  const path=[];let c=ti;while(c!==si){const px=FR[c]%w,py=(FR[c]/w)|0,x=c%w,y=(c/w)|0;path.push({x,y,c:Math.round(stepCost(m,x,y,px,py,pf,water&&m.terr[c]===WATER))});c=FR[c]}
   path.reverse();return path;
 }
 

@@ -28,7 +28,7 @@ function buildLavaShores(){
   }
 }
 // ---------- sombra silueta y brillo ----------
-function silhouette(img,k=.4){const key=img.__sil;if(key)return key;const c=mkc(img.lw,img.lh);const x=c.ctx;x.drawImage(img,0,0,img.lw,img.lh);x.globalCompositeOperation='source-in';x.fillStyle=`rgba(8,6,18,${k})`;x.fillRect(0,0,img.lw,img.lh);return img.__sil=c}
+function silhouette(img,k=.4){const key=img.__sil;if(key)return key;const c=mkc(img.lw,img.lh,1);const x=c.ctx;x.drawImage(img,0,0,img.lw,img.lh);x.globalCompositeOperation='source-in';x.fillStyle=`rgba(8,6,18,${k})`;x.fillRect(0,0,img.lw,img.lh);return img.__sil=c}
 function drawCast(c,img,bx,by,dx,dy,w,h,sway=0){ // sombra proyectada hacia la derecha-abajo
   const s=silhouette(img);c.save();c.translate(bx,by);c.transform(1,0,-.55+sway*.4,-.34,0,0);c.drawImage(s,dx,-dy-h+h,w,h);c.restore()}
 let _glow={};

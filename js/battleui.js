@@ -224,4 +224,4 @@ function showBattleResult(){
   Dlg.show({title:won?'¡Victoria!':'Derrota',w:520,text:(b.fled!=null?(b.fled===me?'Has abandonado el campo de batalla.':'El enemigo huye del combate.'):won?'Tus fuerzas han vencido.':'Tus fuerzas han sido derrotadas.')+'\n'+lines.join('\n')+(won?`\nExperiencia ganada: ${xp}`:''),
     buttons:[{label:'Continuar',primary:1,fn:()=>endBattleUI()}]});
 }
-function endBattleUI(){fadeTo(()=>{S.scr=S.prevScr||'adv';const d=BU.done;BU.b=null;fadeIn(2.5);d&&d();setTimeout(()=>{if(G.map&&!G.over)autosave()},400)},3)}
+function endBattleUI(){fadeTo(()=>{S.scr=S.prevScr||'adv';const d=BU.done;if(BU.bg){BU.bg.width=BU.bg.height=0;BU.bg=null}BU.b=null;fadeIn(2.5);d&&d();setTimeout(()=>{if(G.map&&!G.over)autosave()},400)},3)}
