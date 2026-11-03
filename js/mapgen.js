@@ -40,7 +40,7 @@ function victoryText(v){
     default:return'Derrota a todos tus rivales.'}}
 // v1 = mapas antiguos (partidas guardadas), v2 = mitad de superficie y menos criaturas/recursos sueltos
 // v3: criaturas con el esquema de niveles de Heroes 3 (los mapas v1-v2 se regeneran con los valores anteriores para no mover los objetos)
-const MAP_SCALES={1:3.15,2:2.23,3:2.23},MGV_CUR=3;
+const MAP_SCALES={1:3.15,2:2.23,3:2.23,4:2.23},MGV_CUR=4;
 let GENCR=CR,GENALL=ALL_BY_VAL;
 function mapSpec(i,mv){mv=mv||MGV_CUR;
   const r=mulberry(9001+i*7919);
@@ -376,6 +376,24 @@ function genLevel(spec,opt={}){
     for(let k=0;k<Math.round((V1?40:30)*sc);k++){const x=4+Math.floor(r()*(W-8)),y=4+Math.floor(r()*(H-8));const i=y*W+x;if(m.terr[i]!==WATER||m.fp[i]||m.en[i])continue;addObj({t:'site',k:pick(r,['buoy','mermaids','wreck']),x,y,isle:1,used:{}})}
     for(let k=0;k<Math.round((V1?70:40)*sc);k++){const x=4+Math.floor(r()*(W-8)),y=4+Math.floor(r()*(H-8));const i=y*W+x;if(m.terr[i]!==WATER||m.fp[i])continue;let ok=true;for(let j=-1;j<=1&&ok;j++)for(let q=-1;q<=1;q++)if(m.terr[i+j*W+q]!==WATER||m.fp[i+j*W+q])ok=false;if(!ok)continue;
       if(r()<.2)addObj({t:'chest',x,y,isle:1});else{const rs=r()<.3?'gold':pick(r,RES.slice(1));addObj({t:'res',res:rs,n:rs==='gold'?irnd(r,4,12)*100:irnd(r,3,8),x,y,isle:1})}}
+  }
+  if(keepIslands&&spec.mv>=4){ // mar vivo: restos flotantes, naufragios custodiados y remolinos (RNG propio)
+    const rs=mulberry(spec.seed+4444),open=[];
+    const wok=(x,y,rad)=>{for(let j=-rad;j<=rad;j++)for(let q=-rad;q<=rad;q++){const k=(y+j)*W+x+q;if(m.terr[k]!==WATER||m.fp[k]||m.en[k]||m.deco[k])return false}return true};
+    for(let y=5;y<H-5;y++)for(let x=5;x<W-5;x++)if(wok(x,y,1))open.push({x,y});
+    const pickO=()=>open[Math.floor(rs()*open.length)];
+    const seaGuard=(x,y,pw,pre)=>{const lo=pw/70,hi=pw/2.2,cand=GENALL.filter(id=>pre.some(p=>id.startsWith(p))&&GENCR[id].val>=lo&&GENCR[id].val<=hi);
+      if(!cand.length)return;const cid=cand[Math.floor(rs()*cand.length)];
+      for(const[dx,dy]of[[0,1],[1,0],[-1,0],[0,-1],[1,1],[-1,1]]){const gx=x+dx,gy=y+dy,k=gy*W+gx;if(m.terr[k]===WATER&&!m.fp[k]&&!m.en[k]){addObj({t:'mon',cr:cid,n:Math.max(1,Math.round(pw*(.75+rs()*.5)/GENCR[cid].val)),x:gx,y:gy,isle:1});return}}};
+    if(open.length>50){
+      for(let k=0;k<Math.round(W/4);k++){const p=pickO();if(p&&!m.fp[p.y*W+p.x]&&wok(p.x,p.y,1))addObj({t:'site',k:'flotsam',x:p.x,y:p.y,isle:1,used:{}})}
+      for(let k=0;k<Math.round(W/9);k++){const p=pickO();if(!p||!wok(p.x,p.y,1))continue;const dg=danger(p.x,p.y);
+        addObj({t:'site',k:'shipwreck',x:p.x,y:p.y,isle:1,used:{}});seaGuard(p.x,p.y,1200+dg*dg*4200*spec.monsters,['f2','f5','f6'])}
+      const np=Math.max(1,Math.round(W/36));
+      for(let k=0;k<np;k++){const a=pickO();if(!a||m.fp[a.y*W+a.x])continue;let b=null,bd=0;
+        for(let q=0;q<60;q++){const c=pickO();const d=Math.hypot(c.x-a.x,c.y-a.y);if(d>bd&&!m.fp[c.y*W+c.x]&&d>W*.25){bd=d;b=c}}
+        if(!b)continue;const A=addObj({t:'site',k:'whirl',x:a.x,y:a.y,isle:1,used:{}});const B=addObj({t:'site',k:'whirl',x:b.x,y:b.y,isle:1,used:{}});A.pair=B.id;B.pair=A.id}
+    }
   }
   // decoración / obstáculos: cordilleras (crestas con gargantas), bosquetes (arboleda agrupada) y árboles sueltos muy escasos
   const density=spec.forest*(under?1.1:1);

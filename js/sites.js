@@ -46,6 +46,12 @@ const SITEDEF={
  cache:{n:'Almacén del cíclope',w:1,sh:'cache',c:['#6a5a3a','#b8a070'],gl:'coin',once:'remove',guard:.6,v:1700,eff(h,o,p){p.res.gold+=3000;for(let i=0;i<3;i++){const r=randRes();p.res[r]+=6}return'El almacén contiene 3000 de oro y recursos variados'}},
  buoy:{n:'Boya',w:0,sh:'buoy',c:['#e83a2a','#f0f0f0'],gl:'flag',once:'hero',sea:1,v:350,eff(h){if(!h.boat)return['Solo puedes usarla desde un barco'];h.tmp=h.tmp||{};h.tmp.mor=Math.max(h.tmp.mor||0,1);return'La boya eleva tu moral'}},
  mermaids:{n:'Sirenas',w:0,sh:'mermaid',c:['#3aa8c8','#c8f0f0'],gl:'clover',once:'day',sea:1,v:350,eff(h){if(!h.boat)return['Solo puedes usarla desde un barco'];h.tmp=h.tmp||{};h.tmp.luck=Math.max(h.tmp.luck||0,2);return'Las sirenas te dan suerte'}},
+ flotsam:{n:'Restos flotantes',w:0,sh:'flotsam',c:['#8a6a3a','#d8c090'],gl:'coin',once:'remove',sea:1,v:500,eff(h,o,p){const w=5+Math.floor(Math.random()*6),g=(2+Math.floor(Math.random()*5))*100;p.res.wood+=w;p.res.gold+=g;return`Recoges ${w} de madera y ${g} de oro de los restos`}},
+ shipwreck:{n:'Naufragio custodiado',w:0,sh:'wreck',c:['#5a4a6a','#b8a8d0'],gl:'skull',once:'remove',sea:1,v:1800,eff(h,o,p){if(!h.boat)return['Solo puedes explorarlo desde un barco'];const t=Math.random(),g=1000+Math.floor(Math.random()*16)*100;p.res.gold+=g;
+   if(t<.4)return`Registras el casco: ${g} de oro`;
+   if(t<.75){const a=rewardArt(h,1,3);return a?`Entre los restos hay ${g} de oro y un artefacto: ${ART[a].n}`:`Registras el casco: ${g} de oro`}
+   const r1=randRes(),r2=randRes();p.res[r1]+=5;p.res[r2]+=5;gainXp(h,1500);return`Botín del naufragio: ${g} de oro, 5 de ${RESN[r1]}, 5 de ${RESN[r2]} y 1500 de experiencia`}},
+ whirl:{n:'Remolino',w:0,sh:'whirl',c:['#2a7ab8','#b8e8ff'],gl:'',once:'',sea:1,v:0,eff(){return false}},
  wreck:{n:'Naufragio',w:0,sh:'wreck',c:['#4a3a2a','#8a7a5a'],gl:'coin',once:'remove',sea:1,v:900,eff(h,o,p){p.res.gold+=1500;const a=rewardArt(h,1,2);return'Rescatas 1500 de oro'+(a?` y ${ART[a].n}`:'')}}
 };
 SITEDEF.seer={n:'Cabaña del vidente',w:0,sh:'tower',c:['#7a3a9a','#d8c8f0'],gl:'star',once:'',v:0,eff(){return false}};
@@ -125,7 +131,19 @@ Misiones cumplidas: ${G.qdone}.`);if(G.hooks.sfx)G.hooks.sfx('level');
   if(typeof checkVictory==='function')checkVictory();
 }
 function allQuests(){return G.map.objs.filter(o=>!o.dead&&o.t==='site'&&o.k==='seer'&&o.q&&o.q.acc)}
+function visitWhirl(h,o,p){
+  if(!h.boat){notify('Solo un barco puede cruzar el remolino','bad');return}
+  const m=G.map,dest=o.pair!=null?m.objs[o.pair]:null;if(!dest||dest.dead){notify('El remolino se ha calmado','bad');return}
+  let L=null;for(let rad=1;rad<=3&&!L;rad++)for(let dy=-rad;dy<=rad&&!L;dy++)for(let dx=-rad;dx<=rad;dx++){const x=dest.x+dx,y=dest.y+dy;if(x<0||y<0||x>=m.w||y>=m.h)continue;const k=y*m.w+x;
+    if(m.terr[k]===WATER&&!m.fp[k]&&!m.en[k]&&!G.hmap[k]){L={x,y};break}}
+  if(!L){notify('El remolino está bloqueado','bad');return}
+  const from={x:h.x,y:h.y};if(G.hmap[mapIdx(h.x,h.y)]===h.id+1)G.hmap[mapIdx(h.x,h.y)]=0;h.x=L.x;h.y=L.y;G.hmap[mapIdx(L.x,L.y)]=h.id+1;h.path=null;
+  if(p.fog)reveal(p,L.x,L.y,heroVis(h));if(G.hooks.teleport)G.hooks.teleport(h,from,L);
+  let loss='';const st=h.army.filter(s=>s&&s.n>1);if(st.length){st.sort((a,b)=>CR[a.id].val*a.n-CR[b.id].val*b.n);const w=st[0],n=Math.floor(w.n/2);w.n-=n;loss=` y pierde ${n} ${CR[w.id].name}`}
+  notify(`${h.name} es arrastrado por el remolino a otra zona del mar${loss}`,'good');if(G.hooks.sfx)G.hooks.sfx('boat');
+}
 function visitSite2(h,o,p){
+  if(o.k==='whirl'){visitWhirl(h,o,p);return true}
   if(o.k==='seer'){visitSeer(h,o,p);return true}
   const d=SITEDEF[o.k];const id=o.id,wk=SITE_WEEK();
   if(d.once==='hero'&&h.visited[id]){notify('Ya has estado aquí','bad');return false}
@@ -187,6 +205,8 @@ function siteSprite2(k){
     case'cache':for(const[dx,dy]of[[-12,0],[2,0],[-5,-12],[14,-3]]){rrect(x,cx+dx-7,by+dy-14,14,14,2,lg(x,cx+dx-7,0,cx+dx+7,0,[shade(c1,.3),c1,shade(c1,-.4)]),OUT,1.2);x.strokeStyle=c2;x.lineWidth=1.4;x.strokeRect(cx+dx-7,by+dy-9,14,3)}ell(x,cx,by-30,5,5,'#ffd24a',OUT,1);break;
     case'buoy':ell(x,cx,by-4,16,5,'rgba(255,255,255,.25)');poly(x,[[cx-8,by-8],[cx-5,by-26],[cx+5,by-26],[cx+8,by-8]],lg(x,cx-8,0,cx+8,0,[c1,shade(c1,-.4)]),OUT,1.3);rrect(x,cx-6,by-18,12,5,1,c2);x.strokeStyle=OUT;x.lineWidth=1.6;x.beginPath();x.moveTo(cx,by-26);x.lineTo(cx,by-38);x.stroke();ell(x,cx,by-40,3,3,'#ffd24a',OUT,1);break;
     case'mermaid':poly(x,[[cx-18,by],[cx-12,by-18],[cx+4,by-22],[cx+16,by-10],[cx+20,by]],lg(x,cx-18,by-22,cx+20,by,['#7a8090','#4a5060','#2a3040']),OUT,1.4);ell(x,cx-2,by-30,5,5,'#f0d0b8',OUT,1);poly(x,[[cx-7,by-30],[cx-12,by-18],[cx-3,by-24]],'#c84a8a',OUT,1);poly(x,[[cx-3,by-24],[cx+3,by-22],[cx+1,by-14],[cx-6,by-18]],c1,OUT,1);poly(x,[[cx+1,by-14],[cx+10,by-8],[cx+4,by-6]],c1,OUT,1);break;
+    case'flotsam':{ell(x,cx,by-3,20,5,'rgba(255,255,255,.2)');x.save();x.translate(cx-6,by-8);x.rotate(-.3);rrect(x,-14,-4,28,7,2,lg(x,-14,-4,14,4,['#a07a48','#6a4a28']),OUT,1.2);x.restore();x.save();x.translate(cx+10,by-5);x.rotate(.4);rrect(x,-10,-3,20,6,2,lg(x,-10,-3,10,3,['#8a6a3a','#5a3a1e']),OUT,1.2);x.restore();rrect(x,cx-3,by-20,12,11,2,lg(x,cx-3,by-20,cx+9,by-9,['#c89a50','#7a5a2a']),OUT,1.3);x.fillStyle='#e8c25a';x.fillRect(cx-3,by-16,12,2);break}
+    case'whirl':{for(let i=0;i<5;i++){x.strokeStyle=`rgba(${60+i*35},${150+i*18},${210+i*9},${.9-i*.12})`;x.lineWidth=3-i*.4;x.beginPath();for(let a=0;a<9;a+=.25){const rr=2+a*3-i*.5,px=cx+Math.cos(a+i*1.3)*rr,py=by-14+Math.sin(a+i*1.3)*rr*.45;a?x.lineTo(px,py):x.moveTo(px,py)}x.stroke()}ell(x,cx,by-14,3,1.6,'#04162a');break}
     case'wreck':x.save();x.translate(cx,by-6);x.rotate(-.18);poly(x,[[-24,-4],[24,-10],[18,8],[-18,10]],lg(x,-24,-10,24,10,['#6a4a2a','#4a3220','#2a1a10']),OUT,1.5);x.fillStyle='#2a1a10';x.fillRect(-1,-40,3,34);poly(x,[[2,-38],[16,-30],[2,-22]],'#8a8470',OUT,1);x.restore();break;
   }
   if(d.gl)glyphBadge(x,cx+19,by-60<6?12:12,d.gl,c1);
