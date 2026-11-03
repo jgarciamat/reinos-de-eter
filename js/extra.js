@@ -19,3 +19,22 @@ G.hooks.quickReport=(b,A,D,done)=>{
   else L.push('',`${b.round} rondas`);
   Dlg.show({title:won?'¡Victoria! (combate rápido)':'Derrota (combate rápido)',w:560,text:L.join('\n'),buttons:[{label:'Aceptar',primary:1,fn:done}]});
 };
+
+G.hooks.dialog=(title,text)=>Dlg.show({title,w:560,text,buttons:[{label:'Entendido',primary:1}]});
+function openObjectives(){
+  const m=G.map,v=m.vic||{t:'conquest'};
+  Dlg.show({title:'Objetivos',w:760,draw:()=>{const x=260,y=70,w=760,hh=580;panel(x,y,w,hh,{title:'Objetivos y misiones'});
+    const sp=m.spec;text(`${sp.lvn} · ${sp.startTowns} castillo${sp.startTowns>1?'s':''} inicial${sp.startTowns>1?'es':''}`,x+24,y+54,{size:14,color:'#c8b890'});
+    text('VICTORIA',x+24,y+82,{size:13,bold:true,color:'#c8a24a'});
+    let ly=y+102;ly+=paragraph(victoryText(v),x+24,ly,w-48,{size:15,color:'#ffe9a0'});
+    let prog='';if(v.t==='gold')prog=`Oro actual: ${G.players[0].res.gold.toLocaleString('es-ES')} / ${v.n.toLocaleString('es-ES')}`;else if(v.t==='quests')prog=`Misiones cumplidas: ${G.qdone||0} / ${v.n}`;else if(v.t==='survive')prog=`Día ${G.day} / ${v.n}`;else if(v.t==='capital'){const t=m.objs[v.town];prog=t?`Ciudadela Real: ${t.name} (${t.x},${t.y%(m.lh+2)})`:''}else if(v.t==='grail')prog='La zona aproximada está marcada en el minimapa (círculo dorado).';
+    if(prog)text(prog,x+24,ly+4,{size:13,color:'#9affc8'});
+    if(v.t==='capital'){const t=m.objs[v.town];if(t)button(x+w-170,y+90,140,30,'Ir a la capital',()=>{Dlg.close();camTo(t.x+2,t.y+1)},{size:13})}
+    text('Derrotar a todos los rivales siempre te da la victoria.',x+24,ly+26,{size:12,italic:true,color:'#9a8a70'});
+    text('MISIONES DE LOS VIDENTES',x+24,y+196,{size:13,bold:true,color:'#c8a24a'});
+    const qs=allQuests();if(!qs.length)text('Aún no has hablado con ningún vidente. Busca las cabañas moradas con una estrella.',x+24,y+222,{size:13,italic:true,color:'#9a8a70'});
+    qs.slice(0,7).forEach((o,i)=>{const q=o.q,yy=y+206+i*48;rrect(ctx,x+20,yy,w-40,42,6,'rgba(40,30,44,.85)',q.done?'#5a9a5a':'#7a6a48',1.2);
+      text((q.done?'✔ ':'')+questText(q).slice(0,78),x+30,yy+18,{size:12,bold:true,color:q.done?'#9aff9a':'#f2e6c8'});text(`Recompensa: ${rewardText(q.rw)}`,x+30,yy+34,{size:11,color:'#d8c8a0'});
+      if(!q.done)button(x+w-120,yy+8,80,26,'Ir',()=>{Dlg.close();camTo(o.x,o.y)},{size:12})});
+    button(x+w/2-60,y+hh-48,120,34,'Cerrar',()=>Dlg.close())}});
+}

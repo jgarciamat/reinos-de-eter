@@ -36,10 +36,11 @@ const FUSKEYS=['weapon','shield','helm','ring1'];
     LIN[id].pieces=[w,s,hm,r];
   }
 })();
+A('grial','Cáliz de Éter','misc',5,{a:3,d:3,sp:3,kn:3});ART.grial.quest=true;
 const ART_IDS2=Object.keys(ART);
 for(const k of ART_IDS2)if(ART_IDS.indexOf(k)<0)ART_IDS.push(k);
 // el mapa solo reparte tesoros comunes; los linajes se colocan aparte, las fusiones jamás
-const ART_WORLD=()=>ART_IDS.filter(a=>!ART[a].lin&&!ART[a].fusion);
+const ART_WORLD=()=>ART_IDS.filter(a=>!ART[a].lin&&!ART[a].fusion&&!ART[a].quest);
 
 const hasPiece=(h,id)=>EQKEYS.some(k=>h.eq[k]===id)||h.pack.includes(id);
 const linCount=(h,lid)=>LIN[lid].pieces.filter(p=>hasPiece(h,p)).length;

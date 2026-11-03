@@ -36,3 +36,9 @@ Abre `index.html` en el navegador (doble clic) o, desde esta carpeta:
 - **Artefactos ×2 (308)** y **fusión de linajes** (arma+escudo+yelmo+anillo → reliquia que bloquea 4 ranuras).
 - **30 sitios nuevos** (arenas, escuelas, fuentes, tesoros custodiados, observatorios, faros…).
 - Guardado por diferencias (mapas gigantes).
+
+## Novedades (v4)
+- **Dificultad del mapa** (muy fácil a brutal): cambia los recursos del suelo, las minas, la fuerza de monstruos y guarniciones, tus recursos iniciales y la economía de la IA.
+- **Empiezas con 1 o 2 castillos** según el mapa.
+- **Condiciones de victoria por mapa**: conquista total (siempre vale), Cáliz de Éter, Ciudadela Real, reunir oro, completar misiones o resistir N días. Tecla O o botón «Objetivos» del minimapa.
+- **Misiones de videntes**: tráeme recursos, nivel de héroe, tropas, artefacto, destruir una manada o gobernar N ciudades, con recompensa.

@@ -90,14 +90,14 @@ function newPlayer(id,fac,human,diff){
   return{id,fac,human,res,col:PCOL[id],name:PNAME[id],heroes:[],alive:true,fog:null,pool:[],ai:{}};
 }
 function newGame(idx,opt){
-  const spec=mapSpec(idx);const map=genMap(spec,{fac0:opt.fac});G.map=map;snapMap(map);G.opt=opt;G.day=1;G.cur=0;G.over=false;G.busy=false;G.heroes=[];G.players=[];G.usedH={};G.week={t:'normal',week:1};G.gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);G.quick=G.quick||false;
+  const spec=mapSpec(idx);const map=genMap(spec,{fac0:opt.fac});G.map=map;snapMap(map);G.opt=opt;G.day=1;G.cur=0;G.over=false;G.busy=false;G.heroes=[];G.players=[];G.usedH={};G.qdone=0;G.vdone=false;G.week={t:'normal',week:1};G.gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);G.quick=G.quick||false;
   G.hmap=new Int16Array(map.w*map.h);
   const hc=opt.color==null?0:opt.color;const cols=[hc];for(let i=0;i<8;i++)if(i!==hc)cols.push(i);
   for(let i=0;i<8;i++){const p=newPlayer(i,map.starts[i].fac,i===0,opt.diff);p.col=PCOL[cols[i]];p.name=PNAME[cols[i]];p.colIdx=cols[i];G.players.push(p)}
   for(const o of map.objs)if(o.t==='town')o.gar=padArmy(o.gar);
   const fog=new Uint8Array(map.w*map.h);G.players[0].fog=fog;
   G.players.forEach((p,i)=>{
-    const st=map.starts[i],town=map.objs[st.town];town.owner=i;
+    const st=map.starts[i],town=map.objs[st.town];town.owner=i;if(st.town2!=null)map.objs[st.town2].owner=i;for(const k in p.res)p.res[k]=Math.round(p.res[k]*(spec.startK||1));
     const h=makeHero(p.fac,Math.random()<.5?1:0);placeHero(h,i,town.x+town.ex,town.y+town.ey);refreshPool(p);
     h.mp=maxMP(h);h.mana=maxMana(h);
   });
@@ -251,7 +251,7 @@ function fightTown(h,t,cb){
     applyArmy(A,res[0],h.army);
     defSrc.forEach((o,k)=>{const r=res[1][k];const arr=o.src==='h'?gh.army:t.gar;arr[o.i]=r?{id:r.id,n:r.n}:null});
     if(w===0){gainXp(h,xp[0]+500);postBattle(h,b,0);const old=t.owner;const eh=gh&&gh.pid===old?gh:null;if(eh){removeHero(eh)}
-      t.owner=h.pid;t.builtToday=true;t.gar=padArmy([]);notify(`${G.players[h.pid].name} conquista ${t.name}`,'good');checkDefeat(old);cb(true)}
+      t.owner=h.pid;t.builtToday=true;t.gar=padArmy([]);notify(`${G.players[h.pid].name} conquista ${t.name}`,'good');checkDefeat(old);checkVictory();cb(true)}
     else{if(gh&&gh.pid===t.owner)gainXp(gh,xp[1]);if(b.fled===0)retreatHero(h);else heroDefeated(h);cb(false)}
   });
 }
@@ -264,7 +264,7 @@ function checkDefeat(pid){
 
 // ---------- visitas a objetos ----------
 function visit(h,o,cb){
-  const p=G.players[h.pid],human=p.human,done=()=>{refreshFog(p);cb&&cb()};
+  const p=G.players[h.pid],human=p.human,done=()=>{refreshFog(p);if(human)checkVictory();cb&&cb()};
   switch(o.t){
     case'res':p.res[o.res]+=o.n;notify(`${h.name} recoge ${o.n} ${RESN[o.res]}`,'good');removeObj(o);done();break;
     case'chest':{const lvl=Math.max(1,h.lvl);const gold=1000+lvl*100,xp=500+lvl*150;removeObj(o);
@@ -350,8 +350,21 @@ function startDayFor(p){
 }
 function endDayAll(){
   G.day++;
-  for(const p of G.players){if(!p.alive)continue;const inc=incomeOf(p);const bonus=p.human?1:[.8,1,1.25,1.6][G.opt.diff==null?1:G.opt.diff];for(const k in inc)p.res[k]+=Math.round(inc[k]*bonus)}
+  for(const p of G.players){if(!p.alive)continue;const inc=incomeOf(p);const bonus=p.human?1:[.8,1,1.25,1.6][G.opt.diff==null?1:G.opt.diff]*(G.map.spec.aiK||1);for(const k in inc)p.res[k]+=Math.round(inc[k]*bonus)}
   if((G.day-1)%7===0)newWeek();
+  checkVictory();
+}
+// ---- condiciones de victoria (derrotar a todos los rivales siempre da la victoria) ----
+function checkVictory(){
+  if(G.over||G.vdone||!G.map.vic)return;const v=G.map.vic,p=G.players[0];if(!p.alive)return;let why=null;
+  switch(v.t){
+    case'grail':for(const hid of p.heroes){const h=G.heroes[hid];if(hasPiece(h,'grial')&&objAtTownTile(h))why='Has llevado el Cáliz de Éter a tu ciudad. ¡Los reinos te reconocen como soberano!';}break;
+    case'capital':{const t=G.map.objs[v.town];if(t&&!t.dead&&t.owner===0)why='La Ciudadela Real es tuya. ¡El reino te reconoce como soberano!';break}
+    case'gold':if(p.res.gold>=v.n)why=`Has reunido ${v.n.toLocaleString('es-ES')} de oro. ¡Tu riqueza es legendaria!`;break;
+    case'quests':if((G.qdone||0)>=v.n)why=`Has completado ${v.n} misiones de los videntes.`;break;
+    case'survive':if(G.day>=v.n)why=`Has resistido hasta el día ${v.n}.`;break;
+  }
+  if(why){G.over=true;G.vdone=true;G.vreason=why;G.hooks.gameOver(true,why)}
 }
 // ---- semanas especiales (como en Heroes 3): semana de una criatura o plaga ----
 function rollWeek(week){
@@ -537,7 +550,7 @@ function aiHeroAct(p,h,cb){
 function saveState(){
   const m=G.map;return JSON.stringify({idx:m.spec.i,opt:G.opt,day:G.day,cur:G.cur,
     players:G.players.map(p=>({...p,fog:null})),fog:G.players[0].fog?packFog(G.players[0].fog):null,
-    heroes:G.heroes,gid:G.gid,usedH:G.usedH,week:G.week,objs:diffObjs(m)});
+    heroes:G.heroes,gid:G.gid,qdone:G.qdone,vdone:G.vdone,usedH:G.usedH,week:G.week,objs:diffObjs(m)});
 }
 // solo se guardan los objetos que cambiaron respecto al mundo generado por la semilla
 function snapMap(m){m.snap=m.objs.map(o=>JSON.stringify(o))}
@@ -550,7 +563,7 @@ function loadState(str){
   for(const o of d.objs){if(o.id>=map.objs.length){if(o.dead)map.objs.push({t:'void',dead:1,id:o.id,x:0,y:0,w:1,h:1,ex:0,ey:0});else addMapObj(o);continue}
     if(o.dead){const real=map.objs[o.id];if(real&&!real.dead)removeObj(real)}else Object.assign(map.objs[o.id],o)}
   for(const o of map.objs)if(!o.dead&&o.t==='town')o.gar=padArmy(o.gar);
-  G.heroes=d.heroes;G.players=d.players;G.usedH=d.usedH||{};G.gid=d.gid||('g'+Date.now().toString(36));G.week=d.week||{t:'normal',week:Math.floor((d.day-1)/7)+1};G.hmap=new Int16Array(map.w*map.h);
+  G.heroes=d.heroes;G.players=d.players;G.usedH=d.usedH||{};G.gid=d.gid||('g'+Date.now().toString(36));G.qdone=d.qdone||0;G.vdone=!!d.vdone;G.week=d.week||{t:'normal',week:Math.floor((d.day-1)/7)+1};G.hmap=new Int16Array(map.w*map.h);
   for(const h of G.heroes)if(h.alive&&h.x>=0)G.hmap[mapIdx(h.x,h.y)]=h.id+1;
   G.players[0].fog=d.fog?unpackFog(d.fog,map.w*map.h):new Uint8Array(map.w*map.h);
   for(let i=1;i<G.players.length;i++)G.players[i].fog=null;

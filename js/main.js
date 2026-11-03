@@ -31,7 +31,7 @@ setInterval(()=>{if(!AC||S.sound===false||AC.state!=='running')return;const sc=S
   if(S.scr==='battle'||mus%2===0)tone(root*Math.pow(2,sc[Math.floor(Math.random()*sc.length)]/12),1.2,'triangle',S.scr==='battle'?.02:.014);if(mus%8===0)tone(root/2,2.4,'sine',.02)},S.scr==='battle'?300:520);
 // ---------- ganchos ----------
 G.hooks.notify=(m,k)=>{if(S.ai&&!/conquista|elimin|captura|derrotado/.test(m))return;if(S.ai&&/captura/.test(m)&&!/Tu|tu/.test(m)){}toast(m,k)};
-G.hooks.gameOver=win=>setTimeout(()=>{Dlg.show({title:win?'¡VICTORIA!':'DERROTA',w:560,text:win?'Has eliminado a todos tus rivales. Los Reinos de Éter se inclinan ante ti.':'Todos tus héroes y ciudades han caído. La sombra cubre el reino.',buttons:[{label:'Volver al menú',primary:1,fn:()=>{S.scr='menu'}},{label:win?'Seguir explorando':'Ver el mapa',fn:()=>{G.over=false}}]});sfx(win?'win':'lose')},800);
+G.hooks.gameOver=(win,why)=>setTimeout(()=>{Dlg.show({title:win?'¡VICTORIA!':'DERROTA',w:560,text:win?(why||'Has eliminado a todos tus rivales. Los Reinos de Éter se inclinan ante ti.'):'Todos tus héroes y ciudades han caído. La sombra cubre el reino.',buttons:[{label:'Volver al menú',primary:1,fn:()=>{S.scr='menu'}},{label:win?'Seguir explorando':'Ver el mapa',fn:()=>{G.over=false}}]});sfx(win?'win':'lose')},800);
 // ---------- bucle ----------
 let last=performance.now();
 function frame(now){

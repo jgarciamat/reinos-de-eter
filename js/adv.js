@@ -205,10 +205,12 @@ function drawMinimap(x,y,sz){
     const col=o.t==='gate'?'#ffd890':o.owner>=0?G.players[o.owner].col:'#bbb';c.fillStyle='#000';const s=o.t==='town'?5:3;const px=x+(o.x+o.w/2)*sc,py=y+(o.y-y0+o.h/2)*sc;c.fillRect(px-s/2-1,py-s/2-1,s+2,s+2);c.fillStyle=col;c.fillRect(px-s/2,py-s/2,s,s)}
   c.drawImage(S.miniFog,0,y0,m.w,m.lh,x,y,sz,sz);
   for(const h of G.heroes){if(!h.alive||h.x<0||levelOf(m,h.y)!==lvl)continue;if(h.pid!==0&&!isVis(h.x,h.y))continue;c.fillStyle='#000';c.fillRect(x+h.x*sc-3,y+(h.y-y0)*sc-3,6,6);c.fillStyle=G.players[h.pid].col;c.fillRect(x+h.x*sc-2,y+(h.y-y0)*sc-2,4,4)}
+  {const vi=m.vic;if(vi&&vi.x!=null&&lvl===0&&(vi.t==='grail'||vi.t==='capital')){const g=vi.t==='grail',px=x+(vi.x+(g?((vi.x*31)%17-8):0))*sc,py=y+(vi.y+(g?((vi.y*17)%15-7):0)-y0)*sc;c.strokeStyle=`rgba(255,220,80,${.6+.4*Math.sin(S.t*4)})`;c.lineWidth=2;c.beginPath();c.arc(px,py,g?22:8,0,6.28);c.stroke()}}
   c.strokeStyle='#fff';c.lineWidth=1.4;c.strokeRect(x+S.cam.x/TILE*sc,y+(S.cam.y/TILE-y0)*sc,VPW/TILE*sc,VPH/TILE*sc);c.restore();
   const go=e=>{S.flyTo=null;S.cam.x=(e.x-x)/sc*TILE-VPW/2;S.cam.y=((e.y-y)/sc+y0)*TILE-VPH/2;clampCam()};
   hit(x,y,sz,sz,go,{down:e=>{S.mmDrag=true;go(e)},cursor:'crosshair'});
   if(UI.down&&S.mmDrag&&hovered(x,y,sz,sz))go({x:UI.mx,y:UI.my});if(!UI.down)S.mmDrag=false;
+  button(x+2,y+sz-24,90,22,'Objetivos',()=>openObjectives(),{size:11,tip:'Condición de victoria y misiones (tecla O)'});
   button(x+sz-92,y+sz-24,90,22,lvl?'▲ Superficie':'▼ Subsuelo',()=>switchLevel(),{size:11,tip:'Cambiar de nivel (la cámara pasa al otro mundo)'});
 }
 // ---------- panel lateral ----------
@@ -285,6 +287,7 @@ function advUpdate(dt){
   for(const e of UI.keyq||[]){if(UI.modals.length)break;
     if(e.code==='KeyE'||e.code==='Enter'){if(!S.mov&&!S.ai&&!G.busy)endTurn()}
     else if(e.code==='Space'||e.code==='Tab')nextHero();
+    else if(e.code==='KeyO')openObjectives();
     else if(e.code==='KeyH'&&selHero())openHeroScreen(selHero());
     else if(e.code==='Escape'){if(S.path){S.path=null}else openSystemMenu()}
     else if(e.code==='KeyT'){const t=ownedTowns(0)[0];if(t)openTown(t,heroAt(t.x+t.ex,t.y+t.ey))}

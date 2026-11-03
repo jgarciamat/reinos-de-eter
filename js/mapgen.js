@@ -26,6 +26,18 @@ const SPEC_BIOME=(()=>{const a=[];const r=mulberry(4242);for(let i=0;i<MAP_COUNT
 const SPEC_NAME=(()=>{const used=new Set(),a=[],r=mulberry(777);const roots=NAME_ROOT.slice();for(let i=roots.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[roots[i],roots[j]]=[roots[j],roots[i]]}
   for(let i=0;i<MAP_COUNT;i++){const pre=NAME_PRE[SPEC_BIOME[i]];let n=pre[Math.floor(r()*pre.length)]+' '+roots[i%roots.length];if(used.has(n))n+=' '+['II','III','IV','V','VI'][Math.floor(i/roots.length)-1]||'';let k=2;while(used.has(n)){n+=' '+k++}used.add(n);a.push(n)}return a})();
 
+// dificultad del mapa: recursos sobre el suelo, minas, fuerza de monstruos/guarniciones, recursos iniciales y economía de la IA
+const MAPLV=[null,
+  {n:'Muy fácil',rich:1.6,mon:.6,mines:1.4,start:1.6,ai:.85},{n:'Fácil',rich:1.25,mon:.82,mines:1.15,start:1.25,ai:.95},
+  {n:'Normal',rich:1,mon:1,mines:1,start:1,ai:1},{n:'Difícil',rich:.68,mon:1.3,mines:.78,start:.7,ai:1.12},{n:'Brutal',rich:.42,mon:1.7,mines:.55,start:.45,ai:1.3}];
+const VICT=[{t:'conquest'},{t:'grail'},{t:'capital'},{t:'gold'},{t:'quests'},{t:'survive'}];
+function victoryText(v){
+  switch(v.t){case'grail':return'Encuentra el Cáliz de Éter (custodiado en la zona marcada del mapa) y llévalo a una de tus ciudades.';
+    case'capital':return'Conquista la Ciudadela Real, la capital fortificada de este mundo.';
+    case'gold':return`Reúne ${v.n.toLocaleString('es-ES')} de oro a la vez.`;
+    case'quests':return`Completa ${v.n} misiones de los videntes.`;
+    case'survive':return`Aguanta hasta el día ${v.n} con alguna ciudad o héroe.`;
+    default:return'Derrota a todos tus rivales.'}}
 const MAP_SCALE=3.15; // ~10 veces más superficie que antes
 function mapSpec(i){
   const r=mulberry(9001+i*7919);
@@ -33,9 +45,15 @@ function mapSpec(i){
   const biome=SPEC_BIOME[i],name=SPEC_NAME[i],B=BIOMES[biome];
   const wl=B.wl+(r()-.5)*.06;
   const sea=!!B.sea||(!B.liquid&&r()<.3);
-  const forest=.55+r()*.7,monsters=.7+r()*.7,rich=.8+r()*.5;
-  return{i,seed:1000003*(i+1)+17,name,size,players:8,biome,wl,forest,monsters,rich,sea,diff:1,
-    desc:`${B.n} · ${size}×${size} · 2 niveles · 8 jugadores${sea?' · mar con barcos':''}${B.liquid===LAVA?' · lava':''}`};
+  const lr=r(),level=lr<.14?1:lr<.38?2:lr<.68?3:lr<.9?4:5,LV=MAPLV[level];
+  const startTowns=r()<.4?2:1;
+  const vt=VICT[Math.floor(r()*VICT.length)];const victory={t:vt.t};
+  if(vt.t==='gold')victory.n=[40000,60000,90000,130000,180000][level-1];
+  if(vt.t==='quests')victory.n=3+level*2;
+  if(vt.t==='survive')victory.n=[90,110,140,170,200][level-1];
+  const forest=.55+r()*.7,monsters=(.7+r()*.7)*LV.mon,rich=(.8+r()*.5)*LV.rich;
+  return{i,seed:1000003*(i+1)+17,name,size,players:8,biome,wl,forest,monsters,rich,sea,diff:1,level,lvn:LV.n,mineK:LV.mines,startK:LV.start,aiK:LV.ai,startTowns,victory,
+    desc:`${B.n} · ${size}×${size} · 2 niveles · ${startTowns} castillo${startTowns>1?'s':''} inicial${startTowns>1?'es':''}${sea?' · mar':''}${B.liquid===LAVA?' · lava':''}`};
 }
 // ---------- ruido ----------
 function noise2(seed){
@@ -147,6 +165,8 @@ function genLevel(spec,opt={}){
     m.facs=facs;
     starts.forEach((s,pi)=>{const tx=clamp(s.x-1,4,W-9),ty=clamp(s.y-1,4,H-8);for(let j=-1;j<5;j++)for(let i=-1;i<6;i++)m.occ[(ty+j)*W+tx+i]=0;
       const o=placeTown(tx,ty,facs[pi%8],pi);o.start=pi;m.starts.push({x:tx+1,y:ty+3,town:o.id,fac:facs[pi%8]})});
+    if(spec.startTowns>=2)m.starts.forEach((s,pi)=>{for(let k=0;k<600;k++){const x=s.x-26+Math.floor(r()*52),y=s.y-26+Math.floor(r()*52);const d=Math.hypot(x-s.x,y-s.y);if(d<13||d>26||!area(x,y,4,3))continue;
+      const o=placeTown(x,y,Math.random()<0?0:facs[(pi+1+Math.floor(r()*7))%8],pi);s.town2=o.id;break}});
     startList=m.starts.map(s=>({x:s.x,y:s.y}));seedPt={x:m.starts[0].x,y:m.starts[0].y};
     m.starts.forEach(s=>{
       for(const res of ['wood','ore']){for(let k=0;k<200;k++){const x=s.x-12+Math.floor(r()*24),y=s.y-8+Math.floor(r()*18);if(area(x,y,3,2)&&Math.hypot(x-s.x,y-s.y)>5){addObj({t:'mine',res,x,y,owner:-1});break}}}
@@ -175,7 +195,7 @@ function genLevel(spec,opt={}){
   const guardOf=(o,pw)=>{const ex=o.x+o.ex,ey=o.y+o.ey;const cands=[[0,1],[1,1],[-1,1],[1,0],[-1,0],[0,2]];
     for(const[dx,dy]of cands){const x=ex+dx,y=ey+dy;if(x>=2&&y>=2&&x<W-2&&y<H-2&&!IMP(m.terr[y*W+x])&&!m.fp[y*W+x]){const mo=makeMonster(x,y,pw,r);if(mo){addObj(mo);return}}}};
   const mineTarget={gold:Math.max(4,Math.round(spec.players*2.2)),wood:Math.round(spec.players*1.2),ore:Math.round(spec.players*1.2),mercury:Math.round(spec.players*.9),sulfur:Math.round(spec.players*.9),crystal:Math.round(spec.players*.9),gems:Math.round(spec.players*.9)};
-  for(const res in mineTarget)for(let k=0;k<mineTarget[res]*(W/150)**2*(under?.8:1);k++){const p=randPos(3,2,{l:startList,d:under?10:13});if(!p)continue;const o=addObj({t:'mine',res,x:p[0],y:p[1],owner:-1});guardOf(o,60+danger(p[0],p[1])**2*2500*spec.monsters*MM)}
+  for(const res in mineTarget)for(let k=0;k<mineTarget[res]*(W/150)**2*(under?.8:1)*(spec.mineK||1);k++){const p=randPos(3,2,{l:startList,d:under?10:13});if(!p)continue;const o=addObj({t:'mine',res,x:p[0],y:p[1],owner:-1});guardOf(o,60+danger(p[0],p[1])**2*2500*spec.monsters*MM)}
   const sc=(W*H)/(150*150);
   for(let k=0;k<Math.round(22*sc);k++){const p=randPos(3,2,{l:startList,d:10});if(!p)continue;const dg=danger(p[0],p[1]);
     const maxT=dg<.25?3:dg<.55?5:7,tier=irnd(r,1,maxT),fi=Math.floor(r()*8);const cid=`f${fi}t${tier}`;
@@ -194,6 +214,18 @@ function genLevel(spec,opt={}){
     for(let q=0;q<nLin;q++){const lid=lids[Math.floor(r()*lids.length)];if(used.has('L'+lid))continue;used.add('L'+lid);
       for(const pid of LIN[lid].pieces){let best=null,bd=-1;for(let t=0;t<6;t++){const p=randPos(1,1,{l:startList,d:14});if(!p)continue;const dg=danger(p[0],p[1]);if(dg>bd){bd=dg;best=p}}
         if(!best)continue;used.add(pid);const o=addObj({t:'art',art:pid,x:best[0],y:best[1]});guardOf(o,(900+bd*bd*6500)*spec.monsters*MM)}}}
+  // objetivo de victoria del mapa (solo en la superficie)
+  if(!under){const v=spec.victory;m.vic=Object.assign({},v);
+    if(v.t==='capital'){let bt=null,bd=-1;for(const t of m.objs)if(t.t==='town'&&t.owner<0){const d=mnd(t.x,t.y,[startList[0]]);if(d>bd){bd=d;bt=t}}
+      if(bt){bt.capital=1;bt.name='Ciudadela Real de '+bt.name.split(' ')[0];bt.gar=garrison(bt.fi,(4500+spec.level*1800)*spec.monsters,r);m.vic.town=bt.id;m.vic.x=bt.x;m.vic.y=bt.y}else m.vic={t:'conquest'}}
+    else if(v.t==='grail'){let best=null,bd=-1;for(let t=0;t<12;t++){const p=randPos(1,1,{l:startList,d:20});if(!p)continue;const dg=danger(p[0],p[1]);if(dg>bd){bd=dg;best=p}}
+      if(best){const o=addObj({t:'art',art:'grial',x:best[0],y:best[1]});guardOf(o,(2500+bd*bd*9000)*spec.monsters*MM);m.vic.x=best[0];m.vic.y=best[1]}else m.vic={t:'conquest'}}}
+  // cabañas de videntes: misiones con recompensa
+  {const artObjs=m.objs.filter(o=>o.t==='art'&&!ART[o.art].lin&&o.art!=='grial');
+    for(let k=0;k<Math.round(14*sc*(under?.8:1));k++){const p=randPos(1,1,{l:startList,d:10});if(!p)continue;const dg=danger(p[0],p[1]);
+      const q=makeQuest(r,dg,artObjs);
+      if(q.t==='kill'){const kp=randPos(1,1,{l:startList,d:14});if(!kp)continue;const mo=makeMonster(kp[0],kp[1],(900+dg*dg*4500)*spec.monsters*MM,r);if(!mo)continue;mo.qk=1;q.mon=addObj(mo).id}
+      addObj({t:'site',k:'seer',x:p[0],y:p[1],used:{},q})}}
   for(let k=0;k<Math.round(120*sc*spec.rich);k++){const p=randPos(1,1,null,60);if(!p)continue;const dg=danger(p[0],p[1]);
     addObj({t:'chest',x:p[0],y:p[1]});if(r()<.6)guardOf(m.objs[m.objs.length-1],20+dg*dg*1200*spec.monsters*MM)}
   for(let k=0;k<Math.round(430*sc*spec.rich);k++){const p=randPos(1,1,null,60);if(!p)continue;
@@ -241,13 +273,13 @@ function genLevel(spec,opt={}){
 // ---------- unión de los dos niveles ----------
 function mergeLevels(m0,m1){
   const W=m0.w,H=m0.h,TH=2*H+2,off=H+2,N=W*TH,n0=m0.objs.length;
-  const m={spec:m0.spec,w:W,h:TH,lh:H,levels:2,terr:new Uint8Array(N),road:new Uint8Array(N),deco:new Uint8Array(N),fp:new Int32Array(N),en:new Int32Array(N),objs:[],starts:m0.starts,facs:m0.facs,land:m0.land};
+  const m={spec:m0.spec,vic:m0.vic,w:W,h:TH,lh:H,levels:2,terr:new Uint8Array(N),road:new Uint8Array(N),deco:new Uint8Array(N),fp:new Int32Array(N),en:new Int32Array(N),objs:[],starts:m0.starts,facs:m0.facs,land:m0.land};
   m.terr.set(m0.terr,0);m.road.set(m0.road,0);m.deco.set(m0.deco,0);m.fp.set(m0.fp,0);m.en.set(m0.en,0);
   for(let y=H;y<H+2;y++)for(let x=0;x<W;x++){m.terr[y*W+x]=ROUGH;m.deco[y*W+x]=4}
   m.terr.set(m1.terr,off*W);m.road.set(m1.road,off*W);m.deco.set(m1.deco,off*W);
   for(let i=0;i<m1.fp.length;i++){if(m1.fp[i])m.fp[off*W+i]=m1.fp[i]+n0;if(m1.en[i])m.en[off*W+i]=m1.en[i]+n0}
   m.objs=m0.objs.slice();
-  for(const o of m1.objs){o.y+=off;o.id+=n0;if(o.start!==undefined)delete o.start;m.objs.push(o)}
+  for(const o of m1.objs){o.y+=off;o.id+=n0;if(o.q&&o.q.mon!=null)o.q.mon+=n0;if(o.start!==undefined)delete o.start;m.objs.push(o)}
   const gk={},mk={};
   for(const o of m.objs){if(o.dead)continue;if(o.t==='gate')(gk[o.gk]=gk[o.gk]||[]).push(o);else if(o.t==='mono')(mk[o.key]=mk[o.key]||[]).push(o)}
   const kill=o=>{o.dead=1;for(let j=0;j<o.h;j++)for(let i=0;i<o.w;i++){const k=(o.y+j)*W+o.x+i;if(m.fp[k]===o.id+1)m.fp[k]=0;if(m.en[k]===o.id+1)m.en[k]=0}};

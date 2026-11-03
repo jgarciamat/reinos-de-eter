@@ -47,9 +47,85 @@ const SITEDEF={
  mermaids:{n:'Sirenas',w:0,sh:'mermaid',c:['#3aa8c8','#c8f0f0'],gl:'clover',once:'day',sea:1,v:350,eff(h){if(!h.boat)return['Solo puedes usarla desde un barco'];h.tmp=h.tmp||{};h.tmp.luck=Math.max(h.tmp.luck||0,2);return'Las sirenas te dan suerte'}},
  wreck:{n:'Naufragio',w:0,sh:'wreck',c:['#4a3a2a','#8a7a5a'],gl:'coin',once:'remove',sea:1,v:900,eff(h,o,p){p.res.gold+=1500;const a=rewardArt(h,1,2);return'Rescatas 1500 de oro'+(a?` y ${ART[a].n}`:'')}}
 };
+SITEDEF.seer={n:'Cabaña del vidente',w:0,sh:'tower',c:['#7a3a9a','#d8c8f0'],gl:'star',once:'',v:0,eff(){return false}};
 const SITE_NEW=Object.keys(SITEDEF).filter(k=>!SITEDEF[k].sea&&SITEDEF[k].w>0);
 function pickNewSite(r){let tot=0;for(const k of SITE_NEW)tot+=SITEDEF[k].w;let t=r()*tot;for(const k of SITE_NEW){t-=SITEDEF[k].w;if(t<=0)return k}return SITE_NEW[0]}
+// ---------------- misiones de los videntes ----------------
+function makeQuest(r,dg,arts){
+  const types=['res','res','lvl','army','kill','towns'];if(arts.length)types.push('art');
+  const t=types[Math.floor(r()*types.length)],q={t,acc:0,done:0};
+  switch(t){
+    case'res':{const common=r()<.55;q.res=common?(r()<.5?'wood':'ore'):RESKEYS[2+Math.floor(r()*4)];q.n=common?Math.round(14+dg*24):Math.round(8+dg*14);if(r()<.18){q.res='gold';q.n=Math.round(6000+dg*14000)}break}
+    case'lvl':q.n=Math.round(5+dg*10+r()*2);break;
+    case'army':{const ids=ALL_BY_VAL.filter(id=>CR[id].tier<=5);q.cr=ids[Math.floor(r()*ids.length)];q.n=Math.max(3,Math.round((900+dg*3500)/CR[q.cr].val));break}
+    case'towns':q.n=Math.round(3+dg*3);break;
+    case'art':q.art=arts[Math.floor(r()*arts.length)].art;break;
+  }
+  const rw=r(),mag=.6+dg*1.4;
+  if(rw<.28)q.rw={t:'gold',n:Math.round((3000+4000*mag)/100)*100};
+  else if(rw<.5)q.rw={t:'xp',n:Math.round(1500+2500*mag)};
+  else if(rw<.7)q.rw={t:'art',lo:dg<.4?1:2,hi:dg<.4?2:4};
+  else if(rw<.85)q.rw={t:'stat',k:['a','d','sp','kn'][Math.floor(r()*4)],n:dg>.6?2:1};
+  else{const ids=ALL_BY_VAL.filter(id=>CR[id].tier>=3&&CR[id].tier<=5);q.rw={t:'army',cr:ids[Math.floor(r()*ids.length)],n:Math.round(8+dg*10)}}
+  return q;
+}
+function questText(q){
+  switch(q.t){
+    case'res':return`Tráeme ${q.n} de ${q.res==='gold'?'oro':RESN[q.res]}.`;
+    case'lvl':return`Vuelve cuando tu héroe haya alcanzado el nivel ${q.n}.`;
+    case'army':return`Necesito ${q.n} ${CR[q.cr].name} en tu ejército. Me los quedaré.`;
+    case'kill':{const mo=G.map.objs[q.mon];return`Destruye a las criaturas (${mo?CR[mo.cr].name:'?'}) que acechan en la zona que te muestro.`}
+    case'towns':return`Demuestra tu poder: gobierna al menos ${q.n} ciudades.`;
+    case'art':return`Quiero el artefacto «${ART[q.art].n}». Entrégamelo.`;
+  }
+}
+function rewardText(w){
+  switch(w.t){case'gold':return`${w.n} de oro`;case'xp':return`${w.n} de experiencia`;case'art':return'un artefacto';case'stat':return`+${w.n} de ${STATN[w.k]}`;case'army':return`${w.n} ${CR[w.cr].name}`}
+}
+function questDone(h,p,q){
+  switch(q.t){
+    case'res':return p.res[q.res]>=q.n;case'lvl':return h.lvl>=q.n;
+    case'army':return h.army.reduce((a,s)=>a+(s&&s.id===q.cr?s.n:0),0)>=q.n;
+    case'kill':{const mo=G.map.objs[q.mon];return!mo||!!mo.dead}
+    case'towns':return ownedTowns(p.id).length>=q.n;
+    case'art':return hasPiece(h,q.art);
+  }
+}
+function questConsume(h,p,q){
+  if(q.t==='res')p.res[q.res]-=q.n;
+  else if(q.t==='army'){let n=q.n;for(const s of h.army){if(!s||s.id!==q.cr||n<=0)continue;const t=Math.min(n,s.n);s.n-=t;n-=t}for(let i=0;i<h.army.length;i++)if(h.army[i]&&h.army[i].n<=0)h.army[i]=null}
+  else if(q.t==='art'){const k=EQKEYS.find(k=>h.eq[k]===q.art);if(k)h.eq[k]=null;else{const i=h.pack.indexOf(q.art);if(i>=0)h.pack.splice(i,1)}}
+}
+function questReward(h,p,w){
+  switch(w.t){
+    case'gold':p.res.gold+=w.n;break;case'xp':gainXp(h,w.n);break;case'stat':h[w.k]+=w.n;break;
+    case'art':{const a=rewardArt(h,w.lo,w.hi);if(!a)p.res.gold+=2000;break}
+    case'army':addToArmy(h.army,w.cr,w.n);break;
+  }
+}
+function visitSeer(h,o,p){
+  if(!p.human)return;const q=o.q;if(!q)return;
+  if(q.done){notify('Ya cumpliste la misión de este vidente','bad');return}
+  const D=G.hooks.dialog||(()=>{});
+  if(!q.acc){q.acc=1;if(q.t==='kill'){const mo=G.map.objs[q.mon];if(mo&&p.fog)reveal(p,mo.x,mo.y,6)}
+    D('Misión del vidente',`${questText(q)}
+
+Recompensa: ${rewardText(q.rw)}.
+
+(Puedes consultar tus misiones con la tecla O.)`);return}
+  if(!questDone(h,p,q)){D('Misión del vidente',`Aún no has cumplido lo que pedí.
+
+${questText(q)}
+
+Recompensa: ${rewardText(q.rw)}.`);return}
+  questConsume(h,p,q);questReward(h,p,q.rw);q.done=1;G.qdone=(G.qdone||0)+1;
+  D('¡Misión cumplida!',`El vidente te entrega: ${rewardText(q.rw)}.
+Misiones cumplidas: ${G.qdone}.`);if(G.hooks.sfx)G.hooks.sfx('level');
+  if(typeof checkVictory==='function')checkVictory();
+}
+function allQuests(){return G.map.objs.filter(o=>!o.dead&&o.t==='site'&&o.k==='seer'&&o.q&&o.q.acc)}
 function visitSite2(h,o,p){
+  if(o.k==='seer'){visitSeer(h,o,p);return true}
   const d=SITEDEF[o.k];const id=o.id,wk=SITE_WEEK();
   if(d.once==='hero'&&h.visited[id]){notify('Ya has estado aquí','bad');return false}
   if(d.once==='day'&&h.visited['d'+id]===G.day){notify('Hoy ya no puede ayudarte más','bad');return false}

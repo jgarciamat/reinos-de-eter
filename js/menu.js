@@ -3,12 +3,12 @@
 //  Menú principal y selección de escenarios (200 mapas)
 // =====================================================================
 const SEL={idx:0,scroll:0,biome:'todos',sort:'num',fac:0,color:0,diff:1,prev:null,prevIdx:-1,loading:false,list:[],q:''};
-const SORTS=[['num','Orden'],['size','Tamaño'],['name','Nombre']];
+const SORTS=[['num','Orden'],['size','Tamaño'],['name','Nombre'],['dif','Dificultad']];
 function buildList(){
   let l=[];for(let i=0;i<MAP_COUNT;i++){const sp=mapSpec(i);l.push(sp)}
   if(SEL.biome!=='todos')l=l.filter(s=>s.biome===SEL.biome);
   if(SEL.q)l=l.filter(s=>s.name.toLowerCase().includes(SEL.q.toLowerCase()));
-  if(SEL.sort==='size')l.sort((a,b)=>b.size-a.size||a.i-b.i);else if(SEL.sort==='name')l.sort((a,b)=>a.name.localeCompare(b.name));
+  if(SEL.sort==='size')l.sort((a,b)=>b.size-a.size||a.i-b.i);else if(SEL.sort==='dif')l.sort((a,b)=>a.level-b.level||a.i-b.i);else if(SEL.sort==='name')l.sort((a,b)=>a.name.localeCompare(b.name));
   SEL.list=l;
 }
 function openSelect(){S.scr='select';buildList();pickMap(SEL.list[0]?SEL.list[0].i:0)}
@@ -57,7 +57,7 @@ function drawSelect(dt){
   text('Mundos (200)',40,92,{size:15,bold:true,color:'#c8a24a'});
   const biomes=['todos',...BIOME_IDS];
   button(40,100,150,28,'Bioma: '+(SEL.biome==='todos'?'Todos':BIOMES[SEL.biome].n),()=>{const i=biomes.indexOf(SEL.biome);SEL.biome=biomes[(i+1)%biomes.length];SEL.scroll=0;buildList()},{size:12});
-  button(198,100,130,28,'Orden: '+SORTS.find(s=>s[0]===SEL.sort)[1],()=>{const i=SORTS.findIndex(s=>s[0]===SEL.sort);SEL.sort=SORTS[(i+1)%3][0];buildList()},{size:12});
+  button(198,100,130,28,'Orden: '+SORTS.find(s=>s[0]===SEL.sort)[1],()=>{const i=SORTS.findIndex(s=>s[0]===SEL.sort);SEL.sort=SORTS[(i+1)%SORTS.length][0];buildList()},{size:12});
   button(336,100,134,28,SEL.q?`Buscar: ${SEL.q}▮`:'Buscar (escribe)',()=>{SEL.q=''; buildList()},{size:12,tip:'Escribe para filtrar por nombre; clic para borrar'});
   for(const e of UI.keyq||[]){if(e.key.length===1&&/[\p{L}\d ]/u.test(e.key)&&!e.ctrlKey&&!e.metaKey){SEL.q+=e.key;buildList()}else if(e.code==='Backspace'){SEL.q=SEL.q.slice(0,-1);buildList()}
     else if(e.code==='ArrowDown'){const i=SEL.list.findIndex(s=>s.i===SEL.idx);if(i<SEL.list.length-1)pickMap(SEL.list[i+1].i)}else if(e.code==='ArrowUp'){const i=SEL.list.findIndex(s=>s.i===SEL.idx);if(i>0)pickMap(SEL.list[i-1].i)}}
@@ -67,14 +67,15 @@ function drawSelect(dt){
   for(let r=0;r<rows;r++){const sp=SEL.list[SEL.scroll+r];if(!sp)break;const y=ly+r*rh;const sel=sp.i===SEL.idx;
     const hov=hit(lx,y,436,rh-2,()=>{if(SEL.idx!==sp.i)pickMap(sp.i)},{});
     rrect(c,lx,y,436,rh-3,5,sel?lg(c,0,y,0,y+rh,['#6a4a22','#3a2610']):hov?'rgba(80,64,52,.8)':'rgba(34,26,36,.7)',sel?'#ffe27a':'#4a3e34',sel?2:1);
-    text(`#${String(sp.i+1).padStart(3,'0')}`,lx+8,y+23,{size:12,color:'#a89870'});text(sp.name,lx+52,y+16,{size:14,bold:true,color:sel?'#ffe9a0':'#f2e6c8'});text(`${BIOMES[sp.biome].n} · ${sp.size}×${sp.size}`,lx+52,y+30,{size:11,color:'#b8a888'})}
+    text(`#${String(sp.i+1).padStart(3,'0')}`,lx+8,y+23,{size:12,color:'#a89870'});text(sp.name,lx+52,y+16,{size:14,bold:true,color:sel?'#ffe9a0':'#f2e6c8'});text(`${BIOMES[sp.biome].n} · ${sp.size}×${sp.size} · ${sp.lvn}${sp.startTowns>1?' · 2 castillos':''}`,lx+52,y+30,{size:11,color:'#b8a888'})}
   c.restore();
   const maxS=Math.max(0,SEL.list.length-rows);if(maxS>0){const th=rows*rh,hh=Math.max(30,th*rows/SEL.list.length);const ty=ly+(th-hh)*SEL.scroll/maxS;rrect(c,474,ly,6,th,3,'rgba(0,0,0,.4)');rrect(c,474,ty,6,hh,3,'#c8a24a')}
   text(`${SEL.list.length} escenarios`,40,ly+rows*rh+22,{size:12,color:'#a89870'});
   // detalle
   const sp=mapSpec(SEL.idx);panel(500,66,756,636,{plain:1});
-  text(sp.name,520,100,{size:26,bold:true,color:'#ffe9a0'});text(`${BIOMES[sp.biome].n} · ${sp.size}×${sp.size} casillas (enorme) · 8 jugadores`,520,124,{size:14,color:'#c8b890'});
+  text(sp.name,520,100,{size:26,bold:true,color:'#ffe9a0'});text(`${BIOMES[sp.biome].n} · ${sp.size}×${sp.size} · Mapa ${sp.lvn.toLowerCase()}`,520,124,{size:14,color:'#c8b890'});
   const pw=330;rrect(c,520,138,pw+8,pw+8,6,'#000','#c8a24a',2);
+  text('OBJETIVO',520,500,{size:12,bold:true,color:'#c8a24a'});paragraph(victoryText(sp.victory),520,520,340,{size:13,color:'#ffe9a0'});text(`Empiezas con ${sp.startTowns} castillo${sp.startTowns>1?'s':''} · recursos ${sp.level<=2?'abundantes':sp.level===3?'normales':'escasos'}`,520,586,{size:12,color:'#9affc8'});
   if(SEL.loading||!SEL.prev||SEL.prevIdx!==SEL.idx){text('Generando mundo…',520+pw/2+4,138+pw/2,{size:18,align:'center',color:'#c8b890'});c.strokeStyle='#ffe27a';c.lineWidth=3;c.beginPath();c.arc(520+pw/2+4,138+pw/2+30,14,S.clock*6,S.clock*6+4);c.stroke()}
   else{const P=SEL.prev;c.imageSmoothingEnabled=true;c.drawImage(P.c,524,142,pw,pw);const k=pw/P.w;
     P.objs.forEach(o=>{if(o.start!==undefined&&o.start!=null){c.fillStyle='#000';c.beginPath();c.arc(524+o.x*k,142+o.y*k,7,0,6.28);c.fill();c.fillStyle=PCOL[(o.start===0?SEL.color:(o.start<=SEL.color?o.start-1:o.start))%8];c.beginPath();c.arc(524+o.x*k,142+o.y*k,5.4,0,6.28);c.fill();if(o.start===0){c.strokeStyle='#fff';c.lineWidth=2;c.stroke()}}else{c.fillStyle='#ddd';c.fillRect(524+o.x*k-2,142+o.y*k-2,4,4)}});
