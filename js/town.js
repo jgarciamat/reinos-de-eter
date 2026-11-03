@@ -280,48 +280,93 @@ function inspect(tx,ty){
 const EQPOS={helm:[139,4],neck:[80,62],cloak:[198,62],weapon:[14,124],armor:[139,124],shield:[264,124],gloves:[14,196],ring1:[80,196],ring2:[198,196],boots:[139,200],misc1:[14,296],misc2:[94,296],misc3:[174,296],misc4:[254,296]};
 const EQSLOT={helm:'helm',neck:'neck',cloak:'cloak',weapon:'weapon',armor:'armor',shield:'shield',gloves:'gloves',ring1:'ring',ring2:'ring',boots:'boots',misc1:'misc',misc2:'misc',misc3:'misc',misc4:'misc'};
 function artTip(id){const a=ART[id];const L=[a.n,`${SLOTN[a.slot]} · ${['','Tesoro','Menor','Mayor','Reliquia','Conjunto','Fusión'][a.v]||''}`,...Object.keys(a.b).map(k=>`${BNAMES[k]||k}: ${k==='pf'?'sí':(a.b[k]>0?'+':'')+a.b[k]}`)];if(a.set){const S2=ARTSET[a.set];L.push(`Conjunto: ${S2.n} (${S2.pieces.length} piezas)`)}if(a.lin)L.push(`Linaje ${LIN[a.lin].short}: arma+escudo+yelmo+anillo = fusión`);if(a.fusion)L.push('Ocupa Arma, Escudo, Yelmo y Anillo');return L}
+// ---- piezas de la ficha del héroe (se componen en escritorio o por pestañas en móvil) ----
+function heroHead(h,x,y,w,P){
+  const p=G.players[h.pid],S0=P?150:120;
+  ctx.drawImage(portrait(h.fi,h.port,h.cls),x,y,S0,S0);rrect(ctx,x,y,S0,S0,4,null,'#c8a24a',2.4);
+  const tx=x+S0+14,bw=w-S0-14;
+  text(`Nivel ${h.lvl}`,tx,y+(P?26:20),{size:P?26:20,bold:true,color:'#ffe9a0'});text(p.name,tx,y+(P?50:40),{size:fz(13),color:p.col,bold:true});
+  const nx=xpForLevel(h.lvl+1),cur=xpForLevel(h.lvl),bh=P?20:13,gp=P?30:20,by=y+(P?62:50);
+  const B=[[(h.xp-cur)/(nx-cur),'#b87aff','#6a3aa0',`${h.xp}/${nx} exp.`],[h.mana/Math.max(1,maxMana(h)),'#6aa0ff','#2a5ac0',`Maná ${Math.floor(h.mana)}/${maxMana(h)}`],[h.mp/Math.max(1,maxMP(h)),'#5ad87a','#2a8a4a',`Mov. ${Math.round(h.mp)}/${maxMP(h)}${h.boat?' (barco)':''}`]];
+  B.forEach((q,i)=>{bar(tx,by+i*gp,bw,bh,q[0],q[1],q[2]);text(q[3],tx+bw/2,by+i*gp+bh-(P?5:2),{size:P?13:10,bold:true,align:'center',shadow:false})});
+  return S0}
+function heroStats(h,x,y,w,hh){
+  const st=hstat(h),g=6,tw=(w-g*3)/4;
+  [['Ataque',st.a,h.a],['Defensa',st.d,h.d],['Poder',st.sp,h.sp],['Conocim.',st.kn,h.kn]].forEach((q,i)=>{const sx=x+i*(tw+g);rrect(ctx,sx,y,tw,hh,6,'rgba(40,30,44,.85)','#7a6a48',1.3);text(q[0],sx+tw/2,y+hh*.3,{size:fz(11),align:'center',color:'#c8b890'});text(String(q[1])+(q[1]>q[2]?` (+${q[1]-q[2]})`:''),sx+tw/2,y+hh*.8,{size:hh>70?30:24,bold:true,align:'center',color:q[1]>q[2]?'#9aff9a':'#fff'})});
+  text(`Moral ${st.lead>=0?'+':''}${st.lead} · Suerte ${st.luck>=0?'+':''}${st.luck} · Visión ${heroVis(h)}`,x,y+hh+20,{size:fz(12),color:'#d8c8a0'});
+}
+function heroSkills(h,x,y,cols,cw,ch,P){
+  const sks=Object.keys(h.skills);
+  sks.forEach((k,i)=>{const lv=h.skills[k],cx=x+(i%cols)*(cw+6),cy=y+Math.floor(i/cols)*(ch+6);rrect(ctx,cx,cy,cw,ch,6,'rgba(40,30,44,.85)','#7a6a48',1.2);
+    text(SKILLS[k].n,cx+8,cy+ch*.42,{size:fz(12),bold:true});for(let q=0;q<3;q++){ctx.fillStyle=q<lv?'#ffd24a':'#4a4030';ctx.beginPath();ctx.arc(cx+14+q*(P?18:14),cy+ch*.78,P?5.4:4.4,0,6.28);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.stroke()}
+    text(['Básico','Avanzado','Experto'][lv-1],cx+cw-6,cy+ch*.84,{size:fz(10),align:'right',color:'#ffe27a'});hit(cx,cy,cw,ch,null,{tip:[SKILLS[k].n+' — '+['Básico','Avanzado','Experto'][lv-1],SKILLS[k].d[lv-1]]})});
+  if(!sks.length)text('Sin habilidades secundarias',x,y+16,{size:fz(12),italic:true,color:'#9a8a70'});
+}
+function heroDoll(h,ex,ey,q,mine){
+  rrect(ctx,ex-8,ey-8,356*q+16,372*q,8,'rgba(18,12,24,.55)','rgba(200,162,74,.4)',1.2);
+  ctx.save();ctx.globalAlpha=.1;ctx.drawImage(portrait(h.fi,h.port,h.cls),ex+60*q,ey+130*q,220*q,220*q);ctx.restore();
+  for(const k of EQKEYS){const[ox,oy]=EQPOS[k],sx=ex+ox*q,sy=ey+oy*q,sz=52*q,id0=h.eq[k],blk=id0&&id0.charCodeAt(0)===35,id=blk?id0.slice(1):id0;
+    const hov=hit(sx,sy,sz,sz,mine&&id?()=>{if(unequip(h,k))sfx('click');else toast('Mochila llena','bad')}:null,{tip:id?[...artTip(id),mine?'Clic: guardar en la mochila':'']:SLOTN[EQSLOT[k]]});
+    rrect(ctx,sx,sy,sz,sz,6,lg(ctx,0,sy,0,sy+sz,['#3a3044','#1a1420']),id?TIERCOL[ART[id].v]:hov?'#c8b890':'#6a5a3e',id?2.2:1.4);
+    if(id){if(blk)ctx.globalAlpha=.35;ctx.drawImage(artIcon(id),sx+4,sy+4,sz-8,sz-8);ctx.globalAlpha=1;if(blk){ctx.fillStyle='rgba(255,170,60,.9)';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.fillText('FUSIÓN',sx+sz/2,sy+sz/2+4);ctx.textAlign='left'}}else ctx.drawImage(slotGlyph(EQSLOT[k]),sx+4,sy+4,sz-8,sz-8)}
+}
+function heroPack(h,ex,ey,q,mine,cols=7){
+  const sz=46*q;
+  for(let i=0;i<14;i++){const sx=ex+(i%cols)*(sz+4),sy=ey+Math.floor(i/cols)*(sz+4),id=h.pack[i];
+    hit(sx,sy,sz,sz,mine&&id?()=>{const keys=SLOTKEYS[ART[id].slot];const k=keys.find(z=>!h.eq[z])||keys[0];if(equipFromPack(h,i,k))sfx('level')}:null,{tip:id?[...artTip(id),mine?'Clic: equipar':'']:'Mochila'});
+    rrect(ctx,sx,sy,sz,sz,5,'rgba(30,24,36,.9)',id?TIERCOL[ART[id].v]:'#4a3e34',id?2:1.2);if(id)ctx.drawImage(artIcon(id),sx+1,sy+1,sz-2,sz-2)}
+}
+function heroSpells(h,x,y,cols,cw,ch,maxY){
+  h.spells.slice().sort((a,b)=>SPELLS[a].lv-SPELLS[b].lv).forEach((sp,i)=>{const cx=x+(i%cols)*(cw+6),cy=y+Math.floor(i/cols)*(ch+4);if(cy+ch>maxY)return;rrect(ctx,cx,cy,cw,ch,6,'rgba(60,50,90,.8)','#8a7ac0',1.1);text(SPELLS[sp].n,cx+6,cy+ch*.46,{size:fz(11),bold:true});text(`Nv ${SPELLS[sp].lv} · ${SPELLS[sp].cost} maná`,cx+6,cy+ch*.86,{size:fz(9),color:'#b8a8e0'});hit(cx,cy,cw,ch,null,{tip:[SPELLS[sp].n,SPELLS[sp].d,'Coste: '+SPELLS[sp].cost+' de maná']})});
+  if(!h.spells.length)text('Sin hechizos. Visita un gremio de magos.',x,y+16,{size:fz(12),italic:true,color:'#9a8a70'});
+}
+function heroSets(h,rx,y0,mine){
+  const sets=setProgress(h);if(sets.length){text('CONJUNTOS DE ARTEFACTOS',rx,y0,{size:12,bold:true,color:'#c8a24a'});sets.forEach((q,i)=>{text(`${q.name}: ${q.n}/${q.tot}`+(q.n===q.tot?' ✔':''),rx,y0+18+i*16,{size:fz(11),color:q.n===q.tot?'#9aff9a':'#d8c8a0'})})}
+  let fy=y0+(sets.length?sets.length*16+34:0);text('FUSIÓN DE LINAJES (arma+escudo+yelmo+anillo)',rx,fy,{size:12,bold:true,color:'#ff9a3a'});fy+=8;
+  const fi=fusionInfo(h).slice(0,4);if(!fi.length)text('Reúne las 4 piezas de un linaje para fundirlas',rx,fy+14,{size:fz(11),italic:true,color:'#9a8a70'});
+  fi.forEach((q,i)=>{const yy=fy+4+i*24,done=fusedOf(h).includes(q.id),full=q.n===4;text(`${q.L.short}: ${done?'FUSIONADO':q.n+'/4'}`,rx,yy+14,{size:fz(11),color:done?'#ff9a3a':full?'#9aff9a':'#d8c8a0'});
+    if(mine&&(full||done)){button(rx+170,yy,100,22,done?'Separar':'Fusionar',()=>{const r=done?unfuse(h,q.L.fus):fuseLineage(h,q.id);if(r)toast(r,'bad');else{sfx('level');toast(done?'Piezas separadas':`¡${q.L.name} forjada!`,'good')}},{size:11,primary:!done})}
+    hit(rx,yy,150,22,null,{tip:q.L.pieces.map(pid=>`${hasPiece(h,pid)?'✔':'✘'} ${ART[pid].n}`).concat(['Fusión: '+artText(q.L.fus)])})});
+}
+function heroArmyRow(h,x,y,s,ro){
+  for(let i=0;i<7;i++){const sx=x+i*(s+6),u=h.army[i];const sel=S.pick&&S.pick.arr===h.army&&S.pick.i===i;
+    slot(sx,y,s,{id:u&&u.id,n:u&&u.n,sel,tip:u?[CR[u.id].name,abilText(CR[u.id]),'Clic: mover · Clic derecho: información']:null,fn:ro?null:()=>{const p=S.pick;if(!p){if(u)S.pick={arr:h.army,i};return}
+      if(p.arr===h.army&&p.i===i){S.pick=null;return}const a=p.arr[p.i],b=h.army[i];if(!a){S.pick=null;return}if(b&&a.id===b.id){b.n+=a.n;p.arr[p.i]=null}else{p.arr[p.i]=b;h.army[i]=a}
+      if(armyEmpty(h.army)){const t=p.arr[p.i];p.arr[p.i]=h.army[i];h.army[i]=t}S.pick=null},right:()=>{if(u)creatureInfo(u.id,u.n)}})}
+}
 function openHeroScreen(h,readonly){
-  const mine=h.pid===0&&!readonly;
-  Dlg.show({w:1020,title:h.name,draw:m=>{
-    const x=130,y=18,w=1020,hh=684,p=G.players[h.pid],st=hstat(h);panel(x,y,w,hh,{title:`${h.name} — ${HERO_CLASS[h.fi][h.cls]} (${FDEF[h.fi].short})`});
-    // columna izquierda
-    ctx.drawImage(portrait(h.fi,h.port,h.cls),x+22,y+34,120,120);rrect(ctx,x+22,y+34,120,120,4,null,'#c8a24a',2);
-    text(`Nivel ${h.lvl}`,x+156,y+54,{size:20,bold:true,color:'#ffe9a0'});text(p.name,x+156,y+74,{size:13,color:p.col,bold:true});
-    const nx=xpForLevel(h.lvl+1),cur=xpForLevel(h.lvl);bar(x+156,y+84,170,13,(h.xp-cur)/(nx-cur),'#b87aff','#6a3aa0');text(`${h.xp}/${nx} exp.`,x+241,y+95,{size:10,bold:true,align:'center',shadow:false});
-    bar(x+156,y+104,170,12,h.mana/Math.max(1,maxMana(h)),'#6aa0ff','#2a5ac0');text(`Maná ${Math.floor(h.mana)}/${maxMana(h)}`,x+241,y+114,{size:10,bold:true,align:'center',shadow:false});
-    bar(x+156,y+122,170,12,h.mp/Math.max(1,maxMP(h)),'#5ad87a','#2a8a4a');text(`Mov. ${Math.round(h.mp)}/${maxMP(h)}${h.boat?' (barco)':''}`,x+241,y+132,{size:10,bold:true,align:'center',shadow:false});
-    [['Ataque',st.a,h.a],['Defensa',st.d,h.d],['Poder',st.sp,h.sp],['Conocim.',st.kn,h.kn]].forEach((q,i)=>{const sx=x+22+(i%2)*154,sy=y+164+Math.floor(i/2)*60;rrect(ctx,sx,sy,148,54,6,'rgba(40,30,44,.85)','#7a6a48',1.3);text(q[0],sx+10,sy+20,{size:12,color:'#c8b890'});text(String(q[1])+(q[1]>q[2]?` (+${q[1]-q[2]})`:''),sx+138,sy+42,{size:24,bold:true,align:'right',color:q[1]>q[2]?'#9aff9a':'#fff'})});
-    text(`Moral ${st.lead>=0?'+':''}${st.lead} · Suerte ${st.luck>=0?'+':''}${st.luck} · Visión ${heroVis(h)}`,x+22,y+296,{size:12,color:'#d8c8a0'});
-    paragraph(specText(h),x+22,y+314,300,{size:11,color:'#bfe8ff',italic:true});
-    text('HABILIDADES',x+22,y+356,{size:12,bold:true,color:'#c8a24a'});const sks=Object.keys(h.skills);
-    sks.forEach((k,i)=>{const lv=h.skills[k],cx=x+22+(i%2)*154,cy=y+364+Math.floor(i/2)*44;rrect(ctx,cx,cy,148,38,6,'rgba(40,30,44,.85)','#7a6a48',1.2);text(SKILLS[k].n,cx+8,cy+16,{size:12,bold:true});for(let q=0;q<3;q++){ctx.fillStyle=q<lv?'#ffd24a':'#4a4030';ctx.beginPath();ctx.arc(cx+14+q*14,cy+28,4.4,0,6.28);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.stroke()}text(['Básico','Avanzado','Experto'][lv-1],cx+142,cy+31,{size:10,align:'right',color:'#ffe27a'});hit(cx,cy,148,38,null,{tip:[SKILLS[k].n+' — '+['Básico','Avanzado','Experto'][lv-1],SKILLS[k].d[lv-1]]})});
-    if(!sks.length)text('Sin habilidades',x+22,y+384,{size:12,italic:true,color:'#9a8a70'});
-    // centro: muñeco de equipo
-    const ex=x+350,ey=y+44;rrect(ctx,ex-8,ey-8,356,420,8,'rgba(18,12,24,.55)','rgba(200,162,74,.4)',1.2);
-    ctx.save();ctx.globalAlpha=.1;ctx.drawImage(portrait(h.fi,h.port,h.cls),ex+60,ey+130,220,220);ctx.restore();
-    text('EQUIPO',ex+170,ey-14,{size:12,bold:true,align:'center',color:'#c8a24a'});
-    for(const k of EQKEYS){const[ox,oy]=EQPOS[k],sx=ex+ox,sy=ey+oy,id0=h.eq[k],blk=id0&&id0.charCodeAt(0)===35,id=blk?id0.slice(1):id0;
-      const hov=hit(sx,sy,52,52,mine&&id?()=>{if(unequip(h,k))sfx('click');else toast('Mochila llena','bad')}:null,{tip:id?[...artTip(id),mine?'Clic: guardar en la mochila':'']:SLOTN[EQSLOT[k]]});
-      rrect(ctx,sx,sy,52,52,6,lg(ctx,0,sy,0,sy+52,['#3a3044','#1a1420']),id?TIERCOL[ART[id].v]:hov?'#c8b890':'#6a5a3e',id?2.2:1.4);
-      if(id){if(blk)ctx.globalAlpha=.35;ctx.drawImage(artIcon(id),sx+4,sy+4,44,44);ctx.globalAlpha=1;if(blk){ctx.fillStyle='rgba(255,170,60,.9)';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.fillText('FUSIÓN',sx+26,sy+30);ctx.textAlign='left'}}else ctx.drawImage(slotGlyph(EQSLOT[k]),sx+4,sy+4,44,44)}
-    // mochila
-    text('MOCHILA',ex+170,ey+388,{size:12,bold:true,align:'center',color:'#c8a24a'});
-    for(let i=0;i<14;i++){const sx=ex+(i%7)*50,sy=ey+398+Math.floor(i/7)*50,id=h.pack[i];
-      const hov=hit(sx,sy,46,46,mine&&id?()=>{const keys=SLOTKEYS[ART[id].slot];const k=keys.find(q=>!h.eq[q])||keys[0];if(equipFromPack(h,i,k))sfx('level')}:null,{tip:id?[...artTip(id),mine?'Clic: equipar':'']:'Mochila'});
-      rrect(ctx,sx,sy,46,46,5,'rgba(30,24,36,.9)',id?TIERCOL[ART[id].v]:'#4a3e34',id?2:1.2);if(id)ctx.drawImage(artIcon(id),sx+1,sy+1,44,44)}
-    // derecha: ejército, hechizos, conjuntos
-    const rx=x+730;
-    text('EJÉRCITO',rx,y+54,{size:12,bold:true,color:'#c8a24a'});armyPanelBig(rx,y+62,h,!mine);
-    text(`Poder del ejército: ${armyPower(h.army)}`,rx,y+210,{size:12,color:'#ffe27a'});
-    text('LIBRO DE HECHIZOS',rx,y+236,{size:12,bold:true,color:'#c8a24a'});
-    h.spells.slice().sort((a,b)=>SPELLS[a].lv-SPELLS[b].lv).forEach((sp,i)=>{const cx=rx+(i%2)*140,cy=y+244+Math.floor(i/2)*32;if(cy>y+470)return;rrect(ctx,cx,cy,134,28,6,'rgba(60,50,90,.8)','#8a7ac0',1.1);text(SPELLS[sp].n,cx+6,cy+13,{size:11,bold:true});text(`Nv ${SPELLS[sp].lv} · ${SPELLS[sp].cost}`,cx+6,cy+24,{size:9,color:'#b8a8e0'});hit(cx,cy,134,28,null,{tip:[SPELLS[sp].n,SPELLS[sp].d,'Coste: '+SPELLS[sp].cost+' de maná']})});
-    const sets=setProgress(h);if(sets.length){text('CONJUNTOS DE ARTEFACTOS',rx,y+498,{size:12,bold:true,color:'#c8a24a'});sets.forEach((q,i)=>{text(`${q.name}: ${q.n}/${q.tot}`+(q.n===q.tot?' ✔':''),rx,y+516+i*16,{size:11,color:q.n===q.tot?'#9aff9a':'#d8c8a0'})})}
-    {let fy=y+516+(sets.length?sets.length*16+26:0);if(!sets.length)fy=y+498;text('FUSIÓN DE LINAJES (arma+escudo+yelmo+anillo)',rx,fy,{size:12,bold:true,color:'#ff9a3a'});fy+=8;
-      const fi=fusionInfo(h).slice(0,4);if(!fi.length)text('Reúne las 4 piezas de un linaje para fundirlas',rx,fy+14,{size:11,italic:true,color:'#9a8a70'});
-      fi.forEach((q,i)=>{const yy=fy+4+i*24,done=fusedOf(h).includes(q.id),full=q.n===4;text(`${q.L.short}: ${done?'FUSIONADO':q.n+'/4'}`,rx,yy+14,{size:11,color:done?'#ff9a3a':full?'#9aff9a':'#d8c8a0'});
-        if(mine&&(full||done)){button(rx+170,yy,100,22,done?'Separar':'Fusionar',()=>{const r=done?unfuse(h,q.L.fus):fuseLineage(h,q.id);if(r)toast(r,'bad');else{sfx('level');toast(done?'Piezas separadas':`¡${q.L.name} forjada!`,'good')}},{size:11,primary:!done})}
-        hit(rx,yy,150,22,null,{tip:q.L.pieces.map(pid=>`${hasPiece(h,pid)?'✔':'✘'} ${ART[pid].n}`).concat(['Fusión: '+artText(q.L.fus)])})})}
-    button(x+w/2-60,y+hh-48,120,34,'Cerrar',()=>{S.pick=null;Dlg.close()},{size:15});
+  const mine=h.pid===0&&!readonly;let tab=0;
+  Dlg.show({w:1200,title:h.name,draw:m=>{
+    const P=UI.ph,x=P?20:40,y=P?8:8,w=P?1240:1200,hh=P?704:704;
+    panel(x,y,w,hh,{title:`${h.name} — ${HERO_CLASS[h.fi][h.cls]} (${FDEF[h.fi].short})`});
+    const close=()=>{S.pick=null;Dlg.close()};
+    if(!P){
+      // ---- escritorio: todo a la vez, como la ficha clásica ----
+      const lx=x+22;const S0=heroHead(h,lx,y+36,330,false);
+      heroStats(h,lx,y+170,330,64);
+      paragraph(specText(h),lx,y+270,330,{size:11,color:'#bfe8ff',italic:true});
+      text('HABILIDADES SECUNDARIAS',lx,y+322,{size:12,bold:true,color:'#c8a24a'});heroSkills(h,lx,y+332,2,162,40,false);
+      const ex=x+390,ey=y+52;text('EQUIPO',ex+170,ey-18,{size:12,bold:true,align:'center',color:'#c8a24a'});heroDoll(h,ex,ey,1,mine);
+      text('MOCHILA',ex+170,ey+388,{size:12,bold:true,align:'center',color:'#c8a24a'});heroPack(h,ex,ey+398,1,mine);
+      const rx=x+800;text('LIBRO DE HECHIZOS',rx,y+54,{size:12,bold:true,color:'#c8a24a'});heroSpells(h,rx,y+62,3,126,34,y+360);
+      heroSets(h,rx,y+388,mine);
+      // franja inferior: ejército
+      const ay=y+hh-124;rrect(ctx,x+14,ay,w-28,112,8,'rgba(18,12,24,.55)','rgba(200,162,74,.4)',1.2);
+      text('EJÉRCITO',x+28,ay+18,{size:12,bold:true,color:'#c8a24a'});heroArmyRow(h,x+28,ay+26,76,!mine);
+      text(`Poder del ejército: ${armyPower(h.army)}`,x+28+7*82+16,ay+46,{size:14,bold:true,color:'#ffe27a'});
+      button(x+w-180,ay+54,150,42,'Cerrar',close,{size:16,primary:1});
+    }else{
+      // ---- móvil: tres pestañas con letra grande ----
+      ['Héroe','Equipo','Hechizos'].forEach((n,i)=>button(x+20+i*210,y+16,200,46,n,()=>{tab=i},{size:20,primary:tab===i}));
+      button(x+w-190,y+16,170,46,'Cerrar',close,{size:20,primary:1});
+      const cy=y+74;
+      if(tab===0){const lx=x+24;heroHead(h,lx,cy,520,true);heroStats(h,x+600,cy,600,96);
+        text('HABILIDADES',lx,cy+190,{size:15,bold:true,color:'#c8a24a'});heroSkills(h,lx,cy+200,3,264,50,true);
+        const ay=y+hh-130;text(`EJÉRCITO · Poder ${armyPower(h.army)}`,lx,ay-6,{size:15,bold:true,color:'#c8a24a'});heroArmyRow(h,lx,ay,100,!mine)}
+      else if(tab===1){const q=1.18,ex=x+60;heroDoll(h,ex,cy+8,q,mine);heroPack(h,x+560,cy+30,1.5,mine,6);text('MOCHILA',x+560,cy+16,{size:15,bold:true,color:'#c8a24a'});
+        paragraph('Clic en una pieza equipada para guardarla; clic en la mochila para equiparla.',x+560,cy+300,600,{size:15,color:'#c8b890'})}
+      else{text('LIBRO DE HECHIZOS',x+24,cy+16,{size:15,bold:true,color:'#c8a24a'});heroSpells(h,x+24,cy+28,4,290,50,cy+330);heroSets(h,x+24,cy+360,mine)}
+    }
   }});
 }
 function armyPanelBig(x,y,h,ro){
