@@ -144,7 +144,7 @@ function advDraw(dt){
     L.push({y:hy+1,f:()=>{drawHeroOnMap(h,hx,hy,t);lights.push({x:hx*TILE+TILE/2,y:hy*TILE+TILE/2,r:150,col:'rgba(255,230,180,.55)'})}})}
   L.sort((a,b)=>a.y-b.y);for(const e of L)e.f();
   drawPath(c,t);
-  if(S.hov&&S.hov.tx!=null&&UI.mx<VPW){c.strokeStyle='rgba(255,240,170,.85)';c.lineWidth=2;c.strokeRect(S.hov.tx*TILE+1,S.hov.ty*TILE+1,TILE-2,TILE-2)}
+  if(S.hov&&S.hov.tx!=null&&UI.mx<VPW)drawHoverCursor(c);
   FX.draw(c,0,0);
   updateAmbient(dt,under);drawAmbient(c,t);
   c.restore();
@@ -301,6 +301,8 @@ function advUpdate(dt){
     if(k>=1){a.h.ax=null;a.h.ay=null;const cb=a.next;S.anim=null;a.h.moving=!!S.mov;const L=S.later;S.later=[];for(const f of L)f();if(cb)cb()}}
   // ejecución del movimiento
   if(S.mov&&!S.anim&&!S.mov.wait)advStep();
+  // un clic en el mapa mientras el héroe camina lo detiene (tras el paso en curso)
+  if(S.mov&&!S.ai&&!S.mov.stop&&S.mapClicks&&S.mapClicks.length){S.mov.stop=true;toast('Héroe detenido')}
   // clics del mapa
   if(!S.mov&&!S.anim&&!S.fx&&!G.busy&&!S.ai){
     for(const c of S.mapClicks||[])advClick(c);}
@@ -321,6 +323,7 @@ function advUpdate(dt){
 }
 function advStep(){
   const h=S.mov.h;S.mov.wait=true;
+  if(S.mov.stop){h.path=null;advEndMove();return}
   if(!h.alive||!h.path||!h.path.length){advEndMove();return}
   let sync=true,res=null;
   const handle=r=>{G.busy=false;const cont=()=>{if(!S.mov)return;S.mov.wait=false;if(r!=='moved')advEndMove()};if(S.anim)S.anim.next=cont;else cont()};
@@ -366,7 +369,7 @@ function nextHero(){const hs=myHeroes().filter(h=>!h.sleep&&h.mp>=100);if(!hs.le
 function endTurn(){
   if(S.ai||S.mov||G.busy)return;
   const idle=myHeroes().filter(h=>!h.sleep&&h.mp>=600);
-  const go=()=>{S.ai={pi:1,t:0};S.path=null;S.target=null;runAI()};
+  const go=()=>{autosave();S.ai={pi:1,t:0};S.path=null;S.target=null;runAI()};
   if(idle.length&&!S.noConfirm)Dlg.show({title:'¿Terminar el turno?',text:`${idle.map(h=>h.name).join(', ')} todavía ${idle.length>1?'tienen':'tiene'} movimiento disponible.`,buttons:[{label:'Terminar',primary:1,fn:go},{label:'Seguir jugando'}]});else go();
 }
 function runAI(){
@@ -412,4 +415,27 @@ function drawFxOverlay(){
     // luz cálida de la puerta
     c.save();c.globalCompositeOperation='lighter';c.fillStyle=rg(c,sx,sy-10,2,70,[`rgba(255,200,120,${.5*k})`,'rgba(255,200,120,0)']);c.fillRect(sx-80,sy-90,160,160);c.restore()}
   else{const sx=f.gx-S.cam.x,sy=f.gy-S.cam.y;const r=Math.min(1,k*1.4)*Math.hypot(VPW,VPH);c.save();c.beginPath();c.rect(0,0,VW,VH);c.arc(sx,sy,r,0,6.2832,true);c.fillStyle='#000';c.fill('evenodd');c.restore()}
+}
+
+// cursor del mapa: silueta de caballo donde el héroe puede ir; flecha amarilla donde no
+let _horse=null;
+function horsePath(){
+  if(_horse)return _horse;
+  const P=[[92,38],[86,30],[80,22],[78,12],[74,22],[62,32],[44,35],[24,38],[16,42],[7,60],[14,68],[20,52],[22,58],[18,90],[26,90],[31,66],[47,66],[60,66],[59,90],[68,90],[71,68],[73,58],[80,45],[88,48]];
+  const p=new Path2D(),n=P.length,mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+  let m0=mid(P[n-1],P[0]);p.moveTo(m0[0],m0[1]);
+  for(let i=0;i<n;i++){const q=P[i],m=mid(q,P[(i+1)%n]);p.quadraticCurveTo(q[0],q[1],m[0],m[1])}
+  p.closePath();return _horse=p;
+}
+function hoverReach(){
+  const hv=S.hov,h=selHero();if(!h||!h.alive)return null;
+  const o=hv.o,gx=o?o.x+o.ex:hv.tx,gy=o?o.y+o.ey:hv.ty,key=h.id+':'+h.x+','+h.y+':'+gx+','+gy+':'+(h.boat?1:0);
+  if(S.hovKey!==key){S.hovKey=key;S.hovOk=(isExpl(hv.tx,hv.ty)||isVis(hv.tx,hv.ty))&&((gx===h.x&&gy===h.y)||!!planPath(h,gx,gy))}
+  return S.hovOk;
+}
+function drawHoverCursor(c){
+  const hv=S.hov,ok=S.mov||S.ai?true:hoverReach();
+  if(ok===null){c.strokeStyle='rgba(255,240,170,.85)';c.lineWidth=2;c.strokeRect(hv.tx*TILE+1,hv.ty*TILE+1,TILE-2,TILE-2);return}
+  if(ok){const k=TILE*.9/100,x=hv.tx*TILE+TILE*.05,y=hv.ty*TILE+TILE*.05;c.save();c.translate(x,y);c.scale(k,k);c.shadowColor='rgba(0,0,0,.5)';c.shadowBlur=4;c.fillStyle='rgba(255,226,110,.92)';c.fill(horsePath());c.shadowBlur=0;c.strokeStyle='#3a2a08';c.lineWidth=2.6;c.stroke(horsePath());c.restore();return}
+  UI.cursor='none';const ax=UI.mx+S.cam.x,ay=UI.my+S.cam.y;c.save();c.translate(ax,ay);c.fillStyle='#ffe27a';c.strokeStyle='#3a2a08';c.lineWidth=1.8;c.beginPath();c.moveTo(0,0);c.lineTo(0,19);c.lineTo(5,14.5);c.lineTo(9,23);c.lineTo(12.5,21.5);c.lineTo(8.5,13);c.lineTo(15,13);c.closePath();c.fill();c.stroke();c.restore();
 }

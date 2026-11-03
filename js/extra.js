@@ -12,12 +12,17 @@ G.hooks.weekBanner=(ev,info)=>{
   Dlg.show({title:weekLabel(ev),w:560,text:txt,buttons:[{label:'Entendido',primary:1}]});
 };
 G.hooks.quickReport=(b,A,D,done)=>{
-  const res=b.result(),won=b.winner===0;const L=[];
-  const side=(sd,si,tit)=>{L.push(tit);let any=false;sd.army.forEach((a,i)=>{if(!a||a.n<=0)return;const left=res[si][i]?res[si][i].n:0;L.push(`  ${CR[a.id].name}: ${a.n} → ${left}${left<a.n?`  (−${a.n-left})`:''}`);any=true});if(!any)L.push('  —')};
-  side(A,0,'Tus tropas:');side(D,1,'Enemigo:');
-  if(b.wall){const broken=[...b.wall.values()].filter(w=>w.hp<=0).length;L.push('',`Muralla de nivel ${b.siege.lvl}: ${broken} de ${b.wall.size} secciones destruidas · ${b.round} rondas`)}
-  else L.push('',`${b.round} rondas`);
-  Dlg.show({title:won?'¡Victoria! (combate rápido)':'Derrota (combate rápido)',w:560,text:L.join('\n'),buttons:[{label:'Aceptar',primary:1,fn:done}]});
+  const res=b.result(),won=b.winner===0;
+  const losses=(sd,si)=>{const out=[];sd.army.forEach((a,i)=>{if(!a||a.n<=0)return;const left=res[si][i]?res[si][i].n:0;if(left<a.n)out.push({id:a.id,n:a.n-left})});return out};
+  const mine=losses(A,0),foe=losses(D,1),rows=Math.max(1,Math.ceil(Math.max(mine.length,foe.length)/4));
+  let foot=`${b.round} rondas`;if(b.wall){const broken=[...b.wall.values()].filter(w=>w.hp<=0).length;foot=`Muralla de nivel ${b.siege.lvl}: ${broken} de ${b.wall.size} secciones destruidas · ${foot}`}
+  Dlg.show({title:won?'¡Victoria! (combate rápido)':'Derrota (combate rápido)',w:620,text:'',extra:34+rows*68+26,buttons:[{label:'Aceptar',primary:1,fn:done}],
+    body:(x,y,w)=>{
+      const col=(x0,tit,col,list)=>{text(tit,x0,y+16,{size:14,bold:true,color:col});
+        if(!list.length)text('Sin bajas',x0,y+52,{size:14,italic:true,color:'#9a8a70'});
+        list.forEach((u,i)=>slot(x0+(i%4)*66,y+26+Math.floor(i/4)*68,62,{id:u.id,n:'−'+u.n,tip:[CR[u.id].name,`Bajas: ${u.n}`]}))};
+      col(x+20,'TUS BAJAS','#e08070',mine);col(x+w/2+10,'BAJAS DEL ENEMIGO','#9ad0ff',foe);
+      text(foot,x+w/2,y+34+rows*68+8,{size:12,align:'center',color:'#c8b890'})}});
 };
 
 G.hooks.dialog=(title,text)=>Dlg.show({title,w:560,text,buttons:[{label:'Entendido',primary:1}]});

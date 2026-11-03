@@ -34,11 +34,11 @@ const SaveDB={
 function saveMeta(kind){const p=G.players[0];return{gid:G.gid,kind,ts:Date.now(),name:mapSpec(G.map.spec.i).name,day:G.day,fac:FDEF[p.fac].name,col:p.col,towns:ownedTowns(0).length,heroes:p.heroes.length}}
 let _autoBusy=false;
 function autosave(){if(!G.map||G.over||_autoBusy)return;_autoBusy=true;let s;try{s=saveState()}catch(e){_autoBusy=false;console.warn(e);return}
-  SaveDB.put(G.gid+':auto',saveMeta('auto'),s).catch(e=>console.warn('no se pudo guardar',e)).finally(()=>{_autoBusy=false;refreshSaves()})}
+  const id=G.slot||G.gid+':auto';SaveDB.put(id,saveMeta(/:manual$/.test(id)?'manual':'auto'),s).catch(e=>console.warn('no se pudo guardar',e)).finally(()=>{_autoBusy=false;refreshSaves()})}
 function saveManual(){let s;try{s=saveState()}catch(e){toast('No se pudo guardar','bad');return}
-  SaveDB.put(G.gid+':manual',saveMeta('manual'),s).then(()=>toast('Partida guardada','good')).catch(()=>toast('No se pudo guardar (sin espacio)','bad'))}
+  G.slot=G.gid+':manual';SaveDB.put(G.slot,saveMeta('manual'),s).then(()=>toast('Partida guardada','good')).catch(()=>toast('No se pudo guardar (sin espacio)','bad'))}
 function loadSaveId(id){S.loading='Cargando partida…';
-  SaveDB.get(id).then(s=>{if(!s)throw new Error('vacío');setTimeout(()=>{try{loadState(s);G.sync=false;initWorldUI();for(const p of G.players)if(p.alive)p.human=p.id===0;toast('Partida cargada','good')}catch(e){console.error(e);toast('Error al cargar','bad')}S.loading=null},40)})
+  SaveDB.get(id).then(s=>{if(!s)throw new Error('vacío');setTimeout(()=>{try{loadState(s);G.slot=/^legacy:/.test(id)?null:id;G.sync=false;initWorldUI();for(const p of G.players)if(p.alive)p.human=p.id===0;toast('Partida cargada','good')}catch(e){console.error(e);toast('Error al cargar','bad')}S.loading=null},40)})
   .catch(e=>{console.error(e);toast('No se pudo cargar','bad');S.loading=null})}
 const SV={list:[],page:0,loaded:false};
 function refreshSaves(){return SaveDB.list().then(l=>{SV.list=l;SV.loaded=true;S.hasSaves=l.length>0})}

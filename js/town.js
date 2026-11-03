@@ -36,6 +36,7 @@ function drawTown(dt){
   if(F.id==='alba'||F.id==='marea'){for(let i=0;i<3;i++){const bx=(S.clock*30+i*300)%1000;c.strokeStyle='rgba(30,30,40,.7)';c.lineWidth=1.6;c.beginPath();c.moveTo(bx,90+i*20);c.quadraticCurveTo(bx+5,84+i*20+Math.sin(S.clock*8+i)*3,bx+10,90+i*20);c.quadraticCurveTo(bx+15,84+i*20+Math.sin(S.clock*8+i)*3,bx+20,90+i*20);c.stroke()}}
   if(t.owner===0)drawFlag(c,p.col,12+960/2-3,60,S.clock);
   c.restore();
+  drawTownMinis(t,p);drawTownList(t);
   rrect(c,12,52,960,262,4,null,'#c8a24a',2.4);
   // cabecera
   panel(12,6,960,40,{plain:1,r:8,noshadow:1});
@@ -65,6 +66,27 @@ function drawTown(dt){
   if(tf&&tf.t<.8){c.fillStyle=`rgba(0,0,0,${1-tf.t/.8})`;c.fillRect(0,0,VW,VH)}
   for(const e of UI.keyq||[])if(e.code==='Escape'&&!UI.modals.length)closeTown();
 }
+// edificios construidos en miniatura sobre el panorama: clic para usarlos (reclutar, taberna, mercado…)
+function drawTownMinis(t,p){
+  const c=ctx,list=BUILD_ORDER.filter(b=>t.b[b]&&(b!=='shipyard'||t.dock)),w=60,h=54;
+  list.forEach((b,i)=>{const side=i%2,j=i>>1,row=j%3,col=(j/3)|0;
+    const x=side?904-col*62:20+col*62,y=108+row*56;
+    const hov=hit(x,y,w,h,()=>buildDialog(t,b),{tip:[...buildTip(t,b,p,{ok:1},bCost(b,t.fi)),'Clic: usar este edificio']});
+    ell(c,x+w/2,y+h-3,27,6,'rgba(0,0,0,.38)');
+    if(hov)rrect(c,x-2,y-2,w+4,h+4,7,'rgba(255,230,120,.18)','#ffe27a',1.6);
+    c.drawImage(buildingSprite(b,t.fi),x,y,w,w*87/96);
+    const m=/^dw(\d)$/.exec(b);if(m){const av=t.avail[+m[1]-1];if(av>0){ell(c,x+w-8,y+8,10,10,'#2a6a2a','#c8ffb0',1.2);text(String(av>99?'99+':av),x+w-8,y+12,{size:av>99?8:10,bold:true,align:'center',color:'#fff'})}}
+  });
+}
+// lista de castillos propios (como en el mapa): clic para pasar a otro castillo
+function drawTownList(t){
+  const c=ctx,ts=ownedTowns(0);if(!ts.length)return;
+  rrect(c,16,56,ts.length*62+10,40,6,'rgba(8,4,14,.6)','#5a4a30',1.2);
+  ts.forEach((q,i)=>{const x=20+i*62,y=60,cur=q===t;
+    const hov=hit(x,y,58,32,()=>{if(!cur){const hh=heroAt(q.x+q.ex,q.y+q.ey);S.town={t:q,h:hh&&hh.pid===q.owner?hh:null};S.pick=null;S.townFx={t:0};sfx('click')}},{tip:[q.name,FDEF[q.fi].name,cur?'Estás aquí':'Clic: ir a este castillo']});
+    rrect(c,x,y,58,32,4,lg(c,0,y,0,y+32,[hov?'#5a4a30':'#3a2e22','#1a1410']),cur?'#ffe27a':FDEF[q.fi].col[0],cur?2.6:1.4);
+    c.drawImage(townSprite(q.fi).c,x+2,y+2,54,26*1.2)});
+}
 function drawBuildingGrid(t,p){
   const c=ctx;panel(12,322,960,388,{plain:1,r:8,noshadow:1});
   const list=BUILD_ORDER.filter(b=>b!=='shipyard'||t.dock);const cw=102,ch=118;
@@ -89,7 +111,7 @@ function buildTip(t,b,p,cb,cost){const L=[bTitle(b,t.fi)];let m;
   if(!t.b[b]){L.push('Coste: '+costText(cost));if(!cb.ok)L.push('✖ '+cb.why)}return L}
 function buildDialog(t,b){
   const p=G.players[0],cb=canBuild(t,b,p),cost=bCost(b,t.fi);
-  if(t.b[b]){if(/^dw/.test(b))recruitModal(t,S.town.h);else if(b==='tavern')tavernModal(t);else if(b==='market')marketModal();else if(b==='shipyard'){const e=buyBoat(t,p);if(e)toast(e,'bad');else{sfx('build');toast('Barco amarrado en el muelle','good')}}else if(/^mage/.test(b))guildModal(t,S.town.h);return}
+  if(t.b[b]){if(/^dw/.test(b))recruitModal(t,S.town.h);else if(b==='tavern')tavernModal(t);else if(b==='market')marketModal();else if(b==='shipyard'){const e=buyBoat(t,p);if(e)toast(e,'bad');else{sfx('build');toast('Barco amarrado en el muelle','good')}}else if(/^mage/.test(b))guildModal(t,S.town.h);else Dlg.show({title:bTitle(b,t.fi),w:480,text:buildTip(t,b,p,cb,cost).slice(1).join('\n'),buttons:[{label:'Cerrar',primary:1}]});return}
   Dlg.show({title:bTitle(b,t.fi),w:480,text:buildTip(t,b,p,cb,cost).slice(1).join('\n'),buttons:[{label:'Construir',primary:1,disabled:!cb.ok,fn:()=>{if(build(t,b,p)){sfx('build');toast(`${bTitle(b,t.fi)} construido`,'good');FX.burst(640,200,30,['#ffe27a','#fff'],{spd:160,life:1})}}},{label:'Cancelar'}]});
 }
 // ---------- reclutamiento ----------

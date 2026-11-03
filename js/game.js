@@ -90,7 +90,7 @@ function newPlayer(id,fac,human,diff){
   return{id,fac,human,res,col:PCOL[id],name:PNAME[id],heroes:[],alive:true,fog:null,pool:[],ai:{}};
 }
 function newGame(idx,opt){
-  const spec=mapSpec(idx);const map=genMap(spec,{fac0:opt.fac});G.map=map;snapMap(map);G.opt=opt;G.day=1;G.cur=0;G.over=false;G.busy=false;G.heroes=[];G.players=[];G.usedH={};G.qdone=0;G.vdone=false;G.week={t:'normal',week:1};G.gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);G.quick=G.quick||false;
+  const spec=mapSpec(idx);const map=genMap(spec,{fac0:opt.fac});G.map=map;snapMap(map);G.opt=opt;G.slot=null;G.day=1;G.cur=0;G.over=false;G.busy=false;G.heroes=[];G.players=[];G.usedH={};G.qdone=0;G.vdone=false;G.week={t:'normal',week:1};G.gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);G.quick=G.quick||false;
   G.hmap=new Int16Array(map.w*map.h);
   const hc=opt.color==null?0:opt.color;const cols=[hc];for(let i=0;i<8;i++)if(i!==hc)cols.push(i);
   for(let i=0;i<8;i++){const p=newPlayer(i,map.starts[i].fac,i===0,opt.diff);p.col=PCOL[cols[i]];p.name=PNAME[cols[i]];p.colIdx=cols[i];G.players.push(p)}
@@ -283,7 +283,7 @@ function visit(h,o,cb){
     case'boat':{h.boat=true;h.mp=0;h.path=null;removeObj(o);notify(`${h.name} sube al barco: los pasos se agotan hasta mañana`,'good');if(G.hooks.sfx)G.hooks.sfx('boat');done();break}
     case'gate':case'mono':{if(o.dir==='out'){notify('Esta salida es solo de salida','bad');done();break}const dest=o.pair!=null?G.map.objs[o.pair]:null;
       if(!dest||dest.dead||!teleportHero(h,dest)){notify('El portal está bloqueado','bad');done();break}notify(o.t==='gate'?'Cruzas la puerta entre mundos':'El monolito te transporta','good');done();break}
-    case'mine':{if(o.owner!==h.pid){o.owner=h.pid;notify(`${p.name} captura una mina de ${RESN[o.res]}`,'good')}done();break}
+    case'mine':{if(o.owner!==h.pid){o.owner=h.pid;const rate=o.res==='gold'?1000:(o.res==='wood'||o.res==='ore')?2:1,rn=RESN[o.res].toLowerCase();notify(h.pid===0?`Conquistada mina de ${rn}: +${rate} de ${rn} al día`:`${p.name} captura una mina de ${rn}`,'good')}done();break}
     case'dwell':{if(human)G.hooks.dwell(o,h,done);else{aiBuyDwell(p,h,o);done()}break}
     case'town':{
       if(o.owner===h.pid){learnTownSpells(o,h);const mg=o.b.mage1;if(mg)h.mana=Math.max(h.mana,maxMana(h));
