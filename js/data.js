@@ -6,8 +6,9 @@
 const RES=['gold','wood','ore','mercury','sulfur','crystal','gems'];
 const RESN={gold:'Oro',wood:'Madera',ore:'Mineral',mercury:'Mercurio',sulfur:'Azufre',crystal:'Cristal',gems:'Gemas'};
 const RESC={gold:'#ffd24a',wood:'#b5834f',ore:'#a9b2c0',mercury:'#d4dff0',sulfur:'#ece64a',crystal:'#6ae6ff',gems:'#ff6aae'};
-const WATER=0,GRASS=1,DIRT=2,SAND=3,SNOW=4,SWAMP=5,ROUGH=6,ASH=7;
-const TERR=[{n:'Agua',cost:0},{n:'Pradera',cost:100},{n:'Tierra',cost:100},{n:'Arena',cost:150},{n:'Nieve',cost:150},{n:'Pantano',cost:175},{n:'Roca',cost:125},{n:'Ceniza',cost:110}];
+const WATER=0,GRASS=1,DIRT=2,SAND=3,SNOW=4,SWAMP=5,ROUGH=6,ASH=7,LAVA=8,SUBT=9;
+const IMP=t=>t===WATER||t===LAVA;
+const TERR=[{n:'Agua',cost:0},{n:'Pradera',cost:100},{n:'Tierra',cost:100},{n:'Arena',cost:150},{n:'Nieve',cost:150},{n:'Pantano',cost:175},{n:'Roca',cost:125},{n:'Ceniza',cost:110},{n:'Lava',cost:0},{n:'Subterráneo',cost:100}];
 const PCOL=['#3f7fe0','#e0443c','#3fb85a','#e0b83a','#9a4fd0','#2fc0c0','#e07a2a','#d86aa8'];
 const PNAME=['Azul','Rojo','Verde','Amarillo','Púrpura','Turquesa','Naranja','Rosa'];
 
@@ -132,37 +133,45 @@ const SPELLS={
  cadena:{n:'Cadena de Rayos',lv:3,cost:18,k:'chain',base:40,per:25,d:'Salta entre hasta 4 criaturas enemigas.'},
  resucitar:{n:'Resurrección',lv:3,cost:18,k:'res',base:40,per:30,d:'Revive criaturas aliadas caídas.'},
  implosion:{n:'Implosión',lv:4,cost:25,k:'dmg',base:100,per:75,d:'Gran daño a una criatura.'},
- armagedon:{n:'Armagedón',lv:4,cost:30,k:'all',base:30,per:15,d:'Daño a TODAS las criaturas del campo.'}
+ armagedon:{n:'Armagedón',lv:4,cost:30,k:'all',base:30,per:15,d:'Daño a TODAS las criaturas del campo.'},
+ llamarada:{n:'Llamarada',lv:2,cost:9,k:'dmg',base:20,per:15,d:'Daño de fuego a una criatura: 20 + 15×Poder.'},
+ hielo:{n:'Rayo de Hielo',lv:2,cost:9,k:'dmgslow',base:20,per:15,d:'Daño de hielo y ralentiza a la criatura.'},
+ tormenta:{n:'Tormenta de Meteoros',lv:3,cost:20,k:'area',base:25,per:14,d:'Lluvia de fuego en área (objetivo y adyacentes).'}
 };
+const SCHOOL={chispa:'aire',bendicion:'agua',maldicion:'tierra',prisa:'aire',pielpiedra:'tierra',lentitud:'tierra',curar:'agua',rayo:'aire',escudo:'aire',bola:'fuego',cadena:'aire',resucitar:'agua',implosion:'tierra',armagedon:'fuego',llamarada:'fuego',hielo:'agua',tormenta:'fuego'};
 const SPELL_IDS=Object.keys(SPELLS);
 
-// ---------- artefactos ----------
-const ART={
- espada_alba:{n:'Espada del Alba',b:{a:3},v:2},escudo_guardian:{n:'Escudo del Guardián',b:{d:3},v:2},cetro_sabio:{n:'Cetro del Sabio',b:{sp:3},v:2},libro_arcano:{n:'Libro Arcano',b:{kn:3},v:2},
- botas_viento:{n:'Botas del Viento',b:{mp:300},v:1},anillo_vigor:{n:'Anillo de Vigor',b:{kn:2,sp:1},v:2},yelmo_titan:{n:'Yelmo del Titán',b:{a:2,d:2},v:3},capa_sombra:{n:'Capa de Sombras',b:{d:2,vis:1},v:2},
- amuleto_sol:{n:'Amuleto Solar',b:{sp:2,kn:2},v:3},corona_reyes:{n:'Corona de Reyes',b:{gold:500},v:3},orbe_tormenta:{n:'Orbe de la Tormenta',b:{sp:4},v:3},hacha_furia:{n:'Hacha de la Furia',b:{a:5},v:3},
- coraza_dragon:{n:'Coraza de Dragón',b:{d:5},v:3},baston_eter:{n:'Bastón de Éter',b:{sp:3,kn:3},v:4},gema_alma:{n:'Gema del Alma',b:{kn:5},v:3},guantes_fuerza:{n:'Guantes de Fuerza',b:{a:2},v:1},
- brazalete_roca:{n:'Brazalete de Roca',b:{d:2},v:1},lupa_vidente:{n:'Lupa del Vidente',b:{vis:2},v:2},bolsa_oro:{n:'Bolsa Sin Fondo',b:{gold:250},v:2},caballo_fantasma:{n:'Corcel Fantasma',b:{mp:500},v:3},
- espada_eter:{n:'Espada del Éter',b:{a:6,d:3},v:5},egida_sagrada:{n:'Égida Sagrada',b:{d:6,a:2},v:5},corona_arcana:{n:'Corona Arcana',b:{sp:6,kn:4},v:5},talisman_eras:{n:'Talismán de las Eras',b:{a:3,d:3,sp:3,kn:3},v:6},
- colmillo_vampiro:{n:'Colmillo Vampírico',b:{a:2,sp:2},v:2},pluma_grifo:{n:'Pluma de Grifo',b:{mp:200,vis:1},v:1},rubi_fuego:{n:'Rubí de Fuego',b:{sp:2},v:1},zafiro_hielo:{n:'Zafiro de Hielo',b:{kn:2},v:1},
- martillo_enano:{n:'Martillo Enano',b:{a:3,d:1},v:2},laud_bardo:{n:'Laúd del Bardo',b:{gold:150,kn:1},v:1}
-};
-const ART_IDS=Object.keys(ART);
-
-// ---------- habilidades secundarias ----------
+// ---------- habilidades secundarias (basadas en la serie Heroes 1-5) ----------
 const SKILLS={
- logistica:{n:'Logística',d:['+10% movimiento','+20% movimiento','+30% movimiento']},
- ataque:{n:'Ofensiva',d:['+10% daño cuerpo a cuerpo','+20% daño cuerpo a cuerpo','+30% daño cuerpo a cuerpo']},
- arqueria:{n:'Arquería',d:['+10% daño a distancia','+25% daño a distancia','+50% daño a distancia']},
- armadura:{n:'Armadura',d:['-5% daño recibido','-10% daño recibido','-15% daño recibido']},
- sabiduria:{n:'Sabiduría',d:['+25% maná máximo','+50% maná máximo','+100% maná máximo']},
- misticismo:{n:'Misticismo',d:['+2 maná por día','+4 maná por día','+6 maná por día']},
- exploracion:{n:'Exploración',d:['+1 visión','+2 visión','+3 visión']},
- finanzas:{n:'Finanzas',d:['+250 oro/día','+500 oro/día','+1000 oro/día']},
- liderazgo:{n:'Liderazgo',d:['+1 de moral','+2 de moral','+3 de moral']},
- suerte:{n:'Suerte',d:['+1 de suerte','+2 de suerte','+3 de suerte']}
+ logistica:{n:'Logística',d:['+10% de movimiento por tierra','+20% de movimiento por tierra','+30% de movimiento por tierra'],k:'m'},
+ orientacion:{n:'Orientación',d:['Terrenos difíciles cuestan un 25% menos','Terrenos difíciles cuestan un 50% menos','Sin penalización por terreno'],k:'m'},
+ exploracion:{n:'Exploración',d:['+1 de visión','+2 de visión','+3 de visión'],k:'m'},
+ navegacion:{n:'Navegación',d:['+50% de movimiento marítimo','+100% de movimiento marítimo','+150% de movimiento marítimo'],k:'m'},
+ finanzas:{n:'Fincas',d:['+125 oro/día','+250 oro/día','+500 oro/día'],k:'e'},
+ diplomacia:{n:'Diplomacia',d:['Los monstruos se unen con más facilidad (+25%)','Más facilidad (+50%) y rendición -40%','Máxima facilidad (+75%) y rendición -60%'],k:'e'},
+ liderazgo:{n:'Liderazgo',d:['+1 de moral','+2 de moral','+3 de moral'],k:'c'},
+ suerte:{n:'Suerte',d:['+1 de suerte','+2 de suerte','+3 de suerte'],k:'c'},
+ aprendizaje:{n:'Aprendizaje',d:['+5% de experiencia','+10% de experiencia','+15% de experiencia'],k:'e'},
+ ataque:{n:'Ofensiva',d:['+10% de daño cuerpo a cuerpo','+20% de daño cuerpo a cuerpo','+30% de daño cuerpo a cuerpo'],k:'c'},
+ arqueria:{n:'Arquería',d:['+10% de daño a distancia','+25% de daño a distancia','+50% de daño a distancia'],k:'c'},
+ armadura:{n:'Armadura',d:['-5% de daño recibido','-10% de daño recibido','-15% de daño recibido'],k:'c'},
+ tacticas:{n:'Tácticas',d:['+1 de velocidad en las 2 primeras rondas','+2 de velocidad en las 2 primeras rondas','+3 de velocidad en las 2 primeras rondas'],k:'c'},
+ medicina:{n:'Medicina',d:['Recupera el 10% de las bajas tras el combate','Recupera el 20% de las bajas','Recupera el 30% de las bajas'],k:'c'},
+ necromancia:{n:'Nigromancia',d:['Levanta un 10% de los caídos como esqueletos','Levanta un 20% de los caídos','Levanta un 30% de los caídos'],k:'c'},
+ inteligencia:{n:'Inteligencia',d:['+25% de maná máximo','+50% de maná máximo','+100% de maná máximo'],k:'g'},
+ misticismo:{n:'Misticismo',d:['+2 maná por día','+4 maná por día','+6 maná por día'],k:'g'},
+ sabiduria:{n:'Sabiduría',d:['Aprende hechizos de nivel 3','Aprende hechizos de nivel 4','Aprende todos los hechizos'],k:'g'},
+ hechiceria:{n:'Hechicería',d:['+5% de daño de hechizos','+10% de daño de hechizos','+15% de daño de hechizos'],k:'g'},
+ resistencia:{n:'Resistencia',d:['5% de resistir hechizos de daño','10% de resistir hechizos de daño','20% de resistir hechizos de daño'],k:'g'},
+ ojo_aguila:{n:'Ojo de Águila',d:['20% de aprender hechizos enemigos','30% de aprender hechizos enemigos','40% de aprender hechizos enemigos'],k:'g'},
+ fuego:{n:'Magia de Fuego',d:['Hechizos de fuego +20%','Hechizos de fuego +40%','Hechizos de fuego +60%'],k:'g'},
+ agua:{n:'Magia de Agua',d:['Hechizos de agua +20%','Hechizos de agua +40%','Hechizos de agua +60%'],k:'g'},
+ tierra:{n:'Magia de Tierra',d:['Hechizos de tierra +20%','Hechizos de tierra +40%','Hechizos de tierra +60%'],k:'g'},
+ aire:{n:'Magia de Aire',d:['Hechizos de aire +20%','Hechizos de aire +40%','Hechizos de aire +60%'],k:'g'}
 };
 const SKILL_IDS=Object.keys(SKILLS);
+const SK_PREF=[['ataque','armadura','logistica','liderazgo','orientacion','tacticas','diplomacia','suerte','arqueria','finanzas','medicina','exploracion','aprendizaje'],['inteligencia','sabiduria','misticismo','hechiceria','fuego','aire','agua','tierra','resistencia','aprendizaje','ojo_aguila','logistica','liderazgo']];
+const SPEC_RES=['gold','wood','ore','mercury','sulfur','crystal','gems'];
 
 // ---------- héroes ----------
 const HERO_NAMES=[
@@ -180,7 +189,7 @@ function xpForLevel(l){if(l<=XP_LV.length)return XP_LV[l-1];let v=XP_LV[XP_LV.le
 
 // ---------- edificios de ciudad ----------
 const BNAME={hall1:'Ayuntamiento',hall2:'Concejo Municipal',hall3:'Capitolio',fort1:'Empalizada',fort2:'Ciudadela',fort3:'Castillo',
- mage1:'Gremio de Magos I',mage2:'Gremio de Magos II',mage3:'Gremio de Magos III',mage4:'Gremio de Magos IV',tavern:'Taberna',market:'Mercado',
+ mage1:'Gremio de Magos I',mage2:'Gremio de Magos II',mage3:'Gremio de Magos III',mage4:'Gremio de Magos IV',tavern:'Taberna',market:'Mercado',shipyard:'Astillero',
  dw1:'Viviendas',dw2:'Tiro',dw3:'Cobijo',dw4:'Salón',dw5:'Santuario',dw6:'Palacio',dw7:'Trono'};
 const FBNAME=[ // nombres temáticos para viviendas por facción
  ['Cuartel','Campo de Tiro','Aviario Solar','Establos Reales','Capilla','Palacio de Justas','Santuario Celeste'],
@@ -198,7 +207,7 @@ function bCost(b,fi){
   if(up){const t=+up[1];const c={gold:[0,500,800,1200,1800,2500,3500,6000][t]};if(t>=3)c.ore=4;if(t>=5)c[r]=3;return c}
   m={hall1:{gold:2500},hall2:{gold:5000},hall3:{gold:10000},fort1:{gold:1500,wood:10,ore:10},fort2:{gold:2500,ore:10},fort3:{gold:5000,ore:20,wood:10},
    mage1:{gold:2000,wood:5,ore:5},mage2:{gold:1500,wood:5,ore:5,mercury:4},mage3:{gold:1500,wood:5,ore:5,mercury:6,sulfur:4},mage4:{gold:2000,wood:5,ore:5,crystal:6,gems:6},
-   tavern:{gold:500,wood:5},market:{gold:500,wood:5,ore:5}}[b];
+   tavern:{gold:500,wood:5},market:{gold:500,wood:5,ore:5},shipyard:{gold:2000,wood:20}}[b];
   return m||{gold:999999};
 }
 function bReq(b,town){
@@ -210,7 +219,7 @@ function bReq(b,town){
   if(b==='mage2')return['mage1'];if(b==='mage3')return['mage2'];if(b==='mage4')return['mage3'];
   return[];
 }
-const BUILD_ORDER=['hall1','hall2','hall3','fort1','fort2','fort3','tavern','market','mage1','mage2','mage3','mage4','dw1','dw2','dw3','dw4','dw5','dw6','dw7','up1','up2','up3','up4','up5','up6','up7'];
+const BUILD_ORDER=['hall1','hall2','hall3','fort1','fort2','fort3','tavern','market','shipyard','mage1','mage2','mage3','mage4','dw1','dw2','dw3','dw4','dw5','dw6','dw7','up1','up2','up3','up4','up5','up6','up7'];
 function bTitle(b,fi){let m;if(m=/^dw(\d)$/.exec(b))return FBNAME[fi][+m[1]-1];if(m=/^up(\d)$/.exec(b))return 'Mejora: '+FBNAME[fi][+m[1]-1];return BNAME[b]}
 function canAfford(p,cost,mul=1){for(const k in cost)if((p.res[k]||0)<cost[k]*mul)return false;return true}
 function spend(p,cost,mul=1){for(const k in cost)p.res[k]-=cost[k]*mul}

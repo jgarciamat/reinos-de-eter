@@ -13,7 +13,7 @@ function buildList(){
 }
 function openSelect(){S.scr='select';buildList();pickMap(SEL.list[0]?SEL.list[0].i:0)}
 function pickMap(i){SEL.idx=i;SEL.prev=null;SEL.loading=true;const my=++SEL.token||(SEL.token=1);SEL.token=my;
-  setTimeout(()=>{if(SEL.token!==my)return;try{const m=genMap(mapSpec(i),{fac0:SEL.fac});SEL.prev=previewOf(m);SEL.prevIdx=i}catch(e){SEL.prev=null;console.error(e)}SEL.loading=false},40)}
+  setTimeout(()=>{if(SEL.token!==my)return;try{const m=genMap(mapSpec(i),{fac0:SEL.fac,surfaceOnly:true});SEL.prev=previewOf(m);SEL.prevIdx=i}catch(e){SEL.prev=null;console.error(e)}SEL.loading=false},40)}
 function previewOf(m){
   const c=document.createElement('canvas');c.width=m.w;c.height=m.h;const x=c.getContext('2d'),img=x.createImageData(m.w,m.h);
   for(let i=0;i<m.w*m.h;i++){const col=TCOLM[m.terr[i]];let r=col[0],g=col[1],b=col[2];if(m.deco[i]){r*=.55;g*=.62;b*=.55}if(m.road[i]){r=176;g=140;b=96}img.data[i*4]=r;img.data[i*4+1]=g;img.data[i*4+2]=b;img.data[i*4+3]=255}

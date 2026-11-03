@@ -18,7 +18,7 @@ class Battle{
     for(let i=0;i<nO;i++){const x=3+Math.floor(Math.random()*9),y=Math.floor(Math.random()*BH);this.obst.add(hk(x,y))}
     sides.forEach((sd,si)=>{
       const arr=sd.army.map((a,slot)=>({a,slot})).filter(o=>o.a&&o.a.n>0);const pos=SLOTS[Math.max(0,arr.length-1)];
-      arr.forEach((o,k)=>{const cr=CR[o.a.id];const y=pos[k],x=si===0?0:BW-1;this.obst.delete(hk(x,y));this.obst.delete(hk(x+(si?-1:1),y));
+      arr.forEach((o,k)=>{const hsb=sd.hs||{};const cr0=CR[o.a.id];const cr=(hsb.hpB||hsb.spdB)?Object.assign({},cr0,{hp:cr0.hp+(hsb.hpB||0),spd:cr0.spd+(hsb.spdB||0)}):cr0;const y=pos[k],x=si===0?0:BW-1;this.obst.delete(hk(x,y));this.obst.delete(hk(x+(si?-1:1),y));
         const s={side:si,slot:o.slot,id:o.a.id,cr,n:o.a.n,startN:o.a.n,top:cr.hp,x,y,ret:true,defend:false,waited:false,buff:{},shots:cr.shots,idx:this.st.length,dead:false,killed:0,fresh:true};
         this.st.push(s);this.grid.set(hk(x,y),s)})});
     this.startRound();
@@ -27,9 +27,10 @@ class Battle{
   alive(side){return this.st.filter(s=>!s.dead&&(side===undefined||s.side===side))}
   at(x,y){return this.grid.get(hk(x,y))||null}
   hs(side){return this.sides[side].hs||{a:0,d:0,sp:0,kn:0,off:0,arch:0,armor:0,mana:0}}
-  spd(s){let v=s.cr.spd;if(s.buff.haste)v+=3;if(s.buff.slow)v=Math.max(1,v-Math.ceil(v*.4));return v}
-  atkVal(s){return s.cr.atk+this.hs(s.side).a}
-  defVal(s){let d=s.cr.def+this.hs(s.side).d;if(s.buff.stone)d+=4;if(s.defend)d=Math.ceil(d*1.2);return d}
+  spd(s){let v=s.cr.spd;if(this.round<=2)v+=this.hs(s.side).tact||0;if(s.buff.haste)v+=3;if(s.buff.slow)v=Math.max(1,v-Math.ceil(v*.4));return v}
+  specB(s){const sp=this.hs(s.side).spec;return sp&&sp.id.replace('u','')===s.id.replace('u','')?sp.bonus:0}
+  atkVal(s){return s.cr.atk+this.hs(s.side).a+this.specB(s)}
+  defVal(s){let d=s.cr.def+this.hs(s.side).d+this.specB(s);if(s.buff.stone)d+=4;if(s.defend)d=Math.ceil(d*1.2);return d}
   total(s){return s.dead?0:(s.n-1)*s.cr.hp+s.top}
   cur(){return this.queue[0]||null}
   // ---- rondas ----
@@ -128,15 +129,22 @@ class Battle{
   // ---- magia ----
   heroMana(side){const h=this.sides[side].hero;return h?h.mana:0}
   canCast(side,sp){const h=this.sides[side].hero;return !!h&&!this.cast[side]&&h.mana>=SPELLS[sp].cost&&(h.spells||[]).includes(sp)}
+  spellPower(side,sp){
+    const h=this.hs(side),S=SPELLS[sp];let k=1+.05*(h.sorc||0);const sc=SCHOOL[sp];if(sc){k+=[0,.2,.4,.6][(h.sch&&h.sch[sc])||0]+((h.schA&&h.schA[sc])||0)/100}
+    if(h.specSpell&&h.specSpell.id===sp)k+=h.specSpell.pct;
+    return(S.base+S.per*(h.sp||0))*k;
+  }
   castSpell(side,sp,target,cx,cy){
-    if(!this.canCast(side,sp))return false;const S=SPELLS[sp],h=this.sides[side].hero,pw=this.hs(side).sp;
-    h.mana-=S.cost;this.cast[side]=true;const dmg=S.base+S.per*pw;
+    if(!this.canCast(side,sp))return false;const S=SPELLS[sp],h=this.sides[side].hero;
+    h.mana-=S.cost;this.cast[side]=true;const dmg=this.spellPower(side,sp);
+    (this.casts=this.casts||[[],[]])[side].push(sp);
     this.ev.push({t:'spell',sp,side,target,x:target?target.x:cx,y:target?target.y:cy});
-    const hurt=(u,amt)=>{if(!u||u.dead)return;const k=this.applyDmg(u,amt,null);this.ev.push({t:'hit',a:null,d:u,dmg:amt,kills:k,spell:true,dead:u.dead,na:u.n,ta:u.top,sp})};
+    const hurt=(u,amt)=>{if(!u||u.dead)return;const hr=this.hs(u.side).resi||0;if(hr&&Math.random()<hr/100){this.ev.push({t:'text',s:u,txt:'¡Resiste!'});return}amt=Math.floor(amt);const k=this.applyDmg(u,amt,null);this.ev.push({t:'hit',a:null,d:u,dmg:amt,kills:k,spell:true,dead:u.dead,na:u.n,ta:u.top,sp})};
     switch(S.k){
       case'dmg':hurt(target,dmg);break;
+      case'dmgslow':hurt(target,dmg);if(target&&!target.dead){target.buff.slow=3;this.ev.push({t:'text',s:target,txt:'Ralentizado'})}break;
       case'area':{const hs=[[target.x,target.y],...hexNb(target.x,target.y)];for(const[x,y]of hs){const u=this.at(x,y);if(u)hurt(u,dmg)}break}
-      case'chain':{let cur=target,d=dmg;const hit=new Set();for(let i=0;i<4&&cur;i++){hit.add(cur);hurt(cur,Math.floor(d));d/=2;
+      case'chain':{let cur=target,d=dmg;const hit=new Set();for(let i=0;i<4&&cur;i++){hit.add(cur);hurt(cur,d);d/=2;
         cur=this.alive(1-side).filter(u=>!hit.has(u)).sort((a,b)=>hexDist(cur.x,cur.y,a.x,a.y)-hexDist(cur.x,cur.y,b.x,b.y))[0]}break}
       case'all':for(const u of this.alive())hurt(u,dmg);break;
       case'heal':{const max=target.startN*target.cr.hp,tot=Math.min(max,this.total(target)+dmg);target.n=Math.ceil(tot/target.cr.hp);target.top=tot-(target.n-1)*target.cr.hp;this.ev.push({t:'text',s:target,txt:'+'+Math.floor(dmg)});break}
@@ -174,9 +182,9 @@ class Battle{
   aiSpell(side){
     const h=this.sides[side].hero;if(!h||this.cast[side]||!h.spells)return;
     const foes=this.alive(1-side),fr=this.alive(side);if(!foes.length)return;
-    let best=null,bv=0;const pw=this.hs(side).sp;
-    for(const sp of h.spells){const S=SPELLS[sp];if(h.mana<S.cost)continue;const dmg=S.base?S.base+S.per*pw:0;
-      if(S.k==='dmg'){for(const t of foes){const v=Math.min(dmg,this.total(t))/t.cr.hp*t.cr.val-S.cost*2;if(v>bv){bv=v;best={sp,t}}}}
+    let best=null,bv=0;
+    for(const sp of h.spells){const S=SPELLS[sp];if(h.mana<S.cost)continue;const dmg=S.base?this.spellPower(side,sp):0;
+      if(S.k==='dmg'||S.k==='dmgslow'){for(const t of foes){const v=Math.min(dmg,this.total(t))/t.cr.hp*t.cr.val-S.cost*2;if(v>bv){bv=v;best={sp,t}}}}
       else if(S.k==='area'){for(const t of foes){let v=-S.cost*2;for(const[x,y]of [[t.x,t.y],...hexNb(t.x,t.y)]){const u=this.at(x,y);if(!u)continue;const w=Math.min(dmg,this.total(u))/u.cr.hp*u.cr.val;v+=u.side!==side?w:-w}if(v>bv){bv=v;best={sp,t}}}}
       else if(S.k==='chain'){for(const t of foes){const v=Math.min(dmg,this.total(t))/t.cr.hp*t.cr.val*1.8-S.cost*2;if(v>bv){bv=v;best={sp,t}}}}
       else if(S.k==='all'){let v=-S.cost*2;for(const u of this.alive()){const w=Math.min(dmg,this.total(u))/u.cr.hp*u.cr.val;v+=u.side!==side?w:-w}if(v>bv){bv=v;best={sp,t:null}}}

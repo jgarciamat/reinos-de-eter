@@ -56,6 +56,7 @@ function drawTown(dt){
   button(998,by,258,34,'Reclutar criaturas',()=>recruitModal(t,h),{primary:1,size:15});by+=40;
   button(998,by,258,30,'Mercado',()=>marketModal(),{size:14,disabled:!t.b.market,tip:t.b.market?null:'Construye un Mercado'});by+=36;
   button(998,by,258,30,'Gremio de magos',()=>guildModal(t,h),{size:14,disabled:!t.b.mage1});by+=36;
+  if(t.dock)button(998,by,258,30,'Astillero: comprar barco',()=>{const e=buyBoat(t,p);if(e)toast(e,'bad');else{sfx('build');toast('Barco amarrado en el muelle','good')}},{size:13,disabled:!t.b.shipyard,tip:t.b.shipyard?'1000 de oro y 10 de madera':'Construye un Astillero'});if(t.dock)by+=36;
   if(S.pick){const u=S.pick.arr[S.pick.i];if(u){button(998,by,126,28,'Dividir',()=>{const n=Math.floor(u.n/2);if(n<1)return;const a=S.pick.arr;const e=a.findIndex(s=>!s);if(e<0){toast('No hay espacio','bad');return}u.n-=n;a[e]={id:u.id,n};S.pick=null},{size:13,disabled:u.n<2});
     const up=upgradeCostFor(t,S.pick.arr,S.pick.i);button(1130,by,126,28,'Mejorar',()=>{if(doUpgrade(p,t,S.pick.arr,S.pick.i)){toast('¡Criaturas mejoradas!','good');sfx('level')}},{size:13,disabled:!up||!canAfford(p,up.cost),tip:up?`Cuesta ${costText(up.cost)}`:'No hay mejora disponible'})}}
   button(998,664,258,34,'Salir de la ciudad',()=>closeTown(),{size:15});
@@ -65,7 +66,7 @@ function drawTown(dt){
 }
 function drawBuildingGrid(t,p){
   const c=ctx;panel(12,322,960,388,{plain:1,r:8,noshadow:1});
-  const list=BUILD_ORDER;const cw=102,ch=118;
+  const list=BUILD_ORDER.filter(b=>b!=='shipyard'||t.dock);const cw=102,ch=118;
   list.forEach((b,i)=>{
     const col=i%9,row=Math.floor(i/9);const x=22+col*(cw+4),y=332+row*(ch+4);
     const built=!!t.b[b];const cb=canBuild(t,b,p);const cost=bCost(b,t.fi);
@@ -83,11 +84,11 @@ function drawBuildingGrid(t,p){
 function buildTip(t,b,p,cb,cost){const L=[bTitle(b,t.fi)];let m;
   if(m=/^dw(\d)$/.exec(b)){const cr=CR[FDEF[t.fi].units[+m[1]-1]];L.push(`Cría: ${cr.name} (${cr.grow}/semana)`,`Atq ${cr.atk} · Def ${cr.def} · Vida ${cr.hp} · Daño ${cr.mn}-${cr.mx}`)}
   else if(m=/^up(\d)$/.exec(b)){const cr=CR[FDEF[t.fi].units[+m[1]-1+7]];L.push(`Mejora a: ${cr.name}`,`Atq ${cr.atk} · Def ${cr.def} · Vida ${cr.hp}`)}
-  else L.push({hall1:'Ingreso base de 250 oro/día',hall2:'+500 de oro al día',hall3:'+1000 de oro al día',fort1:'Defensa de la ciudad',fort2:'+50% de crecimiento semanal',fort3:'+100% de crecimiento semanal',tavern:'Permite contratar héroes',market:'Permite comerciar recursos',mage1:'Hechizos de nivel 1',mage2:'Hechizos de nivel 2',mage3:'Hechizos de nivel 3',mage4:'Hechizos de nivel 4'}[b]||'');
+  else L.push({shipyard:'Permite comprar barcos (1000 de oro y 10 de madera) para navegar',hall1:'Ingreso base de 250 oro/día',hall2:'+500 de oro al día',hall3:'+1000 de oro al día',fort1:'Defensa de la ciudad',fort2:'+50% de crecimiento semanal',fort3:'+100% de crecimiento semanal',tavern:'Permite contratar héroes',market:'Permite comerciar recursos',mage1:'Hechizos de nivel 1',mage2:'Hechizos de nivel 2',mage3:'Hechizos de nivel 3',mage4:'Hechizos de nivel 4'}[b]||'');
   if(!t.b[b]){L.push('Coste: '+costText(cost));if(!cb.ok)L.push('✖ '+cb.why)}return L}
 function buildDialog(t,b){
   const p=G.players[0],cb=canBuild(t,b,p),cost=bCost(b,t.fi);
-  if(t.b[b]){if(/^dw/.test(b))recruitModal(t,S.town.h);else if(b==='tavern')tavernModal(t);else if(b==='market')marketModal();else if(/^mage/.test(b))guildModal(t,S.town.h);return}
+  if(t.b[b]){if(/^dw/.test(b))recruitModal(t,S.town.h);else if(b==='tavern')tavernModal(t);else if(b==='market')marketModal();else if(b==='shipyard'){const e=buyBoat(t,p);if(e)toast(e,'bad');else{sfx('build');toast('Barco amarrado en el muelle','good')}}else if(/^mage/.test(b))guildModal(t,S.town.h);return}
   Dlg.show({title:bTitle(b,t.fi),w:480,text:buildTip(t,b,p,cb,cost).slice(1).join('\n'),buttons:[{label:'Construir',primary:1,disabled:!cb.ok,fn:()=>{if(build(t,b,p)){sfx('build');toast(`${bTitle(b,t.fi)} construido`,'good');FX.burst(640,200,30,['#ffe27a','#fff'],{spd:160,life:1})}}},{label:'Cancelar'}]});
 }
 // ---------- reclutamiento ----------
@@ -187,37 +188,49 @@ function inspect(tx,ty){
   if(o.t==='mon'&&vis)return creatureInfo(o.cr,o.n);
   if(o.t==='town'){const gp=armyPower(o.gar);Dlg.show({title:o.name,w:480,text:`${FDEF[o.fi].name}\n${o.owner>=0?'Propietario: '+G.players[o.owner].name:'Ciudad neutral'}\n${FDEF[o.fi].desc}`+(o.owner!==0&&vis?`\nGuarnición: ${o.gar.filter(s=>s).map(s=>sizeLabel(s.n)+' '+CR[s.id].name).join(', ')||'vacía'}`:''),buttons:[{label:'Cerrar'}]});return}
   if(o.t==='dwell'){creatureInfo(o.cr,o.n);return}
-  Dlg.show({title:objName(o),w:420,text:{mine:`Produce ${RESN[o.res]} cada día. ${o.owner>=0?'Propietario: '+G.players[o.owner].name:'Sin dueño.'}`,site:{shrine:'Enseña un hechizo al héroe que la visita.',hut:'Enseña una habilidad secundaria.',well:'Restaura el maná del héroe.',stone:'Otorga 1000 de experiencia (una vez por héroe).',stable:'Da movimiento extra durante la semana.',mill:'Da oro y recursos cada semana.'}[o.k]||'',res:'Recursos para recoger.',chest:'Oro o experiencia.',art:ART[o.art]?`${ART[o.art].n}: ${Object.keys(ART[o.art].b).map(k=>({a:'Ataque',d:'Defensa',sp:'Poder',kn:'Conocimiento',mp:'Movimiento',vis:'Visión',gold:'Oro/día'}[k]+' +'+ART[o.art].b[k])).join(', ')}`:''}[o.t]||'',buttons:[{label:'Cerrar'}]});
+  Dlg.show({title:objName(o),w:420,text:{mine:`Produce ${RESN[o.res]} cada día. ${o.owner>=0?'Propietario: '+G.players[o.owner].name:'Sin dueño.'}`,site:{shrine:'Enseña un hechizo al héroe que la visita.',hut:'Enseña una habilidad secundaria.',well:'Restaura el maná del héroe.',stone:'Otorga 1000 de experiencia (una vez por héroe).',stable:'Da movimiento extra durante la semana.',mill:'Da oro y recursos cada semana.',shop:'Vende artefactos por oro.'}[o.k]||'',gate:'Une la superficie con el subsuelo.',mono:'Transporta al héroe a su monolito gemelo.',boat:'Sube a bordo para navegar por el mar.',res:'Recursos para recoger.',chest:'Oro o experiencia.',art:ART[o.art]?`${ART[o.art].n}: ${artText(o.art)}`:''}[o.t]||'',buttons:[{label:'Cerrar'}]});
 }
 // ---------- ficha de héroe ----------
+const EQPOS={helm:[139,4],neck:[80,62],cloak:[198,62],weapon:[14,124],armor:[139,124],shield:[264,124],gloves:[14,196],ring1:[80,196],ring2:[198,196],boots:[139,200],misc1:[14,296],misc2:[94,296],misc3:[174,296],misc4:[254,296]};
+const EQSLOT={helm:'helm',neck:'neck',cloak:'cloak',weapon:'weapon',armor:'armor',shield:'shield',gloves:'gloves',ring1:'ring',ring2:'ring',boots:'boots',misc1:'misc',misc2:'misc',misc3:'misc',misc4:'misc'};
+function artTip(id){const a=ART[id];const L=[a.n,`${SLOTN[a.slot]} · ${['','Tesoro','Menor','Mayor','Reliquia','Conjunto'][a.v]||''}`,...Object.keys(a.b).map(k=>`${BNAMES[k]||k}: ${k==='pf'?'sí':(a.b[k]>0?'+':'')+a.b[k]}`)];if(a.set){const S2=ARTSET[a.set];L.push(`Conjunto: ${S2.n} (${S2.pieces.length} piezas)`)}return L}
 function openHeroScreen(h,readonly){
   const mine=h.pid===0&&!readonly;
-  Dlg.show({w:900,title:h.name,draw:m=>{
-    const x=190,y=50,w=900,hh=620,p=G.players[h.pid],st=hstat(h);panel(x,y,w,hh,{title:`${h.name} — ${HERO_CLASS[h.fi][h.cls]} (${FDEF[h.fi].short})`});
-    ctx.drawImage(portrait(h.fi,h.port,h.cls),x+22,y+34,150,150);rrect(ctx,x+22,y+34,150,150,4,null,'#c8a24a',2);
-    text(`Nivel ${h.lvl}`,x+200,y+58,{size:20,bold:true,color:'#ffe9a0'});text(`Jugador: ${p.name}`,x+200,y+80,{size:13,color:p.col});
-    const nx=xpForLevel(h.lvl+1),cur=xpForLevel(h.lvl);bar(x+200,y+92,300,14,(h.xp-cur)/(nx-cur),'#b87aff','#6a3aa0');text(`Experiencia ${h.xp} / ${nx}`,x+350,y+104,{size:11,bold:true,align:'center'});
-    const stats=[['Ataque',st.a,h.a],['Defensa',st.d,h.d],['Poder mágico',st.sp,h.sp],['Conocimiento',st.kn,h.kn]];
-    stats.forEach((s,i)=>{const sx=x+200+i*125,sy=y+124;rrect(ctx,sx,sy,115,58,6,'rgba(40,30,44,.85)','#7a6a48',1.3);text(s[0],sx+57,sy+18,{size:12,align:'center',color:'#c8b890'});text(String(s[1])+(s[1]>s[2]?` (+${s[1]-s[2]})`:''),sx+57,sy+46,{size:24,bold:true,align:'center',color:s[1]>s[2]?'#9aff9a':'#fff'})});
-    text('Maná',x+520,y+60,{size:13,bold:true,color:'#9ab8ff'});bar(x+520,y+66,170,16,h.mana/maxMana(h),'#6aa0ff','#2a5ac0');text(`${Math.floor(h.mana)} / ${maxMana(h)}`,x+605,y+79,{size:12,bold:true,align:'center'});
-    text('Movimiento',x+520,y+104,{size:13,bold:true,color:'#9aff9a'});bar(x+520,y+110,170,16,h.mp/maxMP(h),'#5ad87a','#2a8a4a');text(`${Math.round(h.mp)} / ${maxMP(h)}`,x+605,y+123,{size:12,bold:true,align:'center'});
-    text(`Moral +${st.lead} · Suerte +${st.luck} · Visión ${heroVis(h)}`,x+200,y+204,{size:12,color:'#d8c8a0'});
-    // habilidades
-    text('HABILIDADES SECUNDARIAS',x+24,y+216,{size:12,bold:true,color:'#c8a24a'});const sk=Object.keys(h.skills);
-    sk.forEach((k,i)=>{const lv=h.skills[k],cx=x+24+(i%2)*190,cy=y+226+Math.floor(i/2)*44;rrect(ctx,cx,cy,182,38,6,'rgba(40,30,44,.85)','#7a6a48',1.2);text(SKILLS[k].n,cx+8,cy+16,{size:13,bold:true});text(['Básico','Avanzado','Experto'][lv-1],cx+8,cy+32,{size:11,color:'#ffe27a'});hit(cx,cy,182,38,null,{tip:[SKILLS[k].n,SKILLS[k].d[lv-1]]})});
-    if(!sk.length)text('Sin habilidades',x+24,y+246,{size:13,italic:true,color:'#9a8a70'});
-    // hechizos
-    text('LIBRO DE HECHIZOS',x+420,y+216,{size:12,bold:true,color:'#c8a24a'});
-    h.spells.forEach((s,i)=>{const cx=x+420+(i%3)*150,cy=y+226+Math.floor(i/3)*36;if(cy>y+330)return;rrect(ctx,cx,cy,144,30,6,'rgba(60,50,90,.8)','#8a7ac0',1.2);text(SPELLS[s].n,cx+8,cy+14,{size:12,bold:true});text(`Nv ${SPELLS[s].lv} · ${SPELLS[s].cost}`,cx+8,cy+26,{size:10,color:'#b8a8e0'});hit(cx,cy,144,30,null,{tip:[SPELLS[s].n,SPELLS[s].d,`Coste: ${SPELLS[s].cost} de maná`]})});
-    // artefactos
-    text('ARTEFACTOS',x+24,y+352,{size:12,bold:true,color:'#c8a24a'});
-    for(let i=0;i<14;i++){const cx=x+24+(i%7)*56,cy=y+360+Math.floor(i/7)*56;const a=h.arts[i];rrect(ctx,cx,cy,50,50,6,'rgba(30,24,36,.9)',a?'#ffe27a':'#4a3e34',a?2:1.2);
-      if(a){const hu=(hash2(a.length,a.charCodeAt(1),7)*360)|0;ctx.save();ctx.filter=`hue-rotate(${hu}deg)`;ctx.drawImage(artSprite(),cx-2,cy-2,54,58);ctx.restore();hit(cx,cy,50,50,null,{tip:[ART[a].n,...Object.keys(ART[a].b).map(k=>({a:'Ataque',d:'Defensa',sp:'Poder',kn:'Conocimiento',mp:'Movimiento',vis:'Visión',gold:'Oro/día'}[k]+' +'+ART[a].b[k]))]})}}
-    // ejército
-    text('EJÉRCITO',x+450,y+352,{size:12,bold:true,color:'#c8a24a'});
-    if(mine){armyPanelBig(x+450,y+364,h)}else armyPanelBig(x+450,y+364,h,true);
-    text(`Poder total del ejército: ${armyPower(h.army)}`,x+450,y+530,{size:13,color:'#ffe27a'});
-    button(x+w/2-60,y+hh-52,120,36,'Cerrar',()=>{S.pick=null;Dlg.close()},{size:15});
+  Dlg.show({w:1020,title:h.name,draw:m=>{
+    const x=130,y=18,w=1020,hh=684,p=G.players[h.pid],st=hstat(h);panel(x,y,w,hh,{title:`${h.name} — ${HERO_CLASS[h.fi][h.cls]} (${FDEF[h.fi].short})`});
+    // columna izquierda
+    ctx.drawImage(portrait(h.fi,h.port,h.cls),x+22,y+34,120,120);rrect(ctx,x+22,y+34,120,120,4,null,'#c8a24a',2);
+    text(`Nivel ${h.lvl}`,x+156,y+54,{size:20,bold:true,color:'#ffe9a0'});text(p.name,x+156,y+74,{size:13,color:p.col,bold:true});
+    const nx=xpForLevel(h.lvl+1),cur=xpForLevel(h.lvl);bar(x+156,y+84,170,13,(h.xp-cur)/(nx-cur),'#b87aff','#6a3aa0');text(`${h.xp}/${nx} exp.`,x+241,y+95,{size:10,bold:true,align:'center',shadow:false});
+    bar(x+156,y+104,170,12,h.mana/Math.max(1,maxMana(h)),'#6aa0ff','#2a5ac0');text(`Maná ${Math.floor(h.mana)}/${maxMana(h)}`,x+241,y+114,{size:10,bold:true,align:'center',shadow:false});
+    bar(x+156,y+122,170,12,h.mp/Math.max(1,maxMP(h)),'#5ad87a','#2a8a4a');text(`Mov. ${Math.round(h.mp)}/${maxMP(h)}${h.boat?' (barco)':''}`,x+241,y+132,{size:10,bold:true,align:'center',shadow:false});
+    [['Ataque',st.a,h.a],['Defensa',st.d,h.d],['Poder',st.sp,h.sp],['Conocim.',st.kn,h.kn]].forEach((q,i)=>{const sx=x+22+(i%2)*154,sy=y+164+Math.floor(i/2)*60;rrect(ctx,sx,sy,148,54,6,'rgba(40,30,44,.85)','#7a6a48',1.3);text(q[0],sx+10,sy+20,{size:12,color:'#c8b890'});text(String(q[1])+(q[1]>q[2]?` (+${q[1]-q[2]})`:''),sx+138,sy+42,{size:24,bold:true,align:'right',color:q[1]>q[2]?'#9aff9a':'#fff'})});
+    text(`Moral ${st.lead>=0?'+':''}${st.lead} · Suerte ${st.luck>=0?'+':''}${st.luck} · Visión ${heroVis(h)}`,x+22,y+296,{size:12,color:'#d8c8a0'});
+    paragraph(specText(h),x+22,y+314,300,{size:11,color:'#bfe8ff',italic:true});
+    text('HABILIDADES',x+22,y+356,{size:12,bold:true,color:'#c8a24a'});const sks=Object.keys(h.skills);
+    sks.forEach((k,i)=>{const lv=h.skills[k],cx=x+22+(i%2)*154,cy=y+364+Math.floor(i/2)*44;rrect(ctx,cx,cy,148,38,6,'rgba(40,30,44,.85)','#7a6a48',1.2);text(SKILLS[k].n,cx+8,cy+16,{size:12,bold:true});for(let q=0;q<3;q++){ctx.fillStyle=q<lv?'#ffd24a':'#4a4030';ctx.beginPath();ctx.arc(cx+14+q*14,cy+28,4.4,0,6.28);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.stroke()}text(['Básico','Avanzado','Experto'][lv-1],cx+142,cy+31,{size:10,align:'right',color:'#ffe27a'});hit(cx,cy,148,38,null,{tip:[SKILLS[k].n+' — '+['Básico','Avanzado','Experto'][lv-1],SKILLS[k].d[lv-1]]})});
+    if(!sks.length)text('Sin habilidades',x+22,y+384,{size:12,italic:true,color:'#9a8a70'});
+    // centro: muñeco de equipo
+    const ex=x+350,ey=y+44;rrect(ctx,ex-8,ey-8,356,420,8,'rgba(18,12,24,.55)','rgba(200,162,74,.4)',1.2);
+    ctx.save();ctx.globalAlpha=.1;ctx.drawImage(portrait(h.fi,h.port,h.cls),ex+60,ey+130,220,220);ctx.restore();
+    text('EQUIPO',ex+170,ey-14,{size:12,bold:true,align:'center',color:'#c8a24a'});
+    for(const k of EQKEYS){const[ox,oy]=EQPOS[k],sx=ex+ox,sy=ey+oy,id=h.eq[k];
+      const hov=hit(sx,sy,52,52,mine&&id?()=>{if(unequip(h,k))sfx('click');else toast('Mochila llena','bad')}:null,{tip:id?[...artTip(id),mine?'Clic: guardar en la mochila':'']:SLOTN[EQSLOT[k]]});
+      rrect(ctx,sx,sy,52,52,6,lg(ctx,0,sy,0,sy+52,['#3a3044','#1a1420']),id?TIERCOL[ART[id].v]:hov?'#c8b890':'#6a5a3e',id?2.2:1.4);
+      if(id)ctx.drawImage(artIcon(id),sx+4,sy+4,44,44);else ctx.drawImage(slotGlyph(EQSLOT[k]),sx+4,sy+4,44,44)}
+    // mochila
+    text('MOCHILA',ex+170,ey+388,{size:12,bold:true,align:'center',color:'#c8a24a'});
+    for(let i=0;i<14;i++){const sx=ex+(i%7)*50,sy=ey+398+Math.floor(i/7)*50,id=h.pack[i];
+      const hov=hit(sx,sy,46,46,mine&&id?()=>{const keys=SLOTKEYS[ART[id].slot];const k=keys.find(q=>!h.eq[q])||keys[0];if(equipFromPack(h,i,k))sfx('level')}:null,{tip:id?[...artTip(id),mine?'Clic: equipar':'']:'Mochila'});
+      rrect(ctx,sx,sy,46,46,5,'rgba(30,24,36,.9)',id?TIERCOL[ART[id].v]:'#4a3e34',id?2:1.2);if(id)ctx.drawImage(artIcon(id),sx+1,sy+1,44,44)}
+    // derecha: ejército, hechizos, conjuntos
+    const rx=x+730;
+    text('EJÉRCITO',rx,y+54,{size:12,bold:true,color:'#c8a24a'});armyPanelBig(rx,y+62,h,!mine);
+    text(`Poder del ejército: ${armyPower(h.army)}`,rx,y+210,{size:12,color:'#ffe27a'});
+    text('LIBRO DE HECHIZOS',rx,y+236,{size:12,bold:true,color:'#c8a24a'});
+    h.spells.slice().sort((a,b)=>SPELLS[a].lv-SPELLS[b].lv).forEach((sp,i)=>{const cx=rx+(i%2)*140,cy=y+244+Math.floor(i/2)*32;if(cy>y+470)return;rrect(ctx,cx,cy,134,28,6,'rgba(60,50,90,.8)','#8a7ac0',1.1);text(SPELLS[sp].n,cx+6,cy+13,{size:11,bold:true});text(`Nv ${SPELLS[sp].lv} · ${SPELLS[sp].cost}`,cx+6,cy+24,{size:9,color:'#b8a8e0'});hit(cx,cy,134,28,null,{tip:[SPELLS[sp].n,SPELLS[sp].d,'Coste: '+SPELLS[sp].cost+' de maná']})});
+    const sets=setProgress(h);if(sets.length){text('CONJUNTOS DE ARTEFACTOS',rx,y+498,{size:12,bold:true,color:'#c8a24a'});sets.forEach((q,i)=>{text(`${q.name}: ${q.n}/${q.tot}`+(q.n===q.tot?' ✔':''),rx,y+516+i*16,{size:11,color:q.n===q.tot?'#9aff9a':'#d8c8a0'})})}
+    button(x+w/2-60,y+hh-48,120,34,'Cerrar',()=>{S.pick=null;Dlg.close()},{size:15});
   }});
 }
 function armyPanelBig(x,y,h,ro){
@@ -235,3 +248,18 @@ G.hooks.askChest=(h,r,cb)=>later(()=>{Dlg.show({title:'Cofre del tesoro',w:520,t
 G.hooks.dwell=(o,h,cb)=>later(()=>dwellModal(o,h,cb));
 G.hooks.town=(t,h,cb)=>later(()=>{openTown(t,h);S.townDone=cb});
 function later(fn){if(S.anim)S.later.push(fn);else fn()}
+
+G.hooks.shop=(o,h,cb)=>later(()=>shopModal(o,h,cb));
+G.hooks.askJoin=(h,mo,cb)=>later(()=>Dlg.show({title:'¡Criaturas dispuestas a unirse!',w:520,text:`${sizeLabel(mo.n)} de ${CR[mo.cr].name} (${mo.n}) quieren unirse a ${h.name} sin luchar.`,buttons:[{label:'Aceptar',primary:1,fn:()=>cb(true)},{label:'Luchar',fn:()=>cb(false)}]}));
+G.hooks.teleport=(h,from,to)=>{if(h.pid!==0)return;S.flash={t:0};setTimeout(()=>{camTo(to.x,to.y,true)},120);sfx('spell');FX.burst(to.x*TILE+TILE/2,to.y*TILE+TILE/2,30,['#bfe8ff','#fff','#c8a0ff'],{spd:160,life:.9,add:1})};
+function shopModal(o,h,cb){
+  const p=G.players[h.pid];
+  Dlg.show({w:760,title:'Mercader de artefactos',draw:m=>{const x=260,y=150,w=760,hh=420;panel(x,y,w,hh,{title:'Mercader de artefactos'});
+    text(`Tu oro: ${p.res.gold}`,x+w-24,y+46,{size:15,bold:true,align:'right',color:'#ffe27a'});
+    if(!o.stock.length)text('El mercader se ha quedado sin existencias.',x+w/2,y+200,{size:16,align:'center',italic:true});
+    o.stock.forEach((id,i)=>{const cx=x+20+(i%2)*364,cy=y+64+Math.floor(i/2)*160;const price=ART_PRICE[ART[id].v]||1000;rrect(ctx,cx,cy,350,150,8,lg(ctx,0,cy,0,cy+150,['#3a2e3a','#1a1420']),'#c8a24a',1.4);
+      ctx.drawImage(artIcon(id),cx+12,cy+12,64,64);text(ART[id].n,cx+90,cy+30,{size:15,bold:true,color:'#ffe9a0'});text(`${SLOTN[ART[id].slot]} · ${['','Tesoro','Menor','Mayor','Reliquia','Conjunto'][ART[id].v]}`,cx+90,cy+48,{size:11,color:'#c8b890'});
+      Object.keys(ART[id].b).forEach((k,q)=>text(`${BNAMES[k]||k}: ${k==='pf'?'sí':(ART[id].b[k]>0?'+':'')+ART[id].b[k]}`,cx+90,cy+66+q*14,{size:11}));
+      button(cx+200,cy+112,140,30,`Comprar ${price}`,()=>{const e=buyArt(h,o,i,p);if(e)toast(e,'bad');else{sfx('coin');toast(`${ART[id].n} comprado`,'good')}},{size:13,primary:1,disabled:p.res.gold<price})});
+    button(x+w/2-60,y+hh-46,120,34,'Salir',()=>{Dlg.close();cb&&cb()})}});
+}

@@ -18,10 +18,11 @@ function shadowE(c,x,y,rx,ry,a=.35){c.save();c.translate(x,y);c.scale(1,ry/rx);c
 const hash2=(x,y,s=0)=>{let h=(x*374761393+y*668265263+s*982451653)|0;h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296};
 
 // ---------------- terrenos ----------------
-const TBASE={[GRASS]:'#5a9e3a',[DIRT]:'#8f6e46',[SAND]:'#dcc07c',[SNOW]:'#e6eef6',[SWAMP]:'#4a6a3c',[ROUGH]:'#807868',[ASH]:'#4a3b39',[WATER]:'#2b6cb5'};
-const TPRIO={[WATER]:0,[SAND]:1,[SWAMP]:2,[GRASS]:3,[DIRT]:4,[ASH]:5,[ROUGH]:6,[SNOW]:7};
+const TBASE={[GRASS]:'#5a9e3a',[DIRT]:'#8f6e46',[SAND]:'#dcc07c',[SNOW]:'#e6eef6',[SWAMP]:'#4a6a3c',[ROUGH]:'#807868',[ASH]:'#4a3b39',[WATER]:'#2b6cb5',[LAVA]:'#d2480c',[SUBT]:'#3c3446'};
+const TPRIO={[WATER]:0,[SAND]:1,[SWAMP]:2,[GRASS]:3,[DIRT]:4,[ASH]:5,[ROUGH]:6,[SNOW]:7,[SUBT]:4.5,[LAVA]:0};
 const Gfx={tiles:{},edges:{},shoreL:[],shoreW:[],road:[],cache:{},ready:false};
 function drawTerrainTile(t,v,frame=0){
+  if(t===LAVA||t===SUBT)return drawNewTile(t,v,frame);
   const c=mkc(TILE,TILE),x=c.ctx,r=mulberry(t*977+v*131+17);const base=shade(TBASE[t],(r()-.5)*.03);
   x.fillStyle=base;x.fillRect(0,0,TILE,TILE);
   const speck=(n,cols,sz,shape)=>{for(let i=0;i<n;i++){x.fillStyle=cols[Math.floor(r()*cols.length)];const px=r()*TILE,py=r()*TILE;if(shape==='r')x.fillRect(px,py,sz,sz);else{x.beginPath();x.arc(px,py,sz*(.6+r()*.6),0,6.28);x.fill()}}};
@@ -52,7 +53,7 @@ function drawTerrainTile(t,v,frame=0){
 }
 function buildEdges(){
   const sides=[[0,0,TILE,0,0,TILE*.5],[TILE,0,0,0,TILE*.5,0],[0,TILE,0,0,0,TILE*.5],[0,0,0,TILE,TILE*.5,0]]; // N,E,S,W
-  for(const n of [SAND,SWAMP,GRASS,DIRT,ASH,ROUGH,SNOW]){Gfx.edges[n]=[];
+  for(const n of [SAND,SWAMP,GRASS,DIRT,ASH,ROUGH,SNOW,SUBT]){Gfx.edges[n]=[];
     const src=Gfx.tiles[n][0];
     for(let s=0;s<4;s++){const c=mkc(TILE,TILE),x=c.ctx;x.drawImage(src,0,0,TILE,TILE);x.globalCompositeOperation='destination-in';
       // dirección: s=0 vecino al norte -> degradado desde arriba
@@ -79,6 +80,15 @@ function buildRoads(){
   dirs.forEach((d,i)=>{const c=mkc(TILE,TILE);stroke(c.ctx,d[0],d[1]);Gfx.road[i]=c});
   Gfx.roadDirs=dirs;
 }
+function mountain(t,x,cx,by,r){
+  const pal={[ROUGH]:['#aaa498','#7a746a','#4a4640'],[SNOW]:['#dde6f0','#9aa6b8','#5a6478'],[ASH]:['#6a5250','#3e2e2c','#1c1414'],[SAND]:['#d8b878','#a88850','#6a5430'],[DIRT]:['#a88a62','#7a5e3e','#4a3822'],[SUBT]:['#6a5a7e','#42365a','#201830'],[GRASS]:['#9a9a8c','#6a6a5e','#3e3e36'],[SWAMP]:['#7a8070','#4e5448','#2a3026']}[t]||['#a09a8e','#6e685e','#403c34'];
+  const peak=(px,w,h,snow,al)=>{poly(x,[[px-w,by],[px-w*.4,by-h*.55],[px-w*.12,by-h*.7],[px+w*.1,by-h],[px+w*.45,by-h*.5],[px+w,by]],lg(x,px-w,by-h,px+w,by,[pal[0],pal[1],pal[2]]),OUT,1.8);
+    poly(x,[[px+w*.1,by-h],[px+w*.45,by-h*.5],[px+w*.2,by-h*.45],[px,by-h*.6]],'rgba(0,0,0,.3)');poly(x,[[px-w*.4,by-h*.55],[px-w*.12,by-h*.7],[px+w*.1,by-h],[px-w*.1,by-h*.5]],'rgba(255,255,255,.22)');
+    if(snow){poly(x,[[px+w*.1,by-h],[px-w*.1,by-h*.78],[px-w*.02,by-h*.72],[px+w*.12,by-h*.8],[px+w*.26,by-h*.7],[px+w*.34,by-h*.74]],'#f4f8fc')}
+    x.strokeStyle='rgba(0,0,0,.28)';x.lineWidth=1.2;for(let i=0;i<3;i++){x.beginPath();x.moveTo(px+(r()-.5)*w*.6,by-h*(.3+r()*.4));x.lineTo(px+(r()-.5)*w*.8,by-h*.05);x.stroke()}
+    if(t===ASH){x.strokeStyle='rgba(255,110,30,.9)';x.lineWidth=1.6;x.beginPath();x.moveTo(px+w*.05,by-h*.9);x.lineTo(px-w*.05,by-h*.5);x.lineTo(px+w*.1,by-h*.2);x.stroke()}};
+  shadowE(x,cx,by+2,28,7,.45);peak(cx-13,24,48,t===SNOW||t===ROUGH);peak(cx+14,22,40,t===SNOW);peak(cx,28,64,t===SNOW||t===ROUGH||t===SUBT&&false);
+}
 // ---------------- decorados ----------------
 function decorSprite(t,v,seed){
   const key='d'+t+'_'+v+'_'+seed;if(Gfx.cache[key])return Gfx.cache[key];
@@ -94,7 +104,12 @@ function decorSprite(t,v,seed){
   const rock=(col,n)=>{for(let i=0;i<n;i++){const ox=cx+(i-(n-1)/2)*14+(r()-.5)*5,s=11+r()*9,oy=by-3-r()*3;
       poly(x,[[ox-s,oy],[ox-s*.8,oy-s*.8],[ox-s*.15,oy-s*1.35],[ox+s*.7,oy-s*1.05],[ox+s,oy-s*.1],[ox+s*.5,oy]],lg(x,ox-s,oy-s,ox+s,oy,[shade(col,.3),shade(col,0),shade(col,-.38)]),OUT,1.3);
       poly(x,[[ox-s*.8,oy-s*.8],[ox-s*.15,oy-s*1.35],[ox+s*.7,oy-s*1.05],[ox+s*.2,oy-s*.6]],'rgba(255,255,255,.28)')}};
+  if(v===4){mountain(t,x,cx,by,r);Gfx.cache[key]=c;return c}
   switch(t){
+    case SUBT:{if(v===1){for(const[ox,h,w]of[[-12,34,6],[0,52,8],[12,28,5]]){poly(x,[[cx+ox-w,by],[cx+ox,by-h],[cx+ox+w,by]],lg(x,cx+ox-w,by-h,cx+ox+w,by,['#8a7a9a','#4a3e5a','#241c30']),OUT,1.3)}}
+      else if(v===2){for(const[ox,h,w,col]of[[-10,36,6,'#5ae8ff'],[2,54,8,'#8a7aff'],[13,30,5,'#5ae8ff']]){poly(x,[[cx+ox-w,by],[cx+ox-w*.5,by-h*.7],[cx+ox,by-h],[cx+ox+w*.5,by-h*.7],[cx+ox+w,by]],lg(x,cx+ox-w,by-h,cx+ox+w,by,[shade(col,.6),col,shade(col,-.5)]),OUT,1.2)}x.fillStyle=rg(x,cx,by-30,2,36,['rgba(140,220,255,.4)','rgba(140,220,255,0)']);x.fillRect(cx-40,by-70,80,80)}
+      else{for(const[ox,h,rr,col]of[[-12,20,10,'#c04a8a'],[8,32,13,'#6a5ae0'],[18,16,7,'#c04a8a']]){x.fillStyle=lg(x,cx+ox-rr,0,cx+ox+rr,0,['#d8d0e0','#a898b8']);x.fillRect(cx+ox-2.5,by-h,5,h);x.strokeStyle=OUT;x.lineWidth=1;x.strokeRect(cx+ox-2.5,by-h,5,h);
+          x.beginPath();x.ellipse(cx+ox,by-h,rr,rr*.62,0,Math.PI,0);x.fillStyle=rg(x,cx+ox-rr*.3,by-h-rr*.3,1,rr*1.1,[shade(col,.5),col,shade(col,-.4)]);x.fill();x.strokeStyle=OUT;x.lineWidth=1.3;x.stroke();for(let q=0;q<3;q++)ell(x,cx+ox-rr*.5+q*rr*.5,by-h-rr*.25,1.3,1.3,'rgba(255,255,255,.7)')}}break}
     case GRASS:if(v===1)tree('#3f8a32');else if(v===2)pine('#2b6a36');else{tree('#6a9a30')}break;
     case DIRT:if(v===2){x.strokeStyle='#3a2a1c';x.lineWidth=4;x.beginPath();x.moveTo(cx,by);x.quadraticCurveTo(cx-4,by-24,cx-8,by-44);x.stroke();for(const[bx,bb]of[[-14,-38],[10,-46],[-4,-56]]){x.lineWidth=2.5;x.beginPath();x.moveTo(cx-5,by-34-(bb<-40?8:0));x.lineTo(cx+bx,by+bb);x.stroke()}}else rock('#8c8070',v===3?3:2);break;
     case SAND:if(v===1){for(const[ox,h,w]of[[0,50,7],[-11,32,5.5],[11,38,5.5]]){x.fillStyle=lg(x,cx+ox-w,0,cx+ox+w,0,['#5aa84a','#3a8a3a','#2a6a2a']);rrect(x,cx+ox-w,by-h,w*2,h,w,x.fillStyle,OUT,1.2)}x.strokeStyle='#e8f0b0';x.lineWidth=.8;for(let i=0;i<6;i++){x.beginPath();x.moveTo(cx-5+i*2,by-46);x.lineTo(cx-5+i*2,by-6);x.stroke()}}
@@ -197,6 +212,9 @@ function townSprite(fi,level=1){
     else if(S.kind==='hut'){poly(x,[[x0-6,ty+2],[cx+tx,ty-26],[x0+wd+6,ty+2]],lg(x,x0,ty-26,x0+wd,ty,['#b09a5a','#8a7a3a','#5a4a22']),OUT,1.3)}
     else{for(let i=0;i<4;i++)x.fillStyle=S.wall,x.fillRect(x0-2+i*(wd+2)/3.4,ty-8,6,8),x.strokeRect(x0-2+i*(wd+2)/3.4,ty-8,6,8);x.fillStyle=S.roof;x.fillRect(x0-3,ty-2,wd+6,6);x.strokeRect(x0-3,ty-2,wd+6,6)}
     x.fillStyle=S.trim;x.fillRect(x0,ty+3,wd,2.5)};
+  // casitas del pueblo
+  const hut=(px,py,w,h2)=>{x.fillStyle=lg(x,px,py-h2,px+w,py,[shade(S.wall,.15),shade(S.wall,-.2)]);x.fillRect(px,py-h2,w,h2);x.strokeStyle=OUT;x.lineWidth=1.2;x.strokeRect(px,py-h2,w,h2);poly(x,[[px-3,py-h2],[px+w/2,py-h2-h2*.7],[px+w+3,py-h2]],S.roof,OUT,1.2);x.fillStyle=S.win;x.fillRect(px+w/2-2,py-h2+3,4,5)};
+  hut(cx-88,by-14,18,14);hut(cx-70,by-16,16,16);hut(cx+70,by-16,16,16);hut(cx+88,by-14,18,14);
   // muralla frontal
   x.fillStyle=lg(x,0,by-60,0,by-22,[shade(S.wall,.2),S.wall,shade(S.wall,-.25)]);x.fillRect(cx-66,by-62,132,40);x.strokeStyle=OUT;x.lineWidth=1.5;x.strokeRect(cx-66,by-62,132,40);
   for(let i=0;i<9;i++){x.fillStyle=S.wall;x.fillRect(cx-66+i*15,by-70,9,8);x.strokeRect(cx-66+i*15,by-70,9,8)}
@@ -255,7 +273,8 @@ function drawFlag(ctx,color,x,y,t){const f=flagSprite(color);const w=Math.sin(t*
 function resIcon(res,s=22){const key='i'+res+s;if(Gfx.cache[key])return Gfx.cache[key];const c=mkc(s,s),x=c.ctx;const p=resPile(res);x.drawImage(p,-s*.05,-s*.15,s*1.1,s*1.15);return Gfx.cache[key]=c}
 function initGfx(){
   if(Gfx.ready)return;
-  for(const t of [GRASS,DIRT,SAND,SNOW,SWAMP,ROUGH,ASH]){Gfx.tiles[t]=[];for(let v=0;v<6;v++)Gfx.tiles[t].push(drawTerrainTile(t,v))}
+  for(const t of [GRASS,DIRT,SAND,SNOW,SWAMP,ROUGH,ASH,SUBT]){Gfx.tiles[t]=[];for(let v=0;v<6;v++)Gfx.tiles[t].push(drawTerrainTile(t,v))}
+  Gfx.tiles[LAVA]=[];for(let f=0;f<6;f++)Gfx.tiles[LAVA].push(drawTerrainTile(LAVA,f,f));
   Gfx.tiles[WATER]=[];for(let f=0;f<6;f++)Gfx.tiles[WATER].push(drawTerrainTile(WATER,f,f));
-  buildEdges();buildRoads();Gfx.ready=true;
+  buildEdges();buildRoads();buildLavaShores();Gfx.ready=true;
 }

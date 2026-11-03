@@ -237,6 +237,8 @@ function drawCreatureRaw(cr){
     case'insect':insect(x,{pal:P});break;
     default:humanoid(x,{pal:P,weapon:'sword',helm:'helm',sc});
   }
+  // iluminación: luz arriba-izquierda y sombra abajo
+  x.save();x.globalCompositeOperation='source-atop';x.fillStyle=lg(x,0,0,70,96,['rgba(255,252,230,.26)','rgba(255,255,255,0)','rgba(14,4,40,.3)']);x.fillRect(0,0,96,96);x.fillStyle=rg(x,30,24,2,48,['rgba(255,255,255,.14)','rgba(255,255,255,0)']);x.fillRect(0,0,96,96);x.restore();
   if(cr.up){// destello dorado de criatura mejorada
     x.save();x.globalCompositeOperation='lighter';x.fillStyle=rg(x,48,48,6,52,['rgba(255,230,140,.16)','rgba(255,230,140,0)']);x.fillRect(0,0,96,96);x.restore();
     x.fillStyle='#ffe27a';poly(x,[[82,6],[84,12],[90,14],[84,16],[82,22],[80,16],[74,14],[80,12]],'#ffe27a',OUT,.8)}
@@ -283,6 +285,9 @@ function buildingSprite(b,fi){
   else if(b==='tavern'){house(60,38,'#9a4a28','#c8a070',6);rrect(x,cx-24,by-24,10,10,2,'#e8c25a',OUT,1);x.fillStyle='#fff';ell(x,cx+22,by-22,6,5,'#e8c25a',OUT,1);x.fillStyle='#6a3a1a';x.fillRect(cx+20,by-30,1.6,8)}
   else if(b==='market'){x.fillStyle=bodyG(x,0,by-38,0,by,'#8a5a2e');x.fillRect(cx-46,by-14,92,14);x.strokeStyle=OUT;x.lineWidth=1.4;x.strokeRect(cx-46,by-14,92,14);for(let i=0;i<4;i++){poly(x,[[cx-46+i*23,by-52],[cx-23+i*23,by-52],[cx-23+i*23,by-34],[cx-46+i*23,by-34]],i%2?'#f4f0e0':F.col[0],OUT,1.2)}
     x.strokeStyle='#5a3a1e';x.lineWidth=3;x.beginPath();x.moveTo(cx-44,by-52);x.lineTo(cx-44,by-14);x.moveTo(cx+44,by-52);x.lineTo(cx+44,by-14);x.stroke();for(let i=0;i<5;i++)ell(x,cx-34+i*17,by-18,5,3,['#e8c25a','#c0402a','#5aa83a','#4a7ad8','#d89aff'][i],OUT,.8)}
+  else if(b==='shipyard'){x.fillStyle=lg(x,0,by-14,0,by,['#3a8ad0','#1a5a98']);x.fillRect(cx-56,by-12,112,12);x.fillStyle=bodyG(x,cx-50,by-20,cx+50,by-12,'#8a5a2e');x.fillRect(cx-52,by-18,104,8);x.strokeStyle=OUT;x.lineWidth=1.3;x.strokeRect(cx-52,by-18,104,8);
+    for(let i=0;i<6;i++){x.fillStyle='#5a3a1e';x.fillRect(cx-48+i*18,by-34,4,18)}house(40,30,'#9a4a28','#c8a070',4);
+    poly(x,[[cx+10,by-12],[cx+52,by-12],[cx+46,by],[cx+14,by]],lg(x,0,by-12,0,by,['#a8743c','#6a4426']),OUT,1.4);x.strokeStyle='#6a4426';x.lineWidth=2;x.beginPath();x.moveTo(cx+31,by-12);x.lineTo(cx+31,by-44);x.stroke();poly(x,[[cx+32,by-42],[cx+46,by-24],[cx+32,by-20]],'#f4f0e0',OUT,1)}
   else house(50,36);
   return Gfx.cache[key]=c;
 }
