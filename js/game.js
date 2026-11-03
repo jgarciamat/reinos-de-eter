@@ -205,6 +205,12 @@ function runBattle(A,D,info,cb){
   if(humanIn&&G.hooks.battle!==undefined&&!G.headless){if(G.quick){b.autoPlay();if(G.hooks.quickReport)G.hooks.quickReport(b,A,D,done);else done()}else G.hooks.battle(b,done)}else{b.autoPlay();done()}
 }
 function applyArmy(side,res,targetArmy){for(let i=0;i<7;i++)targetArmy[i]=res[i]?{id:res[i].id,n:res[i].n}:null}
+// experiencia que recibirá el héroe del bando `side` si ha ganado (misma cuenta que gainXp + bonos de combate contra héroes/ciudades)
+function xpPreview(b,side){
+  const h=b.sides[side].hero;if(!h||b.winner!==side||b.fled===side)return null;
+  const ty=b.info&&b.info.type;let x=b.xpFor(side);if(ty==='hero'||(ty==='town'&&side===0))x+=500;
+  const st=hstat(h);x=Math.round(x*(1+st.lear*.05+st.xpB/100));
+  const lv=h.xp+x>=xpForLevel(h.lvl+1);return{h,x,lv,now:h.xp+x,next:xpForLevel(h.lvl+1)}}
 function postBattle(h,b,side){
   const s=hstat(h),enemy=1-side;
   if(b.winner===side){

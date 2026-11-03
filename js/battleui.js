@@ -221,7 +221,7 @@ function showBattleResult(){
   const xp=b.xpFor(w);const lines=[];
   for(let i=0;i<2;i++){const sd=b.sides[i];const lost=b.st.filter(s=>s.side===i).reduce((a,s)=>a+(s.startN-(s.dead?0:s.n)),0);lines.push(`${sd.name}: ${lost} bajas`)}
   sfx(won?'win':'lose');
-  Dlg.show({title:won?'¡Victoria!':'Derrota',w:520,text:(b.fled!=null?(b.fled===me?'Has abandonado el campo de batalla.':'El enemigo huye del combate.'):won?'Tus fuerzas han vencido.':'Tus fuerzas han sido derrotadas.')+'\n'+lines.join('\n')+(won?`\nExperiencia ganada: ${xp}`:''),
+  Dlg.show({title:won?'¡Victoria!':'Derrota',w:520,text:(b.fled!=null?(b.fled===me?'Has abandonado el campo de batalla.':'El enemigo huye del combate.'):won?'Tus fuerzas han vencido.':'Tus fuerzas han sido derrotadas.')+'\n'+lines.join('\n')+(()=>{const q=xpPreview(b,me);return q?`\n${q.h.name} gana ${q.x} de experiencia${q.lv?' · ¡sube de nivel!':` (${q.now}/${q.next})`}`:''})(),
     buttons:[{label:'Continuar',primary:1,fn:()=>endBattleUI()}]});
 }
 function endBattleUI(){fadeTo(()=>{S.scr=S.prevScr||'adv';const d=BU.done;if(BU.bg){BU.bg.width=BU.bg.height=0;BU.bg=null}BU.b=null;fadeIn(2.5);d&&d();setTimeout(()=>{if(G.map&&!G.over)autosave()},400)},3)}
