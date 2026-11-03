@@ -281,7 +281,13 @@ G.hooks.town=(t,h,cb)=>later(()=>{openTown(t,h);S.townDone=cb});
 function later(fn){if(S.anim)S.later.push(fn);else fn()}
 
 G.hooks.shop=(o,h,cb)=>later(()=>shopModal(o,h,cb));
-G.hooks.askJoin=(h,mo,cb)=>later(()=>Dlg.show({title:'¡Criaturas dispuestas a unirse!',w:520,text:`${sizeLabel(mo.n)} de ${CR[mo.cr].name} (${mo.n}) quieren unirse a ${h.name} sin luchar.`,buttons:[{label:'Aceptar',primary:1,fn:()=>cb(true)},{label:'Luchar',fn:()=>cb(false)}]}));
+G.hooks.askMon=(h,mo,att,cb)=>later(()=>{
+  const c=CR[mo.cr],n=`${sizeLabel(mo.n)} de ${c.name} (${mo.n})`,gold=G.players[h.pid].res.gold;
+  const T={join:['¡Criaturas dispuestas a unirse!',`${n} se ofrecen a unirse a ${h.name} sin luchar.`,[{label:'Aceptar',primary:1,fn:()=>cb(true)},{label:'Luchar',fn:()=>cb(false)}]],
+    gold:['Criaturas mercenarias',`${n} se unirían a ${h.name} a cambio de ${att.cost} de oro. Tienes ${gold}.`,[{label:`Pagar ${att.cost}`,primary:1,disabled:gold<att.cost,fn:()=>cb(true)},{label:'Luchar',fn:()=>cb(false)}]],
+    flee:['¡Las criaturas huyen!',`Ante el poder de ${h.name}, ${n} quieren huir sin combatir. Si luchas obtendrás experiencia, pero perderás tropas.`,[{label:'Dejarlas huir',primary:1,fn:()=>cb(true)},{label:'Atacar',fn:()=>cb(false)}]],
+    surrender:['¡Las criaturas se rinden!',`${n} se rinden ante ${h.name} y ofrecen ${att.gold} de oro de tributo para que las dejes marchar.`,[{label:`Aceptar ${att.gold} de oro`,primary:1,fn:()=>cb(true)},{label:'Atacar',fn:()=>cb(false)}]]}[att.kind];
+  Dlg.show({title:T[0],w:560,text:T[1],extra:96,body:(x,y,w)=>{const sp=creatureSprite(mo.cr,false);ctx.drawImage(sp,x+w/2-45,y+6,90,90)},buttons:T[2]})});
 G.hooks.teleport=(h,from,to)=>{if(h.pid!==0)return;S.flash={t:0};setTimeout(()=>{camTo(to.x,to.y,true)},120);sfx('spell');FX.burst(to.x*TILE+TILE/2,to.y*TILE+TILE/2,30,['#bfe8ff','#fff','#c8a0ff'],{spd:160,life:.9,add:1})};
 function shopModal(o,h,cb){
   const p=G.players[h.pid];

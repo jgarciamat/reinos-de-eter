@@ -225,14 +225,34 @@ function postBattle(h,b,side){
 function stealArts(h,e){let n=0;for(const k of EQKEYS)if(e.eq[k]){const id=e.eq[k];e.eq[k]=null;if(id[0]==='#')continue;
   if(ART[id].fusion){for(const pc of LIN[ART[id].fusion].pieces)if(giveArtifact(h,pc))n++;continue}
   if(giveArtifact(h,id))n++}for(const id of e.pack.splice(0)){if(giveArtifact(h,id))n++}if(n)notify(`${h.name} se queda con ${n} artefactos`,'good')}
+// actitud de un grupo de criaturas ante el héroe (como en HoMM3): unirse gratis, unirse por oro, huir o rendirse con tributo
+function monsterAttitude(h,mo){
+  const c=CR[mo.cr],s=hstat(h),ratio=armyPower(h.army)/Math.max(1,sizeVal(mo)),dip=s.dipA/100;
+  const never=/esquel|zombi|vampir|liche|espectr|golem|gólem|elemental|dragón|dragon|diablo|demon|behemo|hidra|ángel|angel|fénix|fenix/i.test(c.name);
+  if(never)return ratio>=4&&Math.random()<.35?{kind:'flee'}:null;
+  const same=h.army.some(a=>a&&a.n>0&&a.id===mo.cr);
+  const eager=c.f<0&&[...mo.cr].reduce((a,ch)=>a+ch.charCodeAt(0),0)%4===0; // criaturas amistosas: nacidas para unirse
+  if(ratio>=1.1&&(same||eager)&&Math.random()<clamp((eager?.7:.4)+dip*.6,0,.95)*Math.min(1,ratio/2))return{kind:'join'};
+  if(ratio>=1.5&&(s.dipLv>0||ratio>=2.5)&&Math.random()<clamp(.1+dip*.7,0,.8)*Math.min(1,ratio/4))
+    return{kind:'gold',cost:Math.max(10,Math.round(c.cost.gold*mo.n*(.8-dip*.4)))};
+  if(ratio>=3&&Math.random()<clamp(.25+dip*.5,0,.85)*Math.min(1,ratio/6))
+    return Math.random()<.5?{kind:'flee'}:{kind:'surrender',gold:Math.max(10,Math.round(c.cost.gold*mo.n*.35))};
+  return null;
+}
 function engage(h,mo,cb){
-  const s=hstat(h);const lv=s.dipLv,bonus=s.dipA/100;
-  if(lv>0||bonus>0){const hp=armyPower(h.army),mp=sizeVal(mo),ratio=hp/Math.max(1,mp);
-    const ch=clamp(.12+(bonus)*.9,0,.85)*Math.min(1.6,ratio/3);
-    if(ratio>=1.5&&Math.random()<ch){
-      const join=()=>{const ok=addToArmy(h.army,mo.cr,mo.n);removeObj(mo);notify(ok?`${mo.n} ${CR[mo.cr].name} se unen a ${h.name}`:`Las criaturas huyen ante ${h.name}`,'good');cb(true)};
-      if(isHuman(h.pid)&&G.hooks.askJoin)G.hooks.askJoin(h,mo,ok=>{if(ok)join();else fightMonster(h,mo,cb)});else join();return}}
-  fightMonster(h,mo,cb);
+  const att=monsterAttitude(h,mo);if(!att){fightMonster(h,mo,cb);return}
+  const p=G.players[h.pid],nm=CR[mo.cr].name;
+  const resolve=ok=>{
+    if(!ok){fightMonster(h,mo,cb);return}
+    if(att.kind==='join'||att.kind==='gold'){
+      if(att.kind==='gold'){if(p.res.gold<att.cost){notify('No tienes oro suficiente','bad');fightMonster(h,mo,cb);return}}
+      if(!addToArmy(h.army,mo.cr,mo.n)){notify('Tu ejército no tiene sitio para ellos','bad');fightMonster(h,mo,cb);return}
+      if(att.kind==='gold')p.res.gold-=att.cost;
+      removeObj(mo);notify(`${mo.n} ${nm} se unen a ${h.name}`+(att.kind==='gold'?` (−${att.cost} de oro)`:''),'good');cb(true)}
+    else if(att.kind==='surrender'){p.res.gold+=att.gold;removeObj(mo);notify(`${nm} se rinden y entregan ${att.gold} de oro`,'good');cb(true)}
+    else{removeObj(mo);notify(`Las criaturas huyen ante ${h.name}`,'good');cb(true)}};
+  if(isHuman(h.pid)&&G.hooks.askMon)G.hooks.askMon(h,mo,att,resolve);
+  else resolve(att.kind==='gold'?p.res.gold>=att.cost*3:true);
 }
 // héroe contra monstruo
 function fightMonster(h,mo,cb){
