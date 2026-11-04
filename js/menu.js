@@ -40,7 +40,7 @@ function drawMenu(dt){
   button(bx,300,300,52,'Nueva partida',()=>openSelect(),{primary:1,size:21});
   button(bx,364,300,46,'Continuar partida',()=>loadMenu(),{size:18,disabled:!has});
   button(bx,422,300,46,'Cómo se juega',()=>helpDlg(),{size:18});
-  button(bx,480,300,46,S.sound===false?'Sonido: NO':'Sonido: SÍ',()=>{S.sound=S.sound===false;sfx('click')},{size:16});
+  button(bx,480,146,46,S.sound===false?'Sonido: NO':'Sonido: SÍ',()=>{S.sound=S.sound===false;sfx('click')},{size:15});button(bx+154,480,146,46,S.music===false?'Música: NO':'Música: SÍ',()=>{S.music=S.music===false;sfx('click')},{size:15});
   text('v1.0 — inspirado en los clásicos de estrategia por turnos con héroes',VW/2,VH-22,{size:13,align:'center',color:'#9a8a70'});
 }
 function helpDlg(){
@@ -111,7 +111,7 @@ function openSystemMenu(){
   Dlg.show({title:'Sistema',w:420,draw:m=>{const x=430,y=120,w=420,hh=490;panel(x,y,w,hh,{title:'Sistema'});let by=y+34;
     button(x+40,by,w-80,40,'Continuar',()=>Dlg.close(),{primary:1});by+=50;
     button(x+40,by,(w-80)/2-4,36,'Guardar',()=>saveManual(),{size:14,tip:'Guarda esta partida (también se autoguarda cada día)'});button(x+40+(w-80)/2+4,by,(w-80)/2-4,36,'Cargar…',()=>loadMenu(),{size:14});by+=42;
-    button(x+40,by,w-80,36,S.sound===false?'Sonido: NO':'Sonido: SÍ',()=>{S.sound=S.sound===false},{size:14});by+=42;
+    button(x+40,by,(w-80)/2-4,36,S.sound===false?'Sonido: NO':'Sonido: SÍ',()=>{S.sound=S.sound===false},{size:14});button(x+40+(w-80)/2+4,by,(w-80)/2-4,36,S.music===false?'Música: NO':'Música: SÍ',()=>{S.music=S.music===false},{size:14});by+=42;
     button(x+40,by,w-80,36,G.quick?'Combate rápido: SÍ':'Combate rápido: NO',()=>toggleQuick(),{size:14,tip:['Combate rápido','El resultado se calcula al instante (muros, catapulta y torres incluidos) sin entrar en la pantalla de combate']});by+=42;
     button(x+40,by,w-80,36,'Ayuda',()=>helpDlg(),{size:14});by+=42;
     button(x+40,by,w-80,36,'Salir al menú principal',()=>Dlg.show({title:'¿Salir?',text:'Se perderá el progreso no guardado.',buttons:[{label:'Salir',primary:1,fn:()=>{UI.modals.length=0;S.scr='menu'}},{label:'Cancelar'}]}),{size:14})}});

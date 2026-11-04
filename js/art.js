@@ -97,6 +97,10 @@ function drawTerrainTile(t,v,frame=0){
         for(const[col,lw]of[['rgba(255,70,10,.35)',4],['rgba(255,120,30,.85)',1.5],['rgba(255,225,130,.7)',.6]]){x.strokeStyle=col;x.lineWidth=lw;x.beginPath();pts.forEach((p,q)=>q?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.stroke()}}
       for(let i=0;i<6;i++){const px=r()*TILE,py=r()*TILE;x.fillStyle='rgba(255,170,60,.8)';x.fillRect(px,py,1.2,1.2)}break}
   }
+  if(t!==GRASS){ // manchas suaves de tono (más variedad de suelo) y guijarros finos
+    for(let i=0;i<5;i++){const px=r()*TILE,py=r()*TILE,rr=5+r()*9,lit=r()<.5;w9(px,py,rr+1,(X,Y)=>{x.fillStyle=lit?'rgba(255,245,220,.10)':'rgba(10,8,20,.12)';x.beginPath();x.ellipse(X,Y,rr,rr*.7,r()*3,0,6.28);x.fill()})}
+    for(let i=0;i<10;i++){const px=r()*TILE,py=r()*TILE,rr=.6+r()*1.1,lit=r()<.5;w9(px,py,rr+1,(X,Y)=>{x.fillStyle=lit?'rgba(255,250,235,.28)':'rgba(15,10,20,.3)';x.beginPath();x.arc(X,Y,rr,0,6.28);x.fill()})}
+  }
   // viñeta de borde muy sutil: marca la rejilla lo justo para dar "baldosa de mapa" sin costuras duras
   return c;
 }
