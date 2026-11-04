@@ -33,7 +33,7 @@ function setupCanvas(){
     T.lp=setTimeout(()=>{if(T&&!T.moved){T.long=true;UI.rclicks.push({x:T.x,y:T.y});if(navigator.vibrate)navigator.vibrate(15)}},520)},{passive:false});
   cv.addEventListener('touchmove',e=>{e.preventDefault();if(!T)return;const t=e.touches[0];tpos(t);
     if(!T.moved&&Math.hypot(UI.mx-T.x,UI.my-T.y)>16&&!T.long){T.moved=true;clearTimeout(T.lp)}
-    if(T.moved&&T.map&&typeof clampCam==='function'){S.flyTo=null;S.cam.x-=UI.mx-T.lx;S.cam.y-=UI.my-T.ly;clampCam()}
+    if(T.moved&&T.map&&typeof clampCam==='function'){S.flyTo=null;S.cam.x-=(UI.mx-T.lx)/ZM;S.cam.y-=(UI.my-T.ly)/ZM;clampCam()}
     T.lx=UI.mx;T.ly=UI.my},{passive:false});
   const tend=e=>{e.preventDefault();if(!T)return;clearTimeout(T.lp);UI.down=false;const cancel=T.moved||T.long;UI.clicks.push({x:cancel?-1000:T.x,y:cancel?-1000:T.y,type:'up'});T=null;setTimeout(()=>{if(!T){UI.mx=-999;UI.my=-999}},120)};
   cv.addEventListener('touchend',tend,{passive:false});cv.addEventListener('touchcancel',tend,{passive:false});

@@ -41,7 +41,7 @@ function frame(now){
     switch(S.scr){
       case'menu':drawMenu(dt);break;
       case'select':drawSelect(dt);break;
-      case'adv':{if(!UI.modals.length||true)advUpdate(dt);advDraw(dt);hit(0,0,VPW,VPH,c=>S.mapClicks.push(c),{right:c=>{const tx=Math.floor((c.x+S.cam.x)/TILE),ty=Math.floor((c.y+S.cam.y)/TILE);if(tx>=0&&ty>=0&&tx<G.map.w&&ty<G.map.h)inspect(tx,ty)},cursor:S.hov&&S.hov.o&&(S.hov.o.t==='mon')?'crosshair':'default'});
+      case'adv':{if(!UI.modals.length||true)advUpdate(dt);advDraw(dt);hit(0,0,VPW,VPH,c=>S.mapClicks.push(c),{right:c=>{const tx=Math.floor((c.x/ZM+S.cam.x)/TILE),ty=Math.floor((c.y/ZM+S.cam.y)/TILE);if(tx>=0&&ty>=0&&tx<G.map.w&&ty<G.map.h)inspect(tx,ty)},cursor:S.hov&&S.hov.o&&(S.hov.o.t==='mon')?'crosshair':'default'});
         drawFxOverlay();drawTopBar();if(UI.ph)drawSidePanelPhone(dt);else drawSidePanel(dt);drawStatus();drawBanner(dt);
         FX.update&&0;break}
       case'town':S.clock+=dt;drawTown(dt);FX.update(dt);FX.draw(ctx,0,0);break;

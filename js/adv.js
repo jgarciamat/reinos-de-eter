@@ -2,6 +2,7 @@
 // =====================================================================
 //  Mapa de aventura: dibujo, cámara, movimiento animado, entrada a castillos
 // =====================================================================
+let ZM=.78; // zoom del mapa: <1 muestra más terreno
 let VPW=1008,VPH=720;const PSTRIP=232;function setAdvSize(){VPW=UI.ph?UI.cw-PSTRIP:1008;VPH=UI.ph?UI.ch:720}
 const S={scr:'menu',cam:{x:0,y:0},sel:null,path:null,target:null,mov:null,anim:null,later:[],fx:null,ai:null,hov:null,busy:false,mini:null,miniT:0,t:0,banner:null,sync:0,clock:0,flyTo:null,vis:null};
 const objName=o=>{switch(o.t){case'town':return o.name;case'mine':return'Mina de '+RESN[o.res];case'dwell':return'Vivienda: '+CR[o.cr].name;
@@ -12,11 +13,11 @@ function curPlayer(){return G.players[0]}
 function selHero(){return S.sel!=null?G.heroes[S.sel]:null}
 function myHeroes(){return G.players[0].heroes.map(i=>G.heroes[i])}
 function selectHero(h,center=true){S.sel=h.id;S.path=null;S.target=null;S.exTarget=null;if(center)camTo(h.x,h.y)}
-function camTo(x,y,instant){S.flyTo={x:x*TILE+TILE/2-VPW/2,y:y*TILE+TILE/2-VPH/2};if(instant){S.cam.x=S.flyTo.x;S.cam.y=S.flyTo.y;clampCam()}}
-function clampCam(){const m=G.map;S.cam.x=clamp(S.cam.x,0,m.w*TILE-VPW);S.cam.y=clamp(S.cam.y,0,m.h*TILE-VPH)}
+function camTo(x,y,instant){S.flyTo={x:x*TILE+TILE/2-VPW/ZM/2,y:y*TILE+TILE/2-VPH/ZM/2};if(instant){S.cam.x=S.flyTo.x;S.cam.y=S.flyTo.y;clampCam()}}
+function clampCam(){const m=G.map;S.cam.x=clamp(S.cam.x,0,m.w*TILE-VPW/ZM);S.cam.y=clamp(S.cam.y,0,m.h*TILE-VPH/ZM)}
 // ---------- visibilidad ----------
 function computeVis(){
-  const m=G.map,p=G.players[0],x0=Math.max(0,Math.floor(S.cam.x/TILE)-1),y0=Math.max(0,Math.floor(S.cam.y/TILE)-1),x1=Math.min(m.w-1,x0+Math.ceil(VPW/TILE)+2),y1=Math.min(m.h-1,y0+Math.ceil(VPH/TILE)+2);
+  const m=G.map,p=G.players[0],x0=Math.max(0,Math.floor(S.cam.x/TILE)-1),y0=Math.max(0,Math.floor(S.cam.y/TILE)-1),x1=Math.min(m.w-1,x0+Math.ceil(VPW/ZM/TILE)+2),y1=Math.min(m.h-1,y0+Math.ceil(VPH/ZM/TILE)+2);
   const w=x1-x0+1,h=y1-y0+1,vis=new Uint8Array(w*h);const src=visSources(p);
   for(const[sx,sy,r]of src){const r2=r*r;for(let j=Math.max(y0,sy-r);j<=Math.min(y1,sy+r);j++)for(let i=Math.max(x0,sx-r);i<=Math.min(x1,sx+r);i++)if((i-sx)**2+(j-sy)**2<=r2)vis[(j-y0)*w+i-x0]=1}
   S.vis={x0,y0,w,h,a:vis};
@@ -69,11 +70,11 @@ function decalAt(tc,x,y,tr){
 const TREEY=new Set([GRASS,SWAMP]);
 const AMBK={[GRASS]:'pollen',[SNOW]:'snow',[ASH]:'ember',[LAVA]:'ember',[SAND]:'dust',[ROUGH]:'dust',[DIRT]:'dust',[SWAMP]:'fly',[WATER]:'pollen',[SUBT]:'spore'};
 function updateAmbient(dt,under){
-  S.amb=S.amb||[];const m=G.map;const cx=clamp(Math.floor((S.cam.x+VPW/2)/TILE),0,m.w-1),cy=clamp(Math.floor((S.cam.y+VPH/2)/TILE),0,m.h-1);const tr=m.terr[cy*m.w+cx];const kind=under?'spore':AMBK[tr]||'pollen';
-  while(S.amb.length<46)S.amb.push({k:kind,x:S.cam.x+Math.random()*VPW,y:S.cam.y+Math.random()*VPH,ph:Math.random()*6.28,l:Math.random()*8});
+  S.amb=S.amb||[];const m=G.map;const cx=clamp(Math.floor((S.cam.x+VPW/ZM/2)/TILE),0,m.w-1),cy=clamp(Math.floor((S.cam.y+VPH/ZM/2)/TILE),0,m.h-1);const tr=m.terr[cy*m.w+cx];const kind=under?'spore':AMBK[tr]||'pollen';
+  while(S.amb.length<46)S.amb.push({k:kind,x:S.cam.x+Math.random()*VPW/ZM,y:S.cam.y+Math.random()*VPH/ZM,ph:Math.random()*6.28,l:Math.random()*8});
   for(const p of S.amb){p.l+=dt;p.k=kind;const sp=p.k==='snow'?[10,60]:p.k==='ember'?[8,-34]:p.k==='dust'?[40,3]:p.k==='spore'?[2,-5]:[4,-2];
     p.x+=(sp[0]+Math.sin(p.l*1.3+p.ph)*10)*dt;p.y+=(sp[1]+Math.cos(p.l*1.1+p.ph)*6)*dt;
-    if(p.x<S.cam.x-20||p.x>S.cam.x+VPW+20||p.y<S.cam.y-20||p.y>S.cam.y+VPH+20){p.x=S.cam.x+(sp[0]>20?-10:Math.random()*VPW);p.y=S.cam.y+(sp[1]>20?-10:sp[1]<-20?VPH+10:Math.random()*VPH);}}
+    if(p.x<S.cam.x-20||p.x>S.cam.x+VPW/ZM+20||p.y<S.cam.y-20||p.y>S.cam.y+VPH/ZM+20){p.x=S.cam.x+(sp[0]>20?-10:Math.random()*VPW/ZM);p.y=S.cam.y+(sp[1]>20?-10:sp[1]<-20?VPH/ZM+10:Math.random()*VPH/ZM);}}
 }
 function drawAmbient(c,t){
   for(const p of S.amb||[]){const k=p.k;
@@ -88,13 +89,13 @@ let _DK=null;
 function advDraw(dt){
   const c=ctx,m=G.map,t=S.clock;
   computeVis();
-  const lvl=levelOf(m,Math.floor((S.cam.y+VPH/2)/TILE)),under=lvl===1;S.lvl=lvl;
+  const lvl=levelOf(m,Math.floor((S.cam.y+VPH/ZM/2)/TILE)),under=lvl===1;S.lvl=lvl;
   const lights=[];
   c.save();c.beginPath();c.rect(0,0,VPW,VPH);c.clip();
   const cx=Math.round(S.cam.x+(UI.shake?(Math.random()-.5)*UI.shake*6:0)),cy=Math.round(S.cam.y);
-  if(S.fx&&S.fx.zoom!==1){const fx=S.fx.gx-cx,fy=S.fx.gy-cy;c.translate(fx,fy);c.scale(S.fx.zoom,S.fx.zoom);c.translate(-fx,-fy)}
-  c.translate(-cx,-cy);
-  const x0=Math.max(0,Math.floor(cx/TILE)-1),y0=Math.max(0,Math.floor(cy/TILE)-1),x1=Math.min(m.w-1,Math.floor((cx+VPW)/TILE)+1),y1=Math.min(m.h-1,Math.floor((cy+VPH)/TILE)+2);
+  if(S.fx&&S.fx.zoom!==1){const fx=(S.fx.gx-cx)*ZM,fy=(S.fx.gy-cy)*ZM;c.translate(fx,fy);c.scale(S.fx.zoom,S.fx.zoom);c.translate(-fx,-fy)}
+  c.scale(ZM,ZM);c.translate(-cx,-cy);
+  const x0=Math.max(0,Math.floor(cx/TILE)-1),y0=Math.max(0,Math.floor(cy/TILE)-1),x1=Math.min(m.w-1,Math.floor((cx+VPW/ZM)/TILE)+1),y1=Math.min(m.h-1,Math.floor((cy+VPH/ZM)/TILE)+2);
   const wf=Math.floor(t*2.5)%6;
   const terrAt=(x,y)=>x<0||y<0||x>=m.w||y>=m.h?-1:m.terr[y*m.w+x];
   const TLw=(x1-x0+1)*TILE,TLh=(y1-y0+1)*TILE;
@@ -163,30 +164,31 @@ function advDraw(dt){
     else{
       if(!_DK){_DK=document.createElement('canvas');_DK.width=VPW;_DK.height=VPH}const dk=_DK.getContext('2d');dk.globalCompositeOperation='source-over';dk.clearRect(0,0,VPW,VPH);dk.fillStyle='rgba(6,3,16,.74)';dk.fillRect(0,0,VPW,VPH);dk.globalCompositeOperation='destination-out';
       for(const l of lights){const sx=l.x-cx,sy=l.y-cy;if(sx<-200||sy<-200||sx>VPW+200||sy>VPH+200)continue;const g=glowSprite('rgba(0,0,0,1)',128);dk.drawImage(g,sx-l.r,sy-l.r,l.r*2,l.r*2)}
-      c.drawImage(_DK,0,0);c.save();c.globalCompositeOperation='lighter';for(const l of lights){const sx=l.x-cx,sy=l.y-cy;if(sx<-200||sy<-200||sx>VPW+200||sy>VPH+200)continue;c.globalAlpha=.55;c.drawImage(glowSprite(l.col,128),sx-l.r*.9,sy-l.r*.9,l.r*1.8,l.r*1.8)}c.restore()}
+      c.drawImage(_DK,0,0);c.save();c.globalCompositeOperation='lighter';for(const l of lights){const sx=(l.x-cx)*ZM,sy=(l.y-cy)*ZM,lr=l.r*ZM;if(sx<-200||sy<-200||sx>VPW+200||sy>VPH+200)continue;c.globalAlpha=.55;c.drawImage(glowSprite(l.col,128),sx-lr*.9,sy-lr*.9,lr*1.8,lr*1.8)}c.restore()}
   }
   c.save();c.beginPath();c.rect(0,0,VPW,VPH);c.clip();
   if(!S.fx&&!S.noFog)drawFog(c,cx,cy,x0,y0,x1,y1);
   try{postFX(c,0,0,VPW,VPH,{mood:S.lvl?'cave':'day',bloom:.16})}catch(e){c.fillStyle=rg(c,VPW/2,VPH/2,VPH*.45,VPW*.75,['rgba(0,0,0,0)','rgba(8,4,16,.42)']);c.fillRect(0,0,VPW,VPH)}c.restore();
 }
 const NZ=noise2(4242);
-let _fogC=null,_fogB=null,_fogM=null,_fogMk='',_fogDirty=true;
+// niebla al estilo clásico: lo descubierto se ve nítido y lo no descubierto, negro; el borde es irregular pero sin difuminar
+let _fogC=null,_fogM=null,_fogMk='';
 function drawFog(c,cx,cy,x0,y0,x1,y1){
-  const w=x1-x0+1,h=y1-y0+1;if(!_fogC||_fogC.width!==w||_fogC.height!==h){_fogC=document.createElement('canvas');_fogC.width=w;_fogC.height=h;_fogDirty=true}
-  const m=G.map,fog=G.players[0].fog;
-  const msk=new Uint8Array(w*h);
-  for(let j=0;j<h;j++)for(let i=0;i<w;i++){const x=x0+i,y=y0+j;let a=0;
-    if(x>=m.w||y>=m.h)a=255;else if(isVis(x,y))a=0;else if(fog[y*m.w+x])a=110;else a=255;msk[j*w+i]=a}
-  let same=_fogM&&_fogM.length===msk.length&&_fogMk===x0+','+y0+','+w;if(same)for(let q=0;q<msk.length;q++)if(msk[q]!==_fogM[q]){same=false;break}
-  if(!same){_fogM=msk;_fogMk=x0+','+y0+','+w;_fogDirty=true}
-  if(_fogDirty){const fx=_fogC.getContext('2d'),img=fx.createImageData(w,h);
-    for(let q=0;q<msk.length;q++){const k=q*4;img.data[k]=6;img.data[k+1]=4;img.data[k+2]=16;img.data[k+3]=msk[q]}
-    fx.putImageData(img,0,0)}
-  c.save();c.beginPath();c.rect(0,0,VPW,VPH);c.clip();c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
-  // se amplía con suavizado -> bordes difuminados
-  if(!_fogB||_fogB.width!==w*12||_fogB.height!==h*12){_fogB=document.createElement('canvas');_fogB.width=w*12;_fogB.height=h*12;_fogDirty=true}
-  if(_fogDirty){const bx=_fogB.getContext('2d');bx.clearRect(0,0,_fogB.width,_fogB.height);bx.imageSmoothingEnabled=true;bx.filter='blur(7px)';bx.drawImage(_fogC,-6,-6,_fogB.width+12,_fogB.height+12);bx.filter='none';_fogDirty=false}
-  c.drawImage(_fogB,x0*TILE-cx,y0*TILE-cy,w*TILE,h*TILE);c.restore();
+  const w=x1-x0+1,h=y1-y0+1,R=8,m=G.map,fog=G.players[0].fog;
+  const unk=new Uint8Array(w*h);
+  for(let j=0;j<h;j++)for(let i=0;i<w;i++){const x=x0+i,y=y0+j;unk[j*w+i]=(x>=m.w||y>=m.h)?1:(isVis(x,y)||fog[y*m.w+x])?0:1}
+  let same=_fogM&&_fogM.length===unk.length&&_fogMk===x0+','+y0+','+w;if(same)for(let q=0;q<unk.length;q++)if(unk[q]!==_fogM[q]){same=false;break}
+  if(!same||!_fogC||_fogC.width!==w*R||_fogC.height!==h*R){
+    _fogM=unk;_fogMk=x0+','+y0+','+w;if(!_fogC||_fogC.width!==w*R||_fogC.height!==h*R){_fogC=document.createElement('canvas');_fogC.width=w*R;_fogC.height=h*R}
+    const g=_fogC.getContext('2d'),W=w*R,H=h*R,img=g.createImageData(W,H),D=img.data,U=(i,j)=>unk[Math.max(0,Math.min(h-1,j))*w+Math.max(0,Math.min(w-1,i))];
+    for(let py=0;py<H;py++)for(let px=0;px<W;px++){
+      const fx=(px+.5)/R-.5,fy=(py+.5)/R-.5,i0=Math.floor(fx),j0=Math.floor(fy),u=fx-i0,v=fy-j0;
+      const val=(U(i0,j0)*(1-u)+U(i0+1,j0)*u)*(1-v)+(U(i0,j0+1)*(1-u)+U(i0+1,j0+1)*u)*v;
+      const n=hash2(x0*R+px,y0*R+py,77)-.5,o=(py*W+px)*4;
+      if(val+n*.42>.5){D[o+3]=255}}
+    g.putImageData(img,0,0)}
+  c.save();c.beginPath();c.rect(0,0,VPW,VPH);c.clip();c.imageSmoothingEnabled=false;
+  c.drawImage(_fogC,(x0*TILE-cx)*ZM,(y0*TILE-cy)*ZM,w*TILE*ZM,h*TILE*ZM);c.restore();
 }
 function drawHeroOnMap(h,hx,hy,t){
   const c=ctx,p=G.players[h.pid];const moving=h.moving;const fr=moving?Math.floor(t*9)%2:0;const sp=h.boat?shipHeroSprite(p.col,fr):heroSprite(p.col,fr);
@@ -215,7 +217,7 @@ function updateMiniFog(){
   const m=G.map,fog=G.players[0].fog;let n=0;for(let i=0;i<fog.length;i+=7)n+=fog[i];const key=n;if(key===S.miniFogN&&S.miniT>0)return;S.miniFogN=key;
   const x=S.miniFog.getContext('2d'),img=x.createImageData(m.w,m.h);for(let i=0;i<m.w*m.h;i++){img.data[i*4]=4;img.data[i*4+1]=2;img.data[i*4+2]=10;img.data[i*4+3]=fog[i]?0:235}x.putImageData(img,0,0);S.miniT=1;
 }
-function switchLevel(){const m=G.map,off=m.lh+2;const cx=(S.cam.x+VPW/2)/TILE,cy=(S.cam.y+VPH/2)/TILE;camTo(cx,S.lvl?cy-off:cy+off,true)}
+function switchLevel(){const m=G.map,off=m.lh+2;const cx=(S.cam.x+VPW/ZM/2)/TILE,cy=(S.cam.y+VPH/ZM/2)/TILE;camTo(cx,S.lvl?cy-off:cy+off,true)}
 function drawMinimap(x,y,sz){
   const m=G.map,c=ctx,sc=sz/m.w,lvl=S.lvl||0,y0=lvl*(m.lh+2);updateMiniFog();
   panel(x-6,y-6,sz+12,sz+12,{plain:1,r:6,noshadow:1});
@@ -226,8 +228,8 @@ function drawMinimap(x,y,sz){
   c.drawImage(S.miniFog,0,y0,m.w,m.lh,x,y,sz,sz);
   for(const h of G.heroes){if(!h.alive||h.x<0||levelOf(m,h.y)!==lvl)continue;if(h.pid!==0&&!isVis(h.x,h.y))continue;c.fillStyle='#000';c.fillRect(x+h.x*sc-3,y+(h.y-y0)*sc-3,6,6);c.fillStyle=G.players[h.pid].col;c.fillRect(x+h.x*sc-2,y+(h.y-y0)*sc-2,4,4)}
   {const vi=m.vic;if(vi&&vi.x!=null&&lvl===0&&(vi.t==='grail'||vi.t==='capital')){const g=vi.t==='grail',px=x+(vi.x+(g?((vi.x*31)%17-8):0))*sc,py=y+(vi.y+(g?((vi.y*17)%15-7):0)-y0)*sc;c.strokeStyle=`rgba(255,220,80,${.6+.4*Math.sin(S.t*4)})`;c.lineWidth=2;c.beginPath();c.arc(px,py,g?22:8,0,6.28);c.stroke()}}
-  c.strokeStyle='#fff';c.lineWidth=1.4;c.strokeRect(x+S.cam.x/TILE*sc,y+(S.cam.y/TILE-y0)*sc,VPW/TILE*sc,VPH/TILE*sc);c.restore();
-  const go=e=>{S.flyTo=null;S.cam.x=(e.x-x)/sc*TILE-VPW/2;S.cam.y=((e.y-y)/sc+y0)*TILE-VPH/2;clampCam()};
+  c.strokeStyle='#fff';c.lineWidth=1.4;c.strokeRect(x+S.cam.x/TILE*sc,y+(S.cam.y/TILE-y0)*sc,VPW/ZM/TILE*sc,VPH/ZM/TILE*sc);c.restore();
+  const go=e=>{S.flyTo=null;S.cam.x=(e.x-x)/sc*TILE-VPW/ZM/2;S.cam.y=((e.y-y)/sc+y0)*TILE-VPH/ZM/2;clampCam()};
   hit(x,y,sz,sz,go,{down:e=>{S.mmDrag=true;go(e)},cursor:'crosshair'});
   if(UI.down&&S.mmDrag&&hovered(x,y,sz,sz))go({x:UI.mx,y:UI.my});if(!UI.down)S.mmDrag=false;
   button(x+2,y+sz-24,90,22,'Objetivos',()=>openObjectives(),{size:11,tip:'Condición de victoria y misiones (tecla O)'});
@@ -236,7 +238,7 @@ function drawMinimap(x,y,sz){
 // ciudad seleccionada: aro, nombre y botones
 function drawTownSel(){
   const t=S.selTown;if(!t||t.dead||t.owner!==0||S.scr!=='adv'||S.fx){return}
-  const x=t.x*TILE-S.cam.x,y=t.y*TILE-S.cam.y,w=t.w*TILE,hh=t.h*TILE;
+  const x=(t.x*TILE-S.cam.x)*ZM,y=(t.y*TILE-S.cam.y)*ZM,w=t.w*TILE*ZM,hh=t.h*TILE*ZM;
   if(x<VPW&&y<VPH){ctx.save();ctx.beginPath();ctx.rect(0,0,VPW,VPH);ctx.clip();ctx.strokeStyle=`rgba(255,226,122,${.65+.3*Math.sin(S.t*6)})`;ctx.lineWidth=3;ctx.setLineDash([10,6]);ctx.lineDashOffset=-S.t*20;ctx.strokeRect(x-6,y-6,w+12,hh+12);ctx.restore()}
   const bx=VPW/2-250,by=VPH-62;rrect(ctx,bx,by,500,52,10,'rgba(16,10,22,.88)','#c8a24a',1.6);
   text(t.name,bx+14,by+22,{size:15,bold:true,color:'#ffe9a0'});text(`${FDEF[t.fi].name} · guarnición ${t.gar.filter(s=>s&&s.n>0).length}/7`,bx+14,by+40,{size:12,color:'#d8c8a0'});
@@ -383,11 +385,11 @@ function advUpdate(dt){
   if(S.flyTo){const k=1-Math.pow(.0009,dt);S.cam.x+=(S.flyTo.x-S.cam.x)*k;S.cam.y+=(S.flyTo.y-S.cam.y)*k;if(Math.abs(S.flyTo.x-S.cam.x)<1&&Math.abs(S.flyTo.y-S.cam.y)<1)S.flyTo=null}
   clampCam();
   // ratón sobre el mapa
-  S.hov=null;if(UI.mx>=0&&UI.mx<VPW&&UI.my>=0&&UI.my<VPH&&!UI.modals.length){const tx=Math.floor((UI.mx+S.cam.x)/TILE),ty=Math.floor((UI.my+S.cam.y)/TILE);
+  S.hov=null;if(UI.mx>=0&&UI.mx<VPW&&UI.my>=0&&UI.my<VPH&&!UI.modals.length){const tx=Math.floor((UI.mx/ZM+S.cam.x)/TILE),ty=Math.floor((UI.my/ZM+S.cam.y)/TILE);
     if(tx>=0&&ty>=0&&tx<G.map.w&&ty<G.map.h){const fp=G.map.fp[ty*G.map.w+tx];S.hov={tx,ty,o:fp?G.map.objs[fp-1]:null};if(S.hov.o&&S.hov.o.dead)S.hov.o=null}}
   // animación de paso
   if(S.anim){const a=S.anim;a.t+=dt;const k=Math.min(1,a.t/a.dur);const e=k;a.h.ax=a.fx+(a.tx-a.fx)*e;a.h.ay=a.fy+(a.ty-a.fy)*e;
-    if(S.mov&&S.mov.h===a.h){S.flyTo=null;const ax=a.h.ax*TILE+TILE/2-VPW/2,ay=a.h.ay*TILE+TILE/2-VPH/2;S.cam.x+=(ax-S.cam.x)*Math.min(1,dt*7);S.cam.y+=(ay-S.cam.y)*Math.min(1,dt*7)}
+    if(S.mov&&S.mov.h===a.h){S.flyTo=null;const ax=a.h.ax*TILE+TILE/2-VPW/ZM/2,ay=a.h.ay*TILE+TILE/2-VPH/ZM/2;S.cam.x+=(ax-S.cam.x)*Math.min(1,dt*7);S.cam.y+=(ay-S.cam.y)*Math.min(1,dt*7)}
     if(k>=1){a.h.ax=null;a.h.ay=null;const cb=a.next;S.anim=null;a.h.moving=!!S.mov;const L=S.later;S.later=[];for(const f of L)f();if(cb)cb()}}
   // ejecución del movimiento
   if(S.mov&&!S.anim&&!S.mov.wait)advStep();
@@ -429,7 +431,7 @@ function startMove(h){
   if(!h.path||!h.path.length)return;h.sleep=false;S.mov={h,wait:false,cont:true};h.moving=true;
 }
 function advClick(c){
-  const tx=Math.floor((c.x+S.cam.x)/TILE),ty=Math.floor((c.y+S.cam.y)/TILE),m=G.map;if(tx<0||ty<0||tx>=m.w||ty>=m.h)return;
+  const tx=Math.floor((c.x/ZM+S.cam.x)/TILE),ty=Math.floor((c.y/ZM+S.cam.y)/TILE),m=G.map;if(tx<0||ty<0||tx>=m.w||ty>=m.h)return;
   const vis=isVis(tx,ty),expl=isExpl(tx,ty)||vis;
   const fp=m.fp[ty*m.w+tx];let o=fp?m.objs[fp-1]:null;if(o&&o.dead)o=null;
   const h=selHero();
@@ -507,11 +509,11 @@ function drawFxOverlay(){
   const f=S.fx;if(!f)return;const c=ctx;const k=Math.min(1,f.t/f.dur);
   if(f.type==='enter'){
     // iris de cierre sobre la puerta
-    const sx=f.gx-S.cam.x,sy=f.gy-S.cam.y;const r=Math.max(0,(1-easeIn(Math.max(0,(k-.35)/.65)))*Math.hypot(VPW,VPH));
+    const sx=(f.gx-S.cam.x)*ZM,sy=(f.gy-S.cam.y)*ZM;const r=Math.max(0,(1-easeIn(Math.max(0,(k-.35)/.65)))*Math.hypot(VPW,VPH));
     c.save();c.beginPath();c.rect(0,0,VW,VH);c.arc(sx,sy,r,0,6.2832,true);c.fillStyle='#000';c.fill('evenodd');c.restore();
     // luz cálida de la puerta
     c.save();c.globalCompositeOperation='lighter';c.fillStyle=rg(c,sx,sy-10,2,70,[`rgba(255,200,120,${.5*k})`,'rgba(255,200,120,0)']);c.fillRect(sx-80,sy-90,160,160);c.restore()}
-  else{const sx=f.gx-S.cam.x,sy=f.gy-S.cam.y;const r=Math.min(1,k*1.4)*Math.hypot(VPW,VPH);c.save();c.beginPath();c.rect(0,0,VW,VH);c.arc(sx,sy,r,0,6.2832,true);c.fillStyle='#000';c.fill('evenodd');c.restore()}
+  else{const sx=(f.gx-S.cam.x)*ZM,sy=(f.gy-S.cam.y)*ZM;const r=Math.min(1,k*1.4)*Math.hypot(VPW,VPH);c.save();c.beginPath();c.rect(0,0,VW,VH);c.arc(sx,sy,r,0,6.2832,true);c.fillStyle='#000';c.fill('evenodd');c.restore()}
 }
 
 // cursor del mapa: silueta de caballo donde el héroe puede ir; flecha amarilla donde no
@@ -550,7 +552,7 @@ function drawHoverCursor(c){
     else{const k=TILE*.9/100,x=hv.tx*TILE+TILE*.05,y=hv.ty*TILE+TILE*.05;c.save();c.translate(x,y);c.scale(k,k);if(hv.o){const w=-.5-.07*Math.sin(UI.t*7);c.translate(22,90);c.rotate(w);c.translate(-22,-90)}c.shadowColor='rgba(0,0,0,.5)';c.shadowBlur=4;c.fillStyle='rgba(255,226,110,.92)';c.fill(horsePath());c.shadowBlur=0;c.strokeStyle='#3a2a08';c.lineWidth=2.6;c.stroke(horsePath());c.restore()}
     if(!S.mov&&!S.ai&&S.hovFull===false){const bx=hv.tx*TILE+TILE-9,by=hv.ty*TILE+TILE-9;c.save();c.translate(bx,by);c.fillStyle='#c83a30';c.strokeStyle='#fff';c.lineWidth=1.6;c.beginPath();c.arc(0,0,9,0,6.29);c.fill();c.stroke();c.lineWidth=2.6;c.lineCap='round';c.beginPath();c.moveTo(-4,-4);c.lineTo(4,4);c.moveTo(4,-4);c.lineTo(-4,4);c.stroke();c.restore()}
     return}
-  UI.cursor='none';const ax=UI.mx+S.cam.x,ay=UI.my+S.cam.y;c.save();c.translate(ax,ay);c.fillStyle='#ffe27a';c.strokeStyle='#3a2a08';c.lineWidth=1.8;c.beginPath();c.moveTo(0,0);c.lineTo(0,19);c.lineTo(5,14.5);c.lineTo(9,23);c.lineTo(12.5,21.5);c.lineTo(8.5,13);c.lineTo(15,13);c.closePath();c.fill();c.stroke();c.restore();
+  UI.cursor='none';const ax=UI.mx/ZM+S.cam.x,ay=UI.my/ZM+S.cam.y;c.save();c.translate(ax,ay);c.fillStyle='#ffe27a';c.strokeStyle='#3a2a08';c.lineWidth=1.8;c.beginPath();c.moveTo(0,0);c.lineTo(0,19);c.lineTo(5,14.5);c.lineTo(9,23);c.lineTo(12.5,21.5);c.lineTo(8.5,13);c.lineTo(15,13);c.closePath();c.fill();c.stroke();c.restore();
 }
 
 // espadas cruzadas: el clic inicia un combate
